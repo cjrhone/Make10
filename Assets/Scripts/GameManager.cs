@@ -3,30 +3,31 @@ using System;
 
 /// <summary>
 /// Manages game state: scoring, motivation meter, win/lose conditions.
+/// NEW SCORING SYSTEM:
+/// - 10 pts per solve (base)
+/// - Solve #2 activates multiplier bar (x1.25 displayed, 5 sec timer)
+/// - Solve #3+ awards (10 × multiplier) + seconds remaining as bonus
+/// - Each solve resets timer to 5 sec and increases multiplier by 0.25
+/// - Bar hitting 0 hides panel and resets streak
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
     
     [Header("Game Settings")]
-    [SerializeField] private int winScore = 200;
+    [SerializeField] private int winScore = 250;
     [SerializeField] private float startingMotivation = 100f;
-    [SerializeField] private float motivationDrainRate = 1f; // per second while idle
-    [SerializeField] private float motivationMatchReward = 15f; // restored per match
+    [SerializeField] private float motivationDrainRate = 1f;
+    [SerializeField] private float motivationMatchReward = 15f;
     
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
     
-    [Header("Speed Bonus Thresholds (seconds)")]
-    [SerializeField] private float hotStreakTime = 2f;   // x3 multiplier
-    [SerializeField] private float quickTime = 5f;       // x2 multiplier
-    [SerializeField] private float normalTime = 10f;     // x1.5 multiplier
-    
-    [Header("Cascade Multipliers")]
-    [SerializeField] private float cascade1 = 1.0f;
-    [SerializeField] private float cascade2 = 1.5f;
-    [SerializeField] private float cascade3 = 2.0f;
-    [SerializeField] private float cascade4Plus = 2.5f;
+    [Header("Multiplier Settings")]
+    [SerializeField] private float multiplierDuration = 5f; // seconds
+    [SerializeField] private float multiplierDrainRate = 1f; // per second
+    [SerializeField] private float multiplierIncrement = 0.25f; // how much multiplier increases per solve
+    [SerializeField] private float startingMultiplier = 1.25f; // first multiplier value when activated
     
     [Header("References")]
     [SerializeField] private UIManager uiManager;
@@ -35,23 +36,29 @@ public class GameManager : MonoBehaviour
     public int Score { get; private set; }
     public float Motivation { get; private set; }
     public bool IsGameActive { get; private set; }
-    public bool IsProcessing { get; set; } // Set by GridManager during cascades
+    public bool IsProcessing { get; set; }
     
-    // Timing
-    private float timeSinceLastMatch;
-    private float lastSpeedMultiplier = 1f;
-    private int currentCascadeDepth = 0;
+    // Multiplier state
+    private int solveCount = 0;
+    private float currentMultiplier = 1f;
+    private float multiplierTimer = 0f;
+    private bool multiplierActive = false;
+    
+    // Public accessors for UI
+    public bool IsMultiplierActive => multiplierActive;
+    public float CurrentMultiplier => currentMultiplier;
+    public float MultiplierTimer => multiplierTimer;
+    public float MultiplierDuration => multiplierDuration;
     
     // Events for UI updates
     public event Action<int, int> OnScoreChanged; // current, delta
     public event Action<float> OnMotivationChanged;
-    public event Action<float, float> OnMultiplierApplied; // speed mult, cascade mult
+    public event Action<bool, float, float> OnMultiplierChanged; // active, multiplier (float), timer
     public event Action OnGameWon;
     public event Action OnGameLost;
     
     private void Awake()
     {
-        // Singleton pattern
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -69,13 +76,16 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         
-        // Track time since last match
-        timeSinceLastMatch += Time.deltaTime;
-        
-        // Drain motivation while not processing (idle)
+        // Drain motivation while not processing
         if (!IsProcessing)
         {
             DrainMotivation(Time.deltaTime);
+        }
+        
+        // Drain multiplier timer if active
+        if (multiplierActive)
+        {
+            DrainMultiplierTimer(Time.deltaTime);
         }
     }
     
@@ -88,11 +98,16 @@ public class GameManager : MonoBehaviour
         Motivation = startingMotivation;
         IsGameActive = true;
         IsProcessing = false;
-        timeSinceLastMatch = 0f;
-        currentCascadeDepth = 0;
+        
+        // Reset multiplier state
+        solveCount = 0;
+        currentMultiplier = 1f;
+        multiplierTimer = 0f;
+        multiplierActive = false;
         
         OnScoreChanged?.Invoke(Score, 0);
         OnMotivationChanged?.Invoke(Motivation);
+        OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
         Debug.Log("Game started!");
     }
@@ -103,10 +118,6 @@ public class GameManager : MonoBehaviour
     public void OnCascadeStart()
     {
         IsProcessing = true;
-        currentCascadeDepth = 0;
-        
-        // Calculate speed multiplier based on time since last match
-        lastSpeedMultiplier = CalculateSpeedMultiplier();
     }
     
     /// <summary>
@@ -115,8 +126,6 @@ public class GameManager : MonoBehaviour
     public void OnCascadeEnd()
     {
         IsProcessing = false;
-        timeSinceLastMatch = 0f; // Reset timer after cascade completes
-        currentCascadeDepth = 0;
     }
     
     /// <summary>
@@ -126,30 +135,63 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         
-        currentCascadeDepth++;
-        
-        // Calculate multipliers
-        float speedMult = lastSpeedMultiplier;
-        float cascadeMult = GetCascadeMultiplier(currentCascadeDepth);
-        
-        // Calculate score
         int linesCleared = rowsMatched + columnsMatched;
-        int rawScore = baseMatchScore * linesCleared;
-        int finalScore = Mathf.RoundToInt(rawScore * speedMult * cascadeMult);
+        
+        // Process each line as a separate solve
+        for (int i = 0; i < linesCleared; i++)
+        {
+            ProcessSingleSolve();
+        }
+    }
+    
+    /// <summary>
+    /// Process a single "Make 10" solve.
+    /// </summary>
+    private void ProcessSingleSolve()
+    {
+        solveCount++;
+        
+        int pointsAwarded = 0;
+        int bonusSeconds = 0;
+        
+        if (solveCount == 1)
+        {
+            // First solve: base points only
+            pointsAwarded = baseMatchScore;
+            Debug.Log($"<color=green>Solve #1:</color> +{pointsAwarded} pts (base)");
+        }
+        else if (solveCount == 2)
+        {
+            // Second solve: base points, ACTIVATE multiplier bar
+            pointsAwarded = baseMatchScore;
+            ActivateMultiplierBar();
+            Debug.Log($"<color=green>Solve #2:</color> +{pointsAwarded} pts | <color=yellow>MULTIPLIER ACTIVATED (x{currentMultiplier:F2} ready)</color>");
+        }
+        else
+        {
+            // Third+ solve: multiplied points + bonus seconds
+            bonusSeconds = Mathf.FloorToInt(multiplierTimer);
+            int multipliedScore = Mathf.RoundToInt(baseMatchScore * currentMultiplier);
+            pointsAwarded = multipliedScore + bonusSeconds;
+            
+            Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
+            
+            // Increase multiplier for next solve
+            currentMultiplier += multiplierIncrement;
+            
+            // Reset timer
+            multiplierTimer = multiplierDuration;
+            
+            // Notify UI of multiplier change
+            OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
+        }
         
         // Add score
-        Score += finalScore;
+        Score += pointsAwarded;
+        OnScoreChanged?.Invoke(Score, pointsAwarded);
         
         // Restore motivation
-        RestoreMotivation(motivationMatchReward * cascadeMult);
-        
-        // Fire events
-        OnScoreChanged?.Invoke(Score, finalScore);
-        OnMultiplierApplied?.Invoke(speedMult, cascadeMult);
-        
-        Debug.Log($"<color=green>+{finalScore} pts</color> " +
-                 $"(base:{rawScore} × speed:{speedMult:F1} × cascade:{cascadeMult:F1}) " +
-                 $"| Total: {Score}/{winScore}");
+        RestoreMotivation(motivationMatchReward);
         
         // Check win condition
         if (Score >= winScore)
@@ -159,39 +201,46 @@ public class GameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Calculate speed multiplier based on time since last match.
+    /// Activate the multiplier bar (on solve #2).
     /// </summary>
-    private float CalculateSpeedMultiplier()
+    private void ActivateMultiplierBar()
     {
-        if (timeSinceLastMatch < hotStreakTime)
-        {
-            Debug.Log("<color=orange>HOT STREAK! ×3</color>");
-            return 3f;
-        }
-        else if (timeSinceLastMatch < quickTime)
-        {
-            Debug.Log("<color=yellow>Quick! ×2</color>");
-            return 2f;
-        }
-        else if (timeSinceLastMatch < normalTime)
-        {
-            return 1.5f;
-        }
-        return 1f;
+        multiplierActive = true;
+        multiplierTimer = multiplierDuration;
+        currentMultiplier = startingMultiplier; // x1.25 ready for next solve
+        
+        OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
     }
     
     /// <summary>
-    /// Get cascade multiplier based on chain depth.
+    /// Drain the multiplier timer.
     /// </summary>
-    private float GetCascadeMultiplier(int depth)
+    private void DrainMultiplierTimer(float deltaTime)
     {
-        switch (depth)
+        multiplierTimer -= multiplierDrainRate * deltaTime;
+        
+        // Notify UI every frame for smooth bar update
+        OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
+        
+        if (multiplierTimer <= 0f)
         {
-            case 1: return cascade1;
-            case 2: return cascade2;
-            case 3: return cascade3;
-            default: return cascade4Plus;
+            DeactivateMultiplierBar();
         }
+    }
+    
+    /// <summary>
+    /// Deactivate multiplier bar (timer expired).
+    /// </summary>
+    private void DeactivateMultiplierBar()
+    {
+        multiplierActive = false;
+        multiplierTimer = 0f;
+        currentMultiplier = 1f;
+        solveCount = 0; // Reset streak
+        
+        OnMultiplierChanged?.Invoke(false, 1f, 0f);
+        
+        Debug.Log("<color=red>Multiplier expired!</color> Streak reset.");
     }
     
     /// <summary>
@@ -247,6 +296,5 @@ public class GameManager : MonoBehaviour
     public void OnPlayerSwap()
     {
         // Could add small motivation boost for activity
-        // RestoreMotivation(1f);
     }
 }

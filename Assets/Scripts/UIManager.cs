@@ -4,7 +4,7 @@ using TMPro;
 using System.Collections;
 
 /// <summary>
-/// Handles all UI updates: score display, motivation bar, multiplier popups, game over screens.
+/// Handles all UI updates: score display, motivation bar, multiplier bar, game over screens.
 /// </summary>
 public class UIManager : MonoBehaviour
 {
@@ -15,19 +15,31 @@ public class UIManager : MonoBehaviour
     [Header("Motivation Bar")]
     [SerializeField] private Slider motivationSlider;
     [SerializeField] private Image motivationFillImage;
-    [SerializeField] private TMP_Text motivationText; // Optional: show percentage
+    [SerializeField] private TMP_Text motivationText;
     
     [Header("Motivation Bar Colors")]
-    [SerializeField] private Color healthyColor = new Color(0.3f, 0.8f, 0.3f);    // Green
-    [SerializeField] private Color warningColor = new Color(0.9f, 0.7f, 0.2f);    // Yellow
-    [SerializeField] private Color dangerColor = new Color(0.9f, 0.2f, 0.2f);     // Red
+    [SerializeField] private Color healthyColor = new Color(0.3f, 0.8f, 0.3f);
+    [SerializeField] private Color warningColor = new Color(0.9f, 0.7f, 0.2f);
+    [SerializeField] private Color dangerColor = new Color(0.9f, 0.2f, 0.2f);
     [SerializeField] private float warningThreshold = 50f;
     [SerializeField] private float dangerThreshold = 25f;
     
-    [Header("Multiplier Popup")]
-    [SerializeField] private GameObject multiplierPopup;
-    [SerializeField] private TMP_Text multiplierText;
-    [SerializeField] private float popupDuration = 1f;
+    [Header("Multiplier Bar (NEW)")]
+    [SerializeField] private GameObject multiplierPanel;
+    [SerializeField] private Slider multiplierSlider;
+    [SerializeField] private TMP_Text multiplierValueText; // Shows "x2", "x3", etc.
+    [SerializeField] private TMP_Text multiplierTimerText; // Shows seconds remaining
+    [SerializeField] private Image multiplierFillImage;
+    
+    [Header("Multiplier Bar Colors")]
+    [SerializeField] private Color multiplierFullColor = new Color(1f, 0.8f, 0.2f);   // Gold
+    [SerializeField] private Color multiplierLowColor = new Color(1f, 0.3f, 0.2f);    // Red-orange
+    [SerializeField] private float multiplierLowThreshold = 2f; // seconds
+    
+    [Header("Multiplier Pulse Settings")]
+    [SerializeField] private float pulseMinScale = 1.0f;
+    [SerializeField] private float pulseMaxScale = 1.3f;
+    [SerializeField] private float pulseSpeed = 4f;
     
     [Header("Score Popup")]
     [SerializeField] private GameObject scorePopupPrefab;
@@ -42,52 +54,47 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     
     private Coroutine motivationPulseCoroutine;
-    private Coroutine multiplierPopupCoroutine;
+    private Coroutine multiplierPulseCoroutine;
     
     private void Start()
-{
-    StartCoroutine(InitializeAfterDelay());
-}
-
-private IEnumerator InitializeAfterDelay()
-{
-    // Wait one frame to ensure GameManager.Instance is set
-    yield return null;
-    
-    // Auto-find GameManager if not assigned
-    if (gameManager == null)
     {
-        gameManager = GameManager.Instance;
+        StartCoroutine(InitializeAfterDelay());
     }
     
-    if (gameManager == null)
+    private IEnumerator InitializeAfterDelay()
     {
-        Debug.LogError("UIManager: Could not find GameManager!");
-        yield break;
-    }
-    
-    // Subscribe to events
-    gameManager.OnScoreChanged += HandleScoreChanged;
-    gameManager.OnMotivationChanged += HandleMotivationChanged;
-    gameManager.OnMultiplierApplied += HandleMultiplierApplied;
-    gameManager.OnGameWon += HandleGameWon;
-    gameManager.OnGameLost += HandleGameLost;
-    
-    // Initialize UI
-    InitializeUI();
-    
-    Debug.Log("UIManager initialized successfully!");
-    
+        yield return null;
+        
+        if (gameManager == null)
+        {
+            gameManager = GameManager.Instance;
+        }
+        
+        if (gameManager == null)
+        {
+            Debug.LogError("UIManager: Could not find GameManager!");
+            yield break;
+        }
+        
+        // Subscribe to events
+        gameManager.OnScoreChanged += HandleScoreChanged;
+        gameManager.OnMotivationChanged += HandleMotivationChanged;
+        gameManager.OnMultiplierChanged += HandleMultiplierChanged;
+        gameManager.OnGameWon += HandleGameWon;
+        gameManager.OnGameLost += HandleGameLost;
+        
+        InitializeUI();
+        
+        Debug.Log("UIManager initialized successfully!");
     }
     
     private void OnDestroy()
     {
-        // Unsubscribe from events
         if (gameManager != null)
         {
             gameManager.OnScoreChanged -= HandleScoreChanged;
             gameManager.OnMotivationChanged -= HandleMotivationChanged;
-            gameManager.OnMultiplierApplied -= HandleMultiplierApplied;
+            gameManager.OnMultiplierChanged -= HandleMultiplierChanged;
             gameManager.OnGameWon -= HandleGameWon;
             gameManager.OnGameLost -= HandleGameLost;
         }
@@ -101,12 +108,14 @@ private IEnumerator InitializeAfterDelay()
         // Hide game over screens
         if (winScreen != null) winScreen.SetActive(false);
         if (loseScreen != null) loseScreen.SetActive(false);
-        if (multiplierPopup != null) multiplierPopup.SetActive(false);
+        
+        // Hide multiplier panel initially
+        if (multiplierPanel != null) multiplierPanel.SetActive(false);
         
         // Set target score text
         if (targetScoreText != null)
         {
-            targetScoreText.text = "/ 200";
+            targetScoreText.text = "/ 250";
         }
         
         // Initialize motivation bar
@@ -114,6 +123,13 @@ private IEnumerator InitializeAfterDelay()
         {
             motivationSlider.maxValue = 100f;
             motivationSlider.value = 100f;
+        }
+        
+        // Initialize multiplier bar
+        if (multiplierSlider != null)
+        {
+            multiplierSlider.maxValue = 5f;
+            multiplierSlider.value = 5f;
         }
         
         UpdateScoreDisplay(0);
@@ -142,15 +158,11 @@ private IEnumerator InitializeAfterDelay()
     }
     
     /// <summary>
-    /// Handle multiplier display.
+    /// Handle multiplier bar state changes.
     /// </summary>
-    private void HandleMultiplierApplied(float speedMult, float cascadeMult)
+    private void HandleMultiplierChanged(bool active, float multiplier, float timer)
     {
-        // Only show popup for notable multipliers
-        if (speedMult > 1f || cascadeMult > 1f)
-        {
-            ShowMultiplierPopup(speedMult, cascadeMult);
-        }
+        UpdateMultiplierBar(active, multiplier, timer);
     }
     
     /// <summary>
@@ -161,8 +173,6 @@ private IEnumerator InitializeAfterDelay()
         if (scoreText != null)
         {
             scoreText.text = score.ToString();
-            
-            // Punch effect on score change
             StartCoroutine(PunchScale(scoreText.transform, 1.2f, 0.15f));
         }
     }
@@ -182,7 +192,6 @@ private IEnumerator InitializeAfterDelay()
             motivationText.text = $"{Mathf.RoundToInt(motivation)}%";
         }
         
-        // Update bar color based on level
         if (motivationFillImage != null)
         {
             if (motivation <= dangerThreshold)
@@ -200,6 +209,118 @@ private IEnumerator InitializeAfterDelay()
                 motivationFillImage.color = healthyColor;
                 StopDangerPulse();
             }
+        }
+    }
+    
+    /// <summary>
+    /// Update the multiplier bar display.
+    /// </summary>
+    private void UpdateMultiplierBar(bool active, float multiplier, float timer)
+    {
+        if (multiplierPanel == null) return;
+        
+        if (active)
+        {
+            // Show panel
+            if (!multiplierPanel.activeSelf)
+            {
+                multiplierPanel.SetActive(true);
+                StartMultiplierPulse();
+                
+                // Animate panel appearing
+                StartCoroutine(PunchScale(multiplierPanel.transform, 1.15f, 0.2f));
+            }
+            
+            // Update slider
+            if (multiplierSlider != null)
+            {
+                multiplierSlider.value = timer;
+            }
+            
+            // Update multiplier text
+            if (multiplierValueText != null)
+            {
+                multiplierValueText.text = $"x{multiplier:F2}";
+            }
+            
+            // Update timer countdown text
+            if (multiplierTimerText != null)
+            {
+                multiplierTimerText.text = $"{timer:F1}s";
+            }
+            
+            // Update bar color based on time remaining
+            if (multiplierFillImage != null)
+            {
+                if (timer <= multiplierLowThreshold)
+                {
+                    multiplierFillImage.color = Color.Lerp(multiplierLowColor, multiplierFullColor, timer / multiplierLowThreshold);
+                }
+                else
+                {
+                    multiplierFillImage.color = multiplierFullColor;
+                }
+            }
+        }
+        else
+        {
+            // Hide panel
+            if (multiplierPanel.activeSelf)
+            {
+                StopMultiplierPulse();
+                multiplierPanel.SetActive(false);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Start pulsing the multiplier text with energy.
+    /// </summary>
+    private void StartMultiplierPulse()
+    {
+        if (multiplierPulseCoroutine == null && multiplierValueText != null)
+        {
+            multiplierPulseCoroutine = StartCoroutine(MultiplierPulseCoroutine());
+        }
+    }
+    
+    /// <summary>
+    /// Stop the multiplier pulse.
+    /// </summary>
+    private void StopMultiplierPulse()
+    {
+        if (multiplierPulseCoroutine != null)
+        {
+            StopCoroutine(multiplierPulseCoroutine);
+            multiplierPulseCoroutine = null;
+            
+            if (multiplierValueText != null)
+            {
+                multiplierValueText.transform.localScale = Vector3.one;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Energetic pulse animation for multiplier text.
+    /// </summary>
+    private IEnumerator MultiplierPulseCoroutine()
+    {
+        while (true)
+        {
+            if (multiplierValueText != null)
+            {
+                // Smooth sine wave pulse
+                float t = (Mathf.Sin(Time.time * pulseSpeed) + 1f) / 2f;
+                float scale = Mathf.Lerp(pulseMinScale, pulseMaxScale, t);
+                multiplierValueText.transform.localScale = Vector3.one * scale;
+                
+                // Optional: slight color intensity pulse
+                Color baseColor = Color.white;
+                Color brightColor = new Color(1f, 1f, 0.7f); // Slight yellow glow
+                multiplierValueText.color = Color.Lerp(baseColor, brightColor, t);
+            }
+            yield return null;
         }
     }
     
@@ -224,7 +345,6 @@ private IEnumerator InitializeAfterDelay()
             StopCoroutine(motivationPulseCoroutine);
             motivationPulseCoroutine = null;
             
-            // Reset scale
             if (motivationSlider != null)
             {
                 motivationSlider.transform.localScale = Vector3.one;
@@ -239,92 +359,14 @@ private IEnumerator InitializeAfterDelay()
     {
         while (true)
         {
-            // Pulse scale
             if (motivationSlider != null)
             {
-                float t = (Mathf.Sin(Time.time * 8f) + 1f) / 2f; // 0 to 1 oscillation
+                float t = (Mathf.Sin(Time.time * 8f) + 1f) / 2f;
                 float scale = Mathf.Lerp(1f, 1.05f, t);
                 motivationSlider.transform.localScale = Vector3.one * scale;
             }
             yield return null;
         }
-    }
-    
-    /// <summary>
-    /// Show multiplier popup.
-    /// </summary>
-    private void ShowMultiplierPopup(float speedMult, float cascadeMult)
-    {
-        if (multiplierPopup == null || multiplierText == null) return;
-        
-        // Build multiplier string
-        string text = "";
-        
-        if (speedMult >= 3f)
-        {
-            text = "HOT STREAK!\n×3";
-        }
-        else if (speedMult >= 2f)
-        {
-            text = "QUICK!\n×2";
-        }
-        else if (cascadeMult > 1f)
-        {
-            text = $"CHAIN ×{cascadeMult:F1}";
-        }
-        else
-        {
-            return; // Nothing notable to show
-        }
-        
-        multiplierText.text = text;
-        
-        if (multiplierPopupCoroutine != null)
-        {
-            StopCoroutine(multiplierPopupCoroutine);
-        }
-        multiplierPopupCoroutine = StartCoroutine(ShowPopupCoroutine(multiplierPopup, popupDuration));
-    }
-    
-    /// <summary>
-    /// Show a popup for a duration then hide it.
-    /// </summary>
-    private IEnumerator ShowPopupCoroutine(GameObject popup, float duration)
-    {
-        popup.SetActive(true);
-        
-        // Scale in
-        popup.transform.localScale = Vector3.zero;
-        float elapsed = 0f;
-        float scaleInTime = 0.15f;
-        
-        while (elapsed < scaleInTime)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / scaleInTime;
-            float scale = Mathf.Lerp(0f, 1.1f, t);
-            popup.transform.localScale = Vector3.one * scale;
-            yield return null;
-        }
-        
-        popup.transform.localScale = Vector3.one;
-        
-        yield return new WaitForSeconds(duration);
-        
-        // Scale out
-        elapsed = 0f;
-        float scaleOutTime = 0.1f;
-        
-        while (elapsed < scaleOutTime)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / scaleOutTime;
-            float scale = Mathf.Lerp(1f, 0f, t);
-            popup.transform.localScale = Vector3.one * scale;
-            yield return null;
-        }
-        
-        popup.SetActive(false);
     }
     
     /// <summary>
@@ -383,7 +425,6 @@ private IEnumerator InitializeAfterDelay()
         float elapsed = 0f;
         float halfDuration = duration / 2f;
         
-        // Scale up
         while (elapsed < halfDuration)
         {
             elapsed += Time.deltaTime;
@@ -393,7 +434,6 @@ private IEnumerator InitializeAfterDelay()
             yield return null;
         }
         
-        // Scale down
         elapsed = 0f;
         while (elapsed < halfDuration)
         {
@@ -444,17 +484,14 @@ private IEnumerator InitializeAfterDelay()
     /// </summary>
     public void OnRestartButtonClicked()
     {
-        // Hide screens
         if (winScreen != null) winScreen.SetActive(false);
         if (loseScreen != null) loseScreen.SetActive(false);
         
-        // Restart game
         if (gameManager != null)
         {
             gameManager.StartNewGame();
         }
         
-        // Tell GridManager to reset (you'll need to implement this connection)
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         if (gridManager != null)
         {

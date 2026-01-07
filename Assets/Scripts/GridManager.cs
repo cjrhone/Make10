@@ -26,12 +26,12 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float postClearDelay = 0.1f; // pause after clearing before dropping
     
     [Header("Tile Value Weights (must sum to 1.0)")]
-    [SerializeField] private float weight0 = 0.12f; // 0 tiles
-    [SerializeField] private float weight1 = 0.28f; // 1 tiles
-    [SerializeField] private float weight2 = 0.28f; // 2 tiles
-    [SerializeField] private float weight3 = 0.17f; // 3 tiles
-    [SerializeField] private float weight4 = 0.10f; // 4 tiles
-    [SerializeField] private float weight5 = 0.05f; // 5 tiles
+    [SerializeField] private float weight0 = 0.08f; // 0 tiles - fewer wildcards
+    [SerializeField] private float weight1 = 0.22f; // 1 tiles - reduced
+    [SerializeField] private float weight2 = 0.22f; // 2 tiles - reduced
+    [SerializeField] private float weight3 = 0.25f; // 3 tiles - increased
+    [SerializeField] private float weight4 = 0.16f; // 4 tiles - increased
+    [SerializeField] private float weight5 = 0.07f; // 5 tiles - slightly more
 
     
     // The grid array
