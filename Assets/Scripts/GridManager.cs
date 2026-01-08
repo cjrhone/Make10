@@ -26,14 +26,20 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float tileSwapDuration = 0.15f;
     [SerializeField] private float unsolvableResetDelay = 1f; // delay before auto-reset
     
+    [Header("Solve Animation Settings")]
+    [SerializeField] private float solveConvergeDuration = 0.25f;
+    [SerializeField] private float solveShowTenDuration = 0.3f;
+    [SerializeField] private float convergeShrinkAmount = 0.7f; // 1.0 = no shrink, 0.3 = lots of shrink
+    [SerializeField] private GameObject tenTextPrefab; // Prefab for showing "10" text
+    
     [Header("Tile Value Weights (must sum to 1.0)")]
     [SerializeField] private float weight0 = 0.15f; // 0 tiles - wildcard
-    [SerializeField] private float weight1 = 0.22f; // 1 tiles - common
-    [SerializeField] private float weight2 = 0.20f; // 2 tiles
+    [SerializeField] private float weight1 = 0.26f; // 1 tiles - common
+    [SerializeField] private float weight2 = 0.24f; // 2 tiles
     [SerializeField] private float weight3 = 0.15f; // 3 tiles
     [SerializeField] private float weight4 = 0.12f; // 4 tiles
-    [SerializeField] private float weight5 = 0.08f; // 5 tiles
-    [SerializeField] private float weight6 = 0.08f; // 6 tiles - rare
+    [SerializeField] private float weight5 = 0.04f; // 5 tiles - rare
+    [SerializeField] private float weight6 = 0.04f; // 6 tiles - very rare
 
     
     // The grid array
@@ -405,8 +411,8 @@ public class GridManager : MonoBehaviour
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
                     $"{result.TotalMatchedTiles} tiles");
             
-            // 1. Flash matched tiles
-            yield return StartCoroutine(FlashMatchedTiles(result.allMatchedTiles));
+            // 1. Animate tiles converging and show "10"
+            yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));
             
             // 2. Clear matched tiles
             ClearMatchedTiles(result.allMatchedTiles);
@@ -562,55 +568,225 @@ public class GridManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Flash tiles before they disappear.
+    /// Solve animation: tiles converge to center and show "10".
+    /// Numbers brighten and fade as backgrounds disappear.
     /// </summary>
-    /// <summary>
-/// Balloon growth effect - tiles grow then pop.
-/// </summary>
-private IEnumerator FlashMatchedTiles(HashSet<Tile> tiles)
-{
-    float growDuration = 0.4f;
-    float maxScale = 1.4f;
-    
-    // Gradually grow (balloon filling)
-    float elapsed = 0f;
-    while (elapsed < growDuration)
+    private IEnumerator AnimateSolveSequence(HashSet<Tile> tiles, MatchResult result)
     {
-        elapsed += Time.deltaTime;
-        float t = elapsed / growDuration;
+        // Pause progress bars during animation
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.IsSolveAnimationPlaying = true;
+        }
         
-        // Ease out - fast at start, slows down (like air resistance)
-        float easedT = 1f - Mathf.Pow(1f - t, 3f);
-        float currentScale = Mathf.Lerp(1f, maxScale, easedT);
+        // Calculate center point based on whether it's a row or column match
+        Vector2 centerPos = CalculateMatchCenter(tiles, result);
         
-        // Also shift color toward bright yellow/white
-        Color currentColor = Color.Lerp(Color.white, new Color(1f, 1f, 0.7f), easedT);
+        // Store original positions and colors for animation
+        Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
+        Dictionary<Tile, Color> originalTextColors = new Dictionary<Tile, Color>();
         
         foreach (Tile tile in tiles)
         {
             if (tile != null)
             {
-                tile.transform.localScale = Vector3.one * currentScale;
-                tile.GetComponent<Image>().color = currentColor;
+                originalPositions[tile] = tile.GetRectTransform().anchoredPosition;
+                
+                // Store original text color
+                TMPro.TMP_Text numText = tile.GetComponentInChildren<TMPro.TMP_Text>();
+                if (numText != null)
+                {
+                    originalTextColors[tile] = numText.color;
+                }
             }
         }
-        yield return null;
-    }
-    
-    // Brief hold at max size
-    yield return new WaitForSeconds(0.1f);
-    
-    // Quick "pop" - rapid scale up then gone
-    foreach (Tile tile in tiles)
-    {
-        if (tile != null)
+        
+        // Phase 1: Converge tiles toward center
+        float elapsed = 0f;
+        while (elapsed < solveConvergeDuration)
         {
-            tile.transform.localScale = Vector3.one * 1.6f;
-            tile.GetComponent<Image>().color = Color.white;
+            elapsed += Time.deltaTime;
+            float t = elapsed / solveConvergeDuration;
+            
+            // Ease in-out for smooth converge
+            float easedT = t < 0.5f 
+                ? 2f * t * t 
+                : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
+            
+            foreach (Tile tile in tiles)
+            {
+                if (tile != null && originalPositions.ContainsKey(tile))
+                {
+                    RectTransform rt = tile.GetRectTransform();
+                    Vector2 startPos = originalPositions[tile];
+                    
+                    // Move toward center
+                    rt.anchoredPosition = Vector2.Lerp(startPos, centerPos, easedT);
+                    
+                    // Gentle shrink as they converge
+                    float scale = Mathf.Lerp(1f, convergeShrinkAmount, easedT);
+                    tile.transform.localScale = Vector3.one * scale;
+                    
+                    // Fade out tile background (show only numbers)
+                    Image img = tile.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        img.color = new Color(0.85f, 0.85f, 0.85f, 1f - easedT);
+                    }
+                    
+                    // Brighten number text then fade it out
+                    TMPro.TMP_Text numText = tile.GetComponentInChildren<TMPro.TMP_Text>();
+                    if (numText != null && originalTextColors.ContainsKey(tile))
+                    {
+                        Color originalColor = originalTextColors[tile];
+                        
+                        // Brighten toward white in first half, then fade alpha in second half
+                        Color brightenedColor = Color.Lerp(originalColor, Color.white, easedT);
+                        
+                        // Fade out alpha (start fading at 40% through animation)
+                        float fadeStart = 0.4f;
+                        float alphaT = Mathf.Clamp01((easedT - fadeStart) / (1f - fadeStart));
+                        float alpha = 1f - alphaT;
+                        
+                        numText.color = new Color(brightenedColor.r, brightenedColor.g, brightenedColor.b, alpha);
+                    }
+                }
+            }
+            yield return null;
+        }
+        
+        // Phase 2: Show "10" at center
+        yield return StartCoroutine(ShowTenEffect(centerPos));
+        
+        // Resume progress bars
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.IsSolveAnimationPlaying = false;
         }
     }
-    yield return new WaitForSeconds(0.05f);
-}
+    
+    /// <summary>
+    /// Calculate the center point of matched tiles.
+    /// </summary>
+    private Vector2 CalculateMatchCenter(HashSet<Tile> tiles, MatchResult result)
+    {
+        // If it's a row match, center is middle of that row
+        if (result.matchedRows.Count > 0)
+        {
+            int row = result.matchedRows[0];
+            int midX = gridWidth / 2;
+            return GridToWorldPosition(midX, row);
+        }
+        // If it's a column match, center is middle of that column
+        else if (result.matchedColumns.Count > 0)
+        {
+            int col = result.matchedColumns[0];
+            int midY = gridHeight / 2;
+            return GridToWorldPosition(col, midY);
+        }
+        
+        // Fallback: average position of all tiles
+        Vector2 sum = Vector2.zero;
+        int count = 0;
+        foreach (Tile tile in tiles)
+        {
+            if (tile != null)
+            {
+                sum += tile.GetRectTransform().anchoredPosition;
+                count++;
+            }
+        }
+        return count > 0 ? sum / count : Vector2.zero;
+    }
+    
+    /// <summary>
+    /// Show "10" text effect at the center.
+    /// </summary>
+    private IEnumerator ShowTenEffect(Vector2 position)
+    {
+        GameObject tenObj = null;
+        
+        // Create "10" text if we have a prefab, otherwise use a simple approach
+        if (tenTextPrefab != null)
+        {
+            tenObj = Instantiate(tenTextPrefab, gridContainer);
+            RectTransform rt = tenObj.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchoredPosition = position;
+            }
+        }
+        else
+        {
+            // Fallback: create a simple text object
+            tenObj = new GameObject("TenEffect");
+            tenObj.transform.SetParent(gridContainer, false);
+            
+            RectTransform rt = tenObj.AddComponent<RectTransform>();
+            rt.anchoredPosition = position;
+            rt.sizeDelta = new Vector2(200f, 100f);
+            
+            TMPro.TMP_Text text = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
+            text.text = "10";
+            text.fontSize = 72;
+            text.fontStyle = TMPro.FontStyles.Bold;
+            text.color = new Color(1f, 0.85f, 0.2f); // Golden color
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+        }
+        
+        // Animate the "10" - pop in, hold, fade out
+        if (tenObj != null)
+        {
+            RectTransform tenRT = tenObj.GetComponent<RectTransform>();
+            TMPro.TMP_Text tenText = tenObj.GetComponent<TMPro.TMP_Text>();
+            
+            // Pop in (snappy)
+            float popInDuration = 0.08f;
+            float elapsed = 0f;
+            while (elapsed < popInDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / popInDuration;
+                float scale = Mathf.Lerp(0f, 1.15f, t);
+                tenObj.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            
+            // Settle
+            tenObj.transform.localScale = Vector3.one;
+            
+            // Brief hold
+            yield return new WaitForSeconds(solveShowTenDuration * 0.4f);
+            
+            // Fade out and float up
+            float fadeOutDuration = solveShowTenDuration * 0.6f;
+            elapsed = 0f;
+            Vector2 startPos = tenRT.anchoredPosition;
+            Color startColor = tenText != null ? tenText.color : Color.white;
+            
+            while (elapsed < fadeOutDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / fadeOutDuration;
+                
+                // Float up
+                tenRT.anchoredPosition = startPos + new Vector2(0f, 30f * t);
+                
+                // Scale up slightly
+                tenObj.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.3f, t);
+                
+                // Fade out
+                if (tenText != null)
+                {
+                    tenText.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t);
+                }
+                
+                yield return null;
+            }
+            
+            Destroy(tenObj);
+        }
+    }
     
     /// <summary>
     /// Remove matched tiles from the grid.

@@ -41,6 +41,7 @@ public class GameManager : MonoBehaviour
     public float Motivation { get; private set; }
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
+    public bool IsSolveAnimationPlaying { get; set; } // Pause bars during solve animation
     
     // Multiplier state
     private int solveCount = 0;
@@ -81,6 +82,9 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         
+        // Don't drain anything during solve animations
+        if (IsSolveAnimationPlaying) return;
+        
         // Drain motivation while not processing
         if (!IsProcessing)
         {
@@ -115,6 +119,7 @@ public class GameManager : MonoBehaviour
         Motivation = startingMotivation;
         IsGameActive = true;
         IsProcessing = false;
+        IsSolveAnimationPlaying = false;
         
         // Reset multiplier state
         solveCount = 0;

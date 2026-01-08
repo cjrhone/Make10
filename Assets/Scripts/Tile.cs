@@ -52,28 +52,21 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private Vector2 swipeStartPos;
     private bool isSwiping = false;
     
-    // Tile background colors
+    // Tile background - uniform grey for all tiles
+    private static readonly Color TileBackgroundColor = new Color(0.85f, 0.85f, 0.85f); // Light grey
+    
+    // Number text colors - Color math philosophy:
+    // Primaries: 1 (Gold/Yellow), 2 (Blue), 4 (Red)
+    // Secondaries: 3 (Green = 1+2), 5 (Orange = 1+4), 6 (Purple = 2+4)
     private static readonly Color[] NumberColors = new Color[7]
     {
-        new Color(1f, 1f, 1f),           // 0 - White
-        new Color(1f, 0.6f, 0f),         // 1 - Orange
-        new Color(0.2f, 0.4f, 0.9f),     // 2 - Blue
-        new Color(0.2f, 0.75f, 0.3f),    // 3 - Green
-        new Color(0.9f, 0.2f, 0.2f),     // 4 - Red
-        new Color(0.4f, 0.1f, 0.5f),     // 5 - Dark Purple
-        new Color(0.1f, 0.1f, 0.1f)      // 6 - Black
-    };
-    
-    // Text colors - black for 0, white for all others
-    private static readonly Color[] TextColors = new Color[7]
-    {
-        new Color(0.1f, 0.1f, 0.1f),     // 0 - Black text on white
-        new Color(1f, 1f, 1f),           // 1 - White text
-        new Color(1f, 1f, 1f),           // 2 - White text
-        new Color(1f, 1f, 1f),           // 3 - White text
-        new Color(1f, 1f, 1f),           // 4 - White text
-        new Color(1f, 1f, 1f),           // 5 - White text
-        new Color(1f, 1f, 1f)            // 6 - White text
+        new Color(0.6f, 0.6f, 0.6f),     // 0 - Grey (neutral wildcard)
+        new Color(0.85f, 0.65f, 0.1f),   // 1 - Gold (primary)
+        new Color(0.15f, 0.4f, 0.9f),    // 2 - Blue (primary)
+        new Color(0.2f, 0.7f, 0.3f),     // 3 - Green (1+2: Gold+Blue)
+        new Color(0.9f, 0.2f, 0.2f),     // 4 - Red (primary)
+        new Color(0.95f, 0.5f, 0.1f),    // 5 - Orange (1+4: Gold+Red)
+        new Color(0.6f, 0.2f, 0.75f)     // 6 - Purple (2+4: Blue+Red)
     };
 
     private void Awake()
@@ -152,7 +145,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         if (numberText != null)
         {
             numberText.text = Value.ToString();
-            numberText.color = TextColors[Value];
+            numberText.color = NumberColors[Value]; // Colored numbers
             numberText.enabled = true;
             numberText.gameObject.SetActive(true);
         }
@@ -161,10 +154,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found!", this);
         }
         
-        // Set background color based on value
+        // Set uniform grey background for all tiles
         if (backgroundImage != null)
         {
-            backgroundImage.color = NumberColors[Value];
+            backgroundImage.color = TileBackgroundColor;
         }
     }
     
@@ -195,10 +188,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             selectionHighlight.SetActive(false);
         }
         
-        // Restore value-based background color
+        // Restore uniform grey background
         if (backgroundImage != null)
         {
-            backgroundImage.color = NumberColors[Value];
+            backgroundImage.color = TileBackgroundColor;
         }
         
         StopPulse();
@@ -231,8 +224,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     private IEnumerator PulseCoroutine()
     {
-        Color baseColor = NumberColors[Value];
-        Color brightColor = Color.Lerp(baseColor, Color.white, 0.4f); // Brighten by 40%
+        Color baseColor = TileBackgroundColor;
+        Color brightColor = Color.Lerp(baseColor, Color.white, 0.5f); // Brighten by 50%
         
         while (IsSelected)
         {
@@ -242,7 +235,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             float scale = Mathf.Lerp(pulseMinScale, pulseMaxScale, t);
             transform.localScale = Vector3.one * scale;
             
-            // Pulse color between base and brightened
+            // Pulse background between grey and bright
             if (backgroundImage != null)
             {
                 backgroundImage.color = Color.Lerp(baseColor, brightColor, t);
