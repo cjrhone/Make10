@@ -6,25 +6,34 @@ using System;
 using System.Collections;
 
 /// <summary>
-/// Represents a single number tile in the Make 10 grid.
-/// Handles its value, visual state, and click interactions.
+/// Swipe direction enum for gesture controls.
 /// </summary>
-public class Tile : MonoBehaviour, IPointerClickHandler
+public enum SwipeDirection
+{
+    Up,
+    Down,
+    Left,
+    Right
+}
+
+/// <summary>
+/// Represents a single number tile in the Make 10 grid.
+/// Handles its value, visual state, click and swipe interactions.
+/// </summary>
+public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     [Header("Visual References")]
     [SerializeField] private TMP_Text numberText;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private GameObject selectionHighlight;
     
-    [Header("Colors")]
-    [SerializeField] private Color normalColor = new Color(0.6f, 0.6f, 0.65f);
-    [SerializeField] private Color selectedColor = new Color(0.95f, 0.85f, 0.4f);
-    [SerializeField] private Color selectedPulseColor = new Color(1f, 0.95f, 0.6f); // Brighter pulse
-    
     [Header("Selection Pulse Settings")]
     [SerializeField] private float pulseMinScale = 1.05f;
     [SerializeField] private float pulseMaxScale = 1.12f;
     [SerializeField] private float pulseSpeed = 4f;
+    
+    [Header("Swipe Settings")]
+    [SerializeField] private float swipeThreshold = 30f; // Minimum distance to register swipe
     
     // Properties
     public int Value { get; private set; }
@@ -34,19 +43,37 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     
     // Events
     public static event Action<Tile> OnTileClicked;
+    public static event Action<Tile, SwipeDirection> OnTileSwiped;
     
     private RectTransform rectTransform;
     private Coroutine pulseCoroutine;
     
-    // Number colors - dark colors that show on gray background
-    private static readonly Color[] NumberColors = new Color[6]
+    // Swipe tracking
+    private Vector2 swipeStartPos;
+    private bool isSwiping = false;
+    
+    // Tile background colors
+    private static readonly Color[] NumberColors = new Color[7]
     {
-        new Color(0.3f, 0.3f, 0.35f),   // 0 - Dark Gray
-        new Color(0.15f, 0.35f, 0.75f), // 1 - Blue
-        new Color(0.1f, 0.55f, 0.25f),  // 2 - Green
-        new Color(0.8f, 0.45f, 0.1f),   // 3 - Orange
-        new Color(0.75f, 0.15f, 0.15f), // 4 - Red
-        new Color(0.85f, 0f, 0.85f)     // 5 - Purple
+        new Color(1f, 1f, 1f),           // 0 - White
+        new Color(1f, 0.6f, 0f),         // 1 - Orange
+        new Color(0.2f, 0.4f, 0.9f),     // 2 - Blue
+        new Color(0.2f, 0.75f, 0.3f),    // 3 - Green
+        new Color(0.9f, 0.2f, 0.2f),     // 4 - Red
+        new Color(0.4f, 0.1f, 0.5f),     // 5 - Dark Purple
+        new Color(0.1f, 0.1f, 0.1f)      // 6 - Black
+    };
+    
+    // Text colors - black for 0, white for all others
+    private static readonly Color[] TextColors = new Color[7]
+    {
+        new Color(0.1f, 0.1f, 0.1f),     // 0 - Black text on white
+        new Color(1f, 1f, 1f),           // 1 - White text
+        new Color(1f, 1f, 1f),           // 2 - White text
+        new Color(1f, 1f, 1f),           // 3 - White text
+        new Color(1f, 1f, 1f),           // 4 - White text
+        new Color(1f, 1f, 1f),           // 5 - White text
+        new Color(1f, 1f, 1f)            // 6 - White text
     };
 
     private void Awake()
@@ -90,11 +117,6 @@ public class Tile : MonoBehaviour, IPointerClickHandler
             selectionHighlight.SetActive(false);
         }
         
-        if (backgroundImage != null)
-        {
-            backgroundImage.color = normalColor;
-        }
-        
         transform.localScale = Vector3.one;
         
         StopPulse();
@@ -114,29 +136,35 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     }
     
     /// <summary>
-    /// Set the tile's numeric value (0-4).
+    /// Set the tile's numeric value (0-6).
     /// </summary>
     public void SetValue(int value)
     {
-        Value = Mathf.Clamp(value, 0, 5);
+        Value = Mathf.Clamp(value, 0, 6);
         UpdateNumberDisplay();
     }
     
     /// <summary>
-    /// Update the number text display.
+    /// Update the number text display and background color.
     /// </summary>
     private void UpdateNumberDisplay()
     {
         if (numberText != null)
         {
             numberText.text = Value.ToString();
-            numberText.color = NumberColors[Value];
+            numberText.color = TextColors[Value];
             numberText.enabled = true;
             numberText.gameObject.SetActive(true);
         }
         else
         {
             Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found!", this);
+        }
+        
+        // Set background color based on value
+        if (backgroundImage != null)
+        {
+            backgroundImage.color = NumberColors[Value];
         }
     }
     
@@ -150,11 +178,6 @@ public class Tile : MonoBehaviour, IPointerClickHandler
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(true);
-        }
-        
-        if (backgroundImage != null)
-        {
-            backgroundImage.color = selectedColor;
         }
         
         StartPulse();
@@ -172,9 +195,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler
             selectionHighlight.SetActive(false);
         }
         
+        // Restore value-based background color
         if (backgroundImage != null)
         {
-            backgroundImage.color = normalColor;
+            backgroundImage.color = NumberColors[Value];
         }
         
         StopPulse();
@@ -207,6 +231,9 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     /// </summary>
     private IEnumerator PulseCoroutine()
     {
+        Color baseColor = NumberColors[Value];
+        Color brightColor = Color.Lerp(baseColor, Color.white, 0.4f); // Brighten by 40%
+        
         while (IsSelected)
         {
             float t = (Mathf.Sin(Time.time * pulseSpeed) + 1f) / 2f;
@@ -215,10 +242,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler
             float scale = Mathf.Lerp(pulseMinScale, pulseMaxScale, t);
             transform.localScale = Vector3.one * scale;
             
-            // Pulse color
+            // Pulse color between base and brightened
             if (backgroundImage != null)
             {
-                backgroundImage.color = Color.Lerp(selectedColor, selectedPulseColor, t);
+                backgroundImage.color = Color.Lerp(baseColor, brightColor, t);
             }
             
             yield return null;
@@ -226,11 +253,82 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     }
     
     /// <summary>
-    /// Handle click/tap input.
+    /// Handle click/tap input (only fires if not swiping).
     /// </summary>
     public void OnPointerClick(PointerEventData eventData)
     {
-        OnTileClicked?.Invoke(this);
+        // Don't trigger click if we just did a swipe
+        if (!isSwiping)
+        {
+            OnTileClicked?.Invoke(this);
+        }
+        
+        // Reset for next interaction
+        isSwiping = false;
+    }
+    
+    /// <summary>
+    /// Begin drag - record start position.
+    /// </summary>
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        swipeStartPos = eventData.position;
+        isSwiping = false;
+    }
+    
+    /// <summary>
+    /// During drag - required for end drag to fire.
+    /// </summary>
+    public void OnDrag(PointerEventData eventData)
+    {
+        // Required for OnEndDrag to work, but we don't need to do anything here
+    }
+    
+    /// <summary>
+    /// End drag - calculate swipe direction and fire event.
+    /// </summary>
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        Vector2 swipeEndPos = eventData.position;
+        Vector2 swipeDelta = swipeEndPos - swipeStartPos;
+        
+        // Check if swipe distance meets threshold
+        if (swipeDelta.magnitude < swipeThreshold)
+        {
+            isSwiping = false;
+            return;
+        }
+        
+        isSwiping = true;
+        
+        // Determine swipe direction based on which axis had more movement
+        SwipeDirection direction;
+        
+        if (Mathf.Abs(swipeDelta.x) > Mathf.Abs(swipeDelta.y))
+        {
+            // Horizontal swipe
+            direction = swipeDelta.x > 0 ? SwipeDirection.Right : SwipeDirection.Left;
+        }
+        else
+        {
+            // Vertical swipe
+            direction = swipeDelta.y > 0 ? SwipeDirection.Up : SwipeDirection.Down;
+        }
+        
+        Debug.Log($"Swipe detected on {this}: {direction}");
+        OnTileSwiped?.Invoke(this, direction);
+        
+        // Reset swiping flag after a frame (in case OnPointerClick doesn't fire)
+        StartCoroutine(ResetSwipingFlag());
+    }
+    
+    /// <summary>
+    /// Reset swiping flag after a frame delay.
+    /// </summary>
+    private IEnumerator ResetSwipingFlag()
+    {
+        yield return null; // Wait one frame
+        isSwiping = false;
     }
     
     /// <summary>

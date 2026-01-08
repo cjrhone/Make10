@@ -22,19 +22,18 @@ public class GridManager : MonoBehaviour
     [Header("Animation Settings")]
     [SerializeField] private float tileFallSpeed = 800f;
     [SerializeField] private float tileFallDelay = 0.05f;
-    [SerializeField] private float matchFlashDuration = 0.3f;
     [SerializeField] private float postClearDelay = 0.1f;
     [SerializeField] private float tileSwapDuration = 0.15f;
-    [SerializeField] private float postWinDelay = 0.5f;
     [SerializeField] private float unsolvableResetDelay = 1f; // delay before auto-reset
     
     [Header("Tile Value Weights (must sum to 1.0)")]
-    [SerializeField] private float weight0 = 0.08f; // 0 tiles - fewer wildcards
-    [SerializeField] private float weight1 = 0.22f; // 1 tiles - reduced
-    [SerializeField] private float weight2 = 0.22f; // 2 tiles - reduced
-    [SerializeField] private float weight3 = 0.25f; // 3 tiles - increased
-    [SerializeField] private float weight4 = 0.16f; // 4 tiles - increased
-    [SerializeField] private float weight5 = 0.07f; // 5 tiles - slightly more
+    [SerializeField] private float weight0 = 0.15f; // 0 tiles - wildcard
+    [SerializeField] private float weight1 = 0.22f; // 1 tiles - common
+    [SerializeField] private float weight2 = 0.20f; // 2 tiles
+    [SerializeField] private float weight3 = 0.15f; // 3 tiles
+    [SerializeField] private float weight4 = 0.12f; // 4 tiles
+    [SerializeField] private float weight5 = 0.08f; // 5 tiles
+    [SerializeField] private float weight6 = 0.08f; // 6 tiles - rare
 
     
     // The grid array
@@ -55,7 +54,7 @@ public class GridManager : MonoBehaviour
     private void Awake()
     {
         // Cache weights
-        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5 };
+        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
         
         // Initialize grid array
         grid = new Tile[gridWidth, gridHeight];
@@ -64,11 +63,13 @@ public class GridManager : MonoBehaviour
     private void OnEnable()
     {
         Tile.OnTileClicked += HandleTileClicked;
+        Tile.OnTileSwiped += HandleTileSwiped;
     }
     
     private void OnDisable()
     {
         Tile.OnTileClicked -= HandleTileClicked;
+        Tile.OnTileSwiped -= HandleTileSwiped;
     }
     
     private void Start()
@@ -215,6 +216,61 @@ public class GridManager : MonoBehaviour
         
         // Adjacent means exactly 1 step in one direction, 0 in the other
         return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+    }
+    
+    /// <summary>
+    /// Handle swipe gestures on tiles.
+    /// </summary>
+    private void HandleTileSwiped(Tile tile, SwipeDirection direction)
+    {
+        // Don't allow interaction while processing
+        if (isProcessing) return;
+        
+        // Calculate neighbor position based on swipe direction
+        int neighborX = tile.GridX;
+        int neighborY = tile.GridY;
+        
+        switch (direction)
+        {
+            case SwipeDirection.Up:
+                neighborY -= 1; // Up in grid = lower Y index
+                break;
+            case SwipeDirection.Down:
+                neighborY += 1; // Down in grid = higher Y index
+                break;
+            case SwipeDirection.Left:
+                neighborX -= 1;
+                break;
+            case SwipeDirection.Right:
+                neighborX += 1;
+                break;
+        }
+        
+        // Check bounds
+        if (neighborX < 0 || neighborX >= gridWidth || neighborY < 0 || neighborY >= gridHeight)
+        {
+            Debug.Log($"Swipe {direction} blocked - no tile in that direction");
+            return;
+        }
+        
+        // Get neighbor tile
+        Tile neighborTile = grid[neighborX, neighborY];
+        if (neighborTile == null)
+        {
+            Debug.Log($"Swipe {direction} blocked - neighbor tile is null");
+            return;
+        }
+        
+        // Clear any existing selection
+        if (selectedTile != null)
+        {
+            selectedTile.Deselect();
+            selectedTile = null;
+        }
+        
+        // Perform the swap
+        Debug.Log($"Swipe swap: {tile} <-> {neighborTile}");
+        StartCoroutine(AnimatedSwapCoroutine(tile, neighborTile));
     }
     
     /// <summary>
