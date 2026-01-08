@@ -24,8 +24,9 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float tileFallDelay = 0.05f;
     [SerializeField] private float matchFlashDuration = 0.3f;
     [SerializeField] private float postClearDelay = 0.1f;
-    [SerializeField] private float tileSwapDuration = 0.15f; // swap animation time
-    [SerializeField] private float postWinDelay = 0.5f; // delay before win screen
+    [SerializeField] private float tileSwapDuration = 0.15f;
+    [SerializeField] private float postWinDelay = 0.5f;
+    [SerializeField] private float unsolvableResetDelay = 1f; // delay before auto-reset
     
     [Header("Tile Value Weights (must sum to 1.0)")]
     [SerializeField] private float weight0 = 0.08f; // 0 tiles - fewer wildcards
@@ -47,6 +48,9 @@ public class GridManager : MonoBehaviour
     
     // Is the grid currently processing (animating, clearing, etc.)
     private bool isProcessing = false;
+    
+    // Event for unsolvable grid notification
+    public event System.Action OnGridUnsolvable;
     
     private void Awake()
     {
@@ -381,8 +385,124 @@ public class GridManager : MonoBehaviour
             GameManager.Instance.OnCascadeEnd();
         }
         
+        // Check if grid is solvable
+        if (matchChecker != null && !matchChecker.HasValidMoves())
+        {
+            Debug.Log("<color=red>GRID UNSOLVABLE!</color> No valid moves available. Resetting...");
+            OnGridUnsolvable?.Invoke();
+            yield return new WaitForSeconds(unsolvableResetDelay);
+            ResetGridSilent();
+            yield break;
+        }
+        
         isProcessing = false;
         PrintGridState();
+    }
+    
+    /// <summary>
+    /// Reset the grid without awarding points (for unsolvable situations).
+    /// </summary>
+    private void ResetGridSilent()
+    {
+        StartCoroutine(ResetGridWithEffect());
+    }
+    
+    /// <summary>
+    /// Visual effect for resetting unsolvable grid.
+    /// </summary>
+    private IEnumerator ResetGridWithEffect()
+    {
+        Debug.Log("<color=yellow>Grid reset with visual effect (no points awarded)</color>");
+        
+        // Collect all current tiles
+        List<Tile> allTiles = new List<Tile>();
+        for (int y = 0; y < gridHeight; y++)
+        {
+            for (int x = 0; x < gridWidth; x++)
+            {
+                if (grid[x, y] != null)
+                {
+                    allTiles.Add(grid[x, y]);
+                }
+            }
+        }
+        
+        // Flash all tiles red
+        float flashDuration = 0.3f;
+        float elapsed = 0f;
+        while (elapsed < flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.PingPong(elapsed * 8f, 1f); // Fast flicker
+            Color flashColor = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.3f), t);
+            
+            foreach (Tile tile in allTiles)
+            {
+                if (tile != null)
+                {
+                    Image img = tile.GetComponent<Image>();
+                    if (img != null) img.color = flashColor;
+                }
+            }
+            yield return null;
+        }
+        
+        // Shake and fall animation
+        float fallDuration = 0.4f;
+        elapsed = 0f;
+        
+        // Store original positions
+        Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
+        foreach (Tile tile in allTiles)
+        {
+            if (tile != null)
+            {
+                originalPositions[tile] = tile.GetRectTransform().anchoredPosition;
+            }
+        }
+        
+        while (elapsed < fallDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / fallDuration;
+            
+            foreach (Tile tile in allTiles)
+            {
+                if (tile != null && originalPositions.ContainsKey(tile))
+                {
+                    RectTransform rt = tile.GetRectTransform();
+                    Vector2 originalPos = originalPositions[tile];
+                    
+                    // Shake horizontally
+                    float shake = Mathf.Sin(elapsed * 50f) * 5f * (1f - t);
+                    
+                    // Fall down with acceleration
+                    float fallDistance = 800f * t * t;
+                    
+                    rt.anchoredPosition = originalPos + new Vector2(shake, -fallDistance);
+                    
+                    // Fade out
+                    Image img = tile.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        Color c = img.color;
+                        c.a = 1f - t;
+                        img.color = c;
+                    }
+                    
+                    // Shrink slightly
+                    tile.transform.localScale = Vector3.one * (1f - t * 0.3f);
+                }
+            }
+            yield return null;
+        }
+        
+        // Clear and respawn
+        ClearGrid();
+        SpawnGrid();
+        
+        // Check for initial matches
+        StartCoroutine(ProcessMatchesCoroutine());
     }
     
     /// <summary>

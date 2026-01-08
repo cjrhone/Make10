@@ -176,6 +176,59 @@ public class MatchChecker : MonoBehaviour
     }
     
     /// <summary>
+    /// Check if any 6 tiles on the board can sum to 10.
+    /// If not, the grid is unsolvable regardless of swaps.
+    /// </summary>
+    public bool HasValidMoves()
+    {
+        Tile[,] grid = gridManager.GetGrid();
+        Vector2Int gridSize = gridManager.GetGridSize();
+        
+        // Collect all tile values
+        List<int> allValues = new List<int>();
+        for (int y = 0; y < gridSize.y; y++)
+        {
+            for (int x = 0; x < gridSize.x; x++)
+            {
+                if (grid[x, y] != null)
+                {
+                    allValues.Add(grid[x, y].Value);
+                }
+            }
+        }
+        
+        // Check if any combination of 5 tiles sums to 10
+        return CanSum(allValues, 5, targetSum, 0);
+    }
+    
+    /// <summary>
+    /// Recursive check: can we pick 'count' numbers from values (starting at index) that sum to 'target'?
+    /// </summary>
+    private bool CanSum(List<int> values, int count, int target, int startIndex)
+    {
+        // Base case: found a valid combination
+        if (count == 0 && target == 0)
+            return true;
+        
+        // Base case: invalid state
+        if (count == 0 || target < 0 || startIndex >= values.Count)
+            return false;
+        
+        // Pruning: not enough tiles left
+        if (values.Count - startIndex < count)
+            return false;
+        
+        // Try including current tile or skipping it
+        for (int i = startIndex; i < values.Count; i++)
+        {
+            if (CanSum(values, count - 1, target - values[i], i + 1))
+                return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
     /// Debug: Print current sums for all rows and columns.
     /// </summary>
     [ContextMenu("Print All Sums")]

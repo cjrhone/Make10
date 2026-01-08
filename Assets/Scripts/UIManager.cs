@@ -50,8 +50,13 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject loseScreen;
     [SerializeField] private TMP_Text finalScoreText;
     
+    [Header("Unsolvable Grid Popup")]
+    [SerializeField] private GameObject unsolvablePopup;
+    [SerializeField] private float unsolvablePopupDuration = 1f;
+    
     [Header("References")]
     [SerializeField] private GameManager gameManager;
+    [SerializeField] private GridManager gridManager;
     
     private Coroutine motivationPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
@@ -82,6 +87,16 @@ public class UIManager : MonoBehaviour
         gameManager.OnMultiplierChanged += HandleMultiplierChanged;
         gameManager.OnGameWon += HandleGameWon;
         gameManager.OnGameLost += HandleGameLost;
+    
+    // Subscribe to GridManager events
+    if (gridManager == null)
+    {
+        gridManager = FindFirstObjectByType<GridManager>();
+    }
+    if (gridManager != null)
+    {
+        gridManager.OnGridUnsolvable += HandleGridUnsolvable;
+    }
         
         InitializeUI();
         
@@ -98,6 +113,11 @@ public class UIManager : MonoBehaviour
             gameManager.OnGameWon -= HandleGameWon;
             gameManager.OnGameLost -= HandleGameLost;
         }
+        
+        if (gridManager != null)
+        {
+            gridManager.OnGridUnsolvable -= HandleGridUnsolvable;
+        }
     }
     
     /// <summary>
@@ -108,6 +128,7 @@ public class UIManager : MonoBehaviour
         // Hide game over screens
         if (winScreen != null) winScreen.SetActive(false);
         if (loseScreen != null) loseScreen.SetActive(false);
+        if (unsolvablePopup != null) unsolvablePopup.SetActive(false);
         
         // Hide multiplier panel initially
         if (multiplierPanel != null) multiplierPanel.SetActive(false);
@@ -477,6 +498,58 @@ public class UIManager : MonoBehaviour
         {
             finalScoreText.text = $"Score: {gameManager.Score}";
         }
+    }
+    
+    /// <summary>
+    /// Handle unsolvable grid - show popup.
+    /// </summary>
+    private void HandleGridUnsolvable()
+    {
+        if (unsolvablePopup != null)
+        {
+            StartCoroutine(ShowUnsolvablePopup());
+        }
+    }
+    
+    /// <summary>
+    /// Show and hide the unsolvable popup.
+    /// </summary>
+    private IEnumerator ShowUnsolvablePopup()
+    {
+        unsolvablePopup.SetActive(true);
+        
+        // Scale in
+        unsolvablePopup.transform.localScale = Vector3.zero;
+        float elapsed = 0f;
+        float scaleInTime = 0.2f;
+        
+        while (elapsed < scaleInTime)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / scaleInTime;
+            float scale = Mathf.Lerp(0f, 1.1f, t);
+            unsolvablePopup.transform.localScale = Vector3.one * scale;
+            yield return null;
+        }
+        
+        unsolvablePopup.transform.localScale = Vector3.one;
+        
+        yield return new WaitForSeconds(unsolvablePopupDuration);
+        
+        // Scale out
+        elapsed = 0f;
+        float scaleOutTime = 0.15f;
+        
+        while (elapsed < scaleOutTime)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / scaleOutTime;
+            float scale = Mathf.Lerp(1f, 0f, t);
+            unsolvablePopup.transform.localScale = Vector3.one * scale;
+            yield return null;
+        }
+        
+        unsolvablePopup.SetActive(false);
     }
     
     /// <summary>
