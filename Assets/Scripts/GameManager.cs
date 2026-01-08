@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Collections;
 
 /// <summary>
 /// Manages game state: scoring, motivation meter, win/lose conditions.
@@ -16,18 +17,21 @@ public class GameManager : MonoBehaviour
     
     [Header("Game Settings")]
     [SerializeField] private int winScore = 250;
+    public int WinScore => winScore;
     [SerializeField] private float startingMotivation = 100f;
     [SerializeField] private float motivationDrainRate = 1f;
     [SerializeField] private float motivationMatchReward = 15f;
+    [SerializeField] private float postWinDelay = 0.5f; // delay before win screen
     
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
     
     [Header("Multiplier Settings")]
-    [SerializeField] private float multiplierDuration = 5f; // seconds
+    [SerializeField] private float multiplierDuration = 10f; // seconds
     [SerializeField] private float multiplierDrainRate = 1f; // per second
-    [SerializeField] private float multiplierIncrement = 0.25f; // how much multiplier increases per solve
-    [SerializeField] private float startingMultiplier = 1.25f; // first multiplier value when activated
+    [SerializeField] private float multiplierIncrement = 0.25f;
+    [SerializeField] private float startingMultiplier = 1.25f;
+    [SerializeField] private float streakTimeout = 10f; // time allowed between solves before streak resets
     
     [Header("References")]
     [SerializeField] private UIManager uiManager;
@@ -43,6 +47,7 @@ public class GameManager : MonoBehaviour
     private float currentMultiplier = 1f;
     private float multiplierTimer = 0f;
     private bool multiplierActive = false;
+    private float timeSinceLastSolve = 0f; // tracks time for streak timeout
     
     // Public accessors for UI
     public bool IsMultiplierActive => multiplierActive;
@@ -87,6 +92,18 @@ public class GameManager : MonoBehaviour
         {
             DrainMultiplierTimer(Time.deltaTime);
         }
+        else if (solveCount > 0)
+        {
+            // Track streak timeout before multiplier is active
+            timeSinceLastSolve += Time.deltaTime;
+            if (timeSinceLastSolve >= streakTimeout)
+            {
+                // Too long since last solve - reset streak
+                solveCount = 0;
+                timeSinceLastSolve = 0f;
+                Debug.Log("<color=red>Streak timeout!</color> Solve count reset.");
+            }
+        }
     }
     
     /// <summary>
@@ -104,6 +121,7 @@ public class GameManager : MonoBehaviour
         currentMultiplier = 1f;
         multiplierTimer = 0f;
         multiplierActive = false;
+        timeSinceLastSolve = 0f;
         
         OnScoreChanged?.Invoke(Score, 0);
         OnMotivationChanged?.Invoke(Motivation);
@@ -150,6 +168,7 @@ public class GameManager : MonoBehaviour
     private void ProcessSingleSolve()
     {
         solveCount++;
+        timeSinceLastSolve = 0f; // Reset streak timer
         
         int pointsAwarded = 0;
         int bonusSeconds = 0;
@@ -196,7 +215,7 @@ public class GameManager : MonoBehaviour
         // Check win condition
         if (Score >= winScore)
         {
-            WinGame();
+            StartCoroutine(WinGameDelayed());
         }
     }
     
@@ -268,6 +287,15 @@ public class GameManager : MonoBehaviour
         Motivation = Mathf.Min(startingMotivation, Motivation);
         
         OnMotivationChanged?.Invoke(Motivation);
+    }
+    
+    /// <summary>
+    /// Player wins with delay for animations to finish.
+    /// </summary>
+    private IEnumerator WinGameDelayed()
+    {
+        yield return new WaitForSeconds(postWinDelay);
+        WinGame();
     }
     
     /// <summary>

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
 using System;
+using System.Collections;
 
 /// <summary>
 /// Represents a single number tile in the Make 10 grid.
@@ -13,11 +14,17 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     [Header("Visual References")]
     [SerializeField] private TMP_Text numberText;
     [SerializeField] private Image backgroundImage;
-    [SerializeField] private GameObject selectionHighlight; // Changed to GameObject for easier enable/disable
+    [SerializeField] private GameObject selectionHighlight;
     
     [Header("Colors")]
-    [SerializeField] private Color normalColor = new Color(0.6f, 0.6f, 0.65f); // Gray 
-    [SerializeField] private Color selectedColor = new Color(0.95f, 0.85f, 0.4f); // Yellow
+    [SerializeField] private Color normalColor = new Color(0.6f, 0.6f, 0.65f);
+    [SerializeField] private Color selectedColor = new Color(0.95f, 0.85f, 0.4f);
+    [SerializeField] private Color selectedPulseColor = new Color(1f, 0.95f, 0.6f); // Brighter pulse
+    
+    [Header("Selection Pulse Settings")]
+    [SerializeField] private float pulseMinScale = 1.05f;
+    [SerializeField] private float pulseMaxScale = 1.12f;
+    [SerializeField] private float pulseSpeed = 4f;
     
     // Properties
     public int Value { get; private set; }
@@ -29,6 +36,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     public static event Action<Tile> OnTileClicked;
     
     private RectTransform rectTransform;
+    private Coroutine pulseCoroutine;
     
     // Number colors - dark colors that show on gray background
     private static readonly Color[] NumberColors = new Color[6]
@@ -38,27 +46,23 @@ public class Tile : MonoBehaviour, IPointerClickHandler
         new Color(0.1f, 0.55f, 0.25f),  // 2 - Green
         new Color(0.8f, 0.45f, 0.1f),   // 3 - Orange
         new Color(0.75f, 0.15f, 0.15f), // 4 - Red
-        new Color(0.85f, 0f, 0.85f)  // 5 - Purple
-
+        new Color(0.85f, 0f, 0.85f)     // 5 - Purple
     };
 
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
         
-        // Auto-find background image
         if (backgroundImage == null)
         {
             backgroundImage = GetComponent<Image>();
         }
         
-        // Auto-find text (search in children) - using TextMeshPro
         if (numberText == null)
         {
-            numberText = GetComponentInChildren<TMP_Text>(true); // true = include inactive
+            numberText = GetComponentInChildren<TMP_Text>(true);
         }
         
-        // Auto-find selection highlight by name
         if (selectionHighlight == null)
         {
             Transform highlightTransform = transform.Find("SelectionHighlight");
@@ -71,8 +75,6 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     
     private void Start()
     {
-        // CRITICAL: Force reset visual state on start
-        // This fixes the white tile bug from prefab state
         ForceResetVisuals();
     }
     
@@ -83,20 +85,19 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     {
         IsSelected = false;
         
-        // Hide highlight
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(false);
         }
         
-        // Reset background to normal gray
         if (backgroundImage != null)
         {
             backgroundImage.color = normalColor;
         }
         
-        // Reset scale
         transform.localScale = Vector3.one;
+        
+        StopPulse();
     }
     
     /// <summary>
@@ -130,20 +131,17 @@ public class Tile : MonoBehaviour, IPointerClickHandler
         {
             numberText.text = Value.ToString();
             numberText.color = NumberColors[Value];
-            
-            // Make sure text is enabled and visible
             numberText.enabled = true;
             numberText.gameObject.SetActive(true);
         }
         else
         {
-            Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found! " +
-                          "Make sure the Tile prefab has a Text child.", this);
+            Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found!", this);
         }
     }
     
     /// <summary>
-    /// Select this tile (visual highlight).
+    /// Select this tile (visual highlight with pulse).
     /// </summary>
     public void Select()
     {
@@ -159,8 +157,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler
             backgroundImage.color = selectedColor;
         }
         
-        // Scale up slightly for feedback
-        transform.localScale = Vector3.one * 1.1f;
+        StartPulse();
     }
     
     /// <summary>
@@ -170,7 +167,6 @@ public class Tile : MonoBehaviour, IPointerClickHandler
     {
         IsSelected = false;
         
-        // IMPORTANT: Use SetActive, not just enabled
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(false);
@@ -181,7 +177,52 @@ public class Tile : MonoBehaviour, IPointerClickHandler
             backgroundImage.color = normalColor;
         }
         
+        StopPulse();
         transform.localScale = Vector3.one;
+    }
+    
+    /// <summary>
+    /// Start the selection pulse animation.
+    /// </summary>
+    private void StartPulse()
+    {
+        StopPulse();
+        pulseCoroutine = StartCoroutine(PulseCoroutine());
+    }
+    
+    /// <summary>
+    /// Stop the selection pulse animation.
+    /// </summary>
+    private void StopPulse()
+    {
+        if (pulseCoroutine != null)
+        {
+            StopCoroutine(pulseCoroutine);
+            pulseCoroutine = null;
+        }
+    }
+    
+    /// <summary>
+    /// Pulsing scale and color animation while selected.
+    /// </summary>
+    private IEnumerator PulseCoroutine()
+    {
+        while (IsSelected)
+        {
+            float t = (Mathf.Sin(Time.time * pulseSpeed) + 1f) / 2f;
+            
+            // Pulse scale
+            float scale = Mathf.Lerp(pulseMinScale, pulseMaxScale, t);
+            transform.localScale = Vector3.one * scale;
+            
+            // Pulse color
+            if (backgroundImage != null)
+            {
+                backgroundImage.color = Color.Lerp(selectedColor, selectedPulseColor, t);
+            }
+            
+            yield return null;
+        }
     }
     
     /// <summary>
@@ -215,7 +256,6 @@ public class Tile : MonoBehaviour, IPointerClickHandler
         return rectTransform;
     }
     
-    // Debug helper
     public override string ToString()
     {
         return $"Tile[{GridX},{GridY}] = {Value}";

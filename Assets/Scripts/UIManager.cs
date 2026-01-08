@@ -112,10 +112,10 @@ public class UIManager : MonoBehaviour
         // Hide multiplier panel initially
         if (multiplierPanel != null) multiplierPanel.SetActive(false);
         
-        // Set target score text
-        if (targetScoreText != null)
+        // Set target score text dynamically from GameManager
+        if (targetScoreText != null && gameManager != null)
         {
-            targetScoreText.text = "/ 250";
+            targetScoreText.text = $"/ {gameManager.WinScore}";
         }
         
         // Initialize motivation bar
@@ -125,11 +125,11 @@ public class UIManager : MonoBehaviour
             motivationSlider.value = 100f;
         }
         
-        // Initialize multiplier bar
-        if (multiplierSlider != null)
+        // Initialize multiplier bar - read duration from GameManager
+        if (multiplierSlider != null && gameManager != null)
         {
-            multiplierSlider.maxValue = 5f;
-            multiplierSlider.value = 5f;
+            multiplierSlider.maxValue = gameManager.MultiplierDuration;
+            multiplierSlider.value = gameManager.MultiplierDuration;
         }
         
         UpdateScoreDisplay(0);

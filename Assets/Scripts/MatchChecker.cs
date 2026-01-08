@@ -110,6 +110,7 @@ public class MatchChecker : MonoBehaviour
     
     /// <summary>
     /// Get detailed match info for UI/scoring purposes.
+    /// Returns only ONE match at a time (first row or column found).
     /// </summary>
     public MatchResult GetMatchResult()
     {
@@ -117,7 +118,7 @@ public class MatchChecker : MonoBehaviour
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
         
-        // Check rows
+        // Check rows first - return immediately on first match
         for (int y = 0; y < gridSize.y; y++)
         {
             int rowSum = 0;
@@ -140,10 +141,11 @@ public class MatchChecker : MonoBehaviour
                 {
                     result.allMatchedTiles.Add(tile);
                 }
+                return result; // Return after first match found
             }
         }
         
-        // Check columns
+        // Check columns - return immediately on first match
         for (int x = 0; x < gridSize.x; x++)
         {
             int colSum = 0;
@@ -166,6 +168,7 @@ public class MatchChecker : MonoBehaviour
                 {
                     result.allMatchedTiles.Add(tile);
                 }
+                return result; // Return after first match found
             }
         }
         

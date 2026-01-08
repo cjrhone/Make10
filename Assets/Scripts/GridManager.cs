@@ -20,10 +20,12 @@ public class GridManager : MonoBehaviour
     public MatchChecker matchChecker;
     
     [Header("Animation Settings")]
-    [SerializeField] private float tileFallSpeed = 800f; // pixels per second
-    [SerializeField] private float tileFallDelay = 0.05f; // stagger delay between columns
-    [SerializeField] private float matchFlashDuration = 0.3f; // how long tiles flash before disappearing
-    [SerializeField] private float postClearDelay = 0.1f; // pause after clearing before dropping
+    [SerializeField] private float tileFallSpeed = 800f;
+    [SerializeField] private float tileFallDelay = 0.05f;
+    [SerializeField] private float matchFlashDuration = 0.3f;
+    [SerializeField] private float postClearDelay = 0.1f;
+    [SerializeField] private float tileSwapDuration = 0.15f; // swap animation time
+    [SerializeField] private float postWinDelay = 0.5f; // delay before win screen
     
     [Header("Tile Value Weights (must sum to 1.0)")]
     [SerializeField] private float weight0 = 0.08f; // 0 tiles - fewer wildcards
@@ -172,7 +174,18 @@ public class GridManager : MonoBehaviour
         }
         else
         {
-            // Second selection - perform swap
+            // Second selection - check if adjacent
+            if (!IsAdjacent(selectedTile, tile))
+            {
+                // Not adjacent - deselect old, select new
+                selectedTile.Deselect();
+                selectedTile = tile;
+                tile.Select();
+                Debug.Log($"Not adjacent! Switched selection to: {tile}");
+                return;
+            }
+            
+            // Adjacent - perform swap
             Tile firstTile = selectedTile;
             Tile secondTile = tile;
             
@@ -183,9 +196,72 @@ public class GridManager : MonoBehaviour
             firstTile.Deselect();
             secondTile.Deselect();
             
-            // Now perform the swap
-            SwapTiles(firstTile, secondTile);
+            // Now perform the animated swap
+            StartCoroutine(AnimatedSwapCoroutine(firstTile, secondTile));
         }
+    }
+    
+    /// <summary>
+    /// Check if two tiles are adjacent (up, down, left, right only).
+    /// </summary>
+    private bool IsAdjacent(Tile a, Tile b)
+    {
+        int dx = Mathf.Abs(a.GridX - b.GridX);
+        int dy = Mathf.Abs(a.GridY - b.GridY);
+        
+        // Adjacent means exactly 1 step in one direction, 0 in the other
+        return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+    }
+    
+    /// <summary>
+    /// Animate the swap then process matches.
+    /// </summary>
+    private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB)
+    {
+        isProcessing = true;
+        
+        // Get positions
+        Vector2 posA = tileA.GetRectTransform().anchoredPosition;
+        Vector2 posB = tileB.GetRectTransform().anchoredPosition;
+        
+        // Animate both tiles moving to each other's positions
+        float elapsed = 0f;
+        while (elapsed < tileSwapDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / tileSwapDuration;
+            
+            // Smooth step for nicer feel
+            float smoothT = t * t * (3f - 2f * t);
+            
+            tileA.GetRectTransform().anchoredPosition = Vector2.Lerp(posA, posB, smoothT);
+            tileB.GetRectTransform().anchoredPosition = Vector2.Lerp(posB, posA, smoothT);
+            
+            yield return null;
+        }
+        
+        // Snap to final positions
+        tileA.GetRectTransform().anchoredPosition = posB;
+        tileB.GetRectTransform().anchoredPosition = posA;
+        
+        // Update grid array
+        int axOld = tileA.GridX;
+        int ayOld = tileA.GridY;
+        int bxOld = tileB.GridX;
+        int byOld = tileB.GridY;
+        
+        grid[axOld, ayOld] = tileB;
+        grid[bxOld, byOld] = tileA;
+        
+        tileA.GridX = bxOld;
+        tileA.GridY = byOld;
+        tileB.GridX = axOld;
+        tileB.GridY = ayOld;
+        
+        isProcessing = false;
+        
+        // Check for matches after swap
+        StartCoroutine(ProcessMatchesCoroutine());
     }
     
     /// <summary>
