@@ -36,6 +36,10 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip swapSFX;
     [SerializeField] private AudioClip countdownBeepSFX;
     [SerializeField] private AudioClip countdownGoSFX;
+    [SerializeField] private AudioClip transitionSwipeSFX;
+    [SerializeField] private AudioClip tileSelectSFX;
+    [SerializeField] private AudioClip timeWarningSFX; // Looping warning when time is low
+    [SerializeField] private AudioClip finishSFX; // Plays when time runs out
     
     // Current volumes
     private float musicVolume;
@@ -64,6 +68,17 @@ public class AudioManager : MonoBehaviour
     {
         SetupSliders();
         ApplyVolumeSettings();
+        
+        // Check for AudioListener
+        AudioListener listener = FindFirstObjectByType<AudioListener>();
+        if (listener == null)
+        {
+            Debug.LogError("AudioManager: No AudioListener found in scene! Audio won't play.");
+        }
+        else
+        {
+            Debug.Log($"AudioManager: AudioListener found on {listener.gameObject.name}");
+        }
     }
     
     /// <summary>
@@ -74,6 +89,16 @@ public class AudioManager : MonoBehaviour
         musicVolume = PlayerPrefs.GetFloat(MUSIC_VOL_KEY, defaultMusicVolume);
         sfxVolume = PlayerPrefs.GetFloat(SFX_VOL_KEY, defaultSFXVolume);
         voiceVolume = PlayerPrefs.GetFloat(VOICE_VOL_KEY, defaultVoiceVolume);
+        
+        // Safety check: if music volume is 0, reset to default (user may have accidentally muted)
+        if (musicVolume <= 0.01f)
+        {
+            Debug.LogWarning($"Music volume was {musicVolume}, resetting to default {defaultMusicVolume}");
+            musicVolume = defaultMusicVolume;
+            SaveVolumeSettings();
+        }
+        
+        Debug.Log($"AudioManager loaded volumes - Music: {musicVolume}, SFX: {sfxVolume}, Voice: {voiceVolume}");
     }
     
     /// <summary>
@@ -166,9 +191,16 @@ public class AudioManager : MonoBehaviour
     {
         if (musicSource != null && clip != null)
         {
+            Debug.Log($"PlayMusic: Playing clip '{clip.name}' at volume {musicVolume}");
             musicSource.clip = clip;
+            musicSource.volume = musicVolume; // Ensure volume is set
             musicSource.loop = true;
             musicSource.Play();
+            Debug.Log($"PlayMusic: musicSource.isPlaying = {musicSource.isPlaying}");
+        }
+        else
+        {
+            Debug.LogWarning($"PlayMusic failed: musicSource={musicSource}, clip={clip}");
         }
     }
     
@@ -177,6 +209,15 @@ public class AudioManager : MonoBehaviour
     /// </summary>
     public void PlayMenuMusic()
     {
+        Debug.Log($"PlayMenuMusic called. menuMusic={menuMusic}, musicSource={musicSource}");
+        if (menuMusic == null)
+        {
+            Debug.LogWarning("PlayMenuMusic: menuMusic clip is not assigned!");
+        }
+        if (musicSource == null)
+        {
+            Debug.LogWarning("PlayMenuMusic: musicSource is not assigned!");
+        }
         PlayMusic(menuMusic);
     }
     
@@ -185,6 +226,11 @@ public class AudioManager : MonoBehaviour
     /// </summary>
     public void PlayGameMusic()
     {
+        Debug.Log($"PlayGameMusic called. gameMusic={gameMusic}, musicSource={musicSource}");
+        if (gameMusic == null)
+        {
+            Debug.LogWarning("PlayGameMusic: gameMusic clip is not assigned!");
+        }
         PlayMusic(gameMusic);
     }
     
@@ -248,6 +294,56 @@ public class AudioManager : MonoBehaviour
     public void PlayCountdownGo()
     {
         PlaySFX(countdownGoSFX);
+    }
+    
+    /// <summary>
+    /// Play transition swipe sound.
+    /// </summary>
+    public void PlayTransitionSwipe()
+    {
+        PlaySFX(transitionSwipeSFX);
+    }
+    
+    /// <summary>
+    /// Play tile select sound.
+    /// </summary>
+    public void PlayTileSelect()
+    {
+        PlaySFX(tileSelectSFX);
+    }
+    
+    /// <summary>
+    /// Play finish sound (time's up).
+    /// </summary>
+    public void PlayFinishSound()
+    {
+        PlaySFX(finishSFX);
+    }
+    
+    /// <summary>
+    /// Start looping time warning sound.
+    /// </summary>
+    public void StartTimeWarning()
+    {
+        if (sfxSource != null && timeWarningSFX != null && !sfxSource.isPlaying)
+        {
+            sfxSource.clip = timeWarningSFX;
+            sfxSource.loop = true;
+            sfxSource.Play();
+        }
+    }
+    
+    /// <summary>
+    /// Stop the looping time warning sound.
+    /// </summary>
+    public void StopTimeWarning()
+    {
+        if (sfxSource != null && sfxSource.clip == timeWarningSFX)
+        {
+            sfxSource.Stop();
+            sfxSource.loop = false;
+            sfxSource.clip = null;
+        }
     }
     
     /// <summary>

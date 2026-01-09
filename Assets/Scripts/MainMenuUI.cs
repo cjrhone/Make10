@@ -16,9 +16,11 @@ public class MainMenuUI : MonoBehaviour
     
     [Header("Banner Settings")]
     [SerializeField] private RectTransform topBanner;
+    [SerializeField] private RectTransform topBannerDuplicate; // Second copy for seamless loop
     [SerializeField] private RectTransform bottomBanner;
+    [SerializeField] private RectTransform bottomBannerDuplicate; // Second copy for seamless loop
     [SerializeField] private float bannerScrollSpeed = 100f;
-    [SerializeField] private float bannerWidth = 2000f; // Width of the banner text
+    [SerializeField] private float bannerWidth = 1500f; // Width of ONE banner text
     
     [Header("Button References")]
     [SerializeField] private Button playButton;
@@ -46,9 +48,9 @@ public class MainMenuUI : MonoBehaviour
     
     private void Update()
     {
-        // Scroll banners continuously
-        ScrollBanner(topBanner, 1f);  // Scroll right
-        ScrollBanner(bottomBanner, -1f); // Scroll left
+        // Scroll banners continuously (seamless loop with duplicates)
+        ScrollBannerPair(topBanner, topBannerDuplicate, 1f);  // Scroll right
+        ScrollBannerPair(bottomBanner, bottomBannerDuplicate, -1f); // Scroll left
     }
     
     /// <summary>
@@ -118,26 +120,67 @@ public class MainMenuUI : MonoBehaviour
     }
     
     /// <summary>
-    /// Scroll a banner horizontally, looping seamlessly.
+    /// Scroll a banner pair horizontally for seamless looping.
+    /// When one banner scrolls off-screen, it repositions behind the other.
     /// </summary>
-    private void ScrollBanner(RectTransform banner, float direction)
+    private void ScrollBannerPair(RectTransform banner1, RectTransform banner2, float direction)
     {
-        if (banner == null) return;
+        if (banner1 == null) return;
         
-        Vector2 pos = banner.anchoredPosition;
-        pos.x += direction * bannerScrollSpeed * Time.deltaTime;
+        // Move banner 1
+        Vector2 pos1 = banner1.anchoredPosition;
+        pos1.x += direction * bannerScrollSpeed * Time.deltaTime;
+        banner1.anchoredPosition = pos1;
         
-        // Loop when scrolled past banner width
-        if (direction > 0 && pos.x > bannerWidth / 2f)
+        // Move banner 2 (if exists)
+        if (banner2 != null)
         {
-            pos.x -= bannerWidth;
+            Vector2 pos2 = banner2.anchoredPosition;
+            pos2.x += direction * bannerScrollSpeed * Time.deltaTime;
+            banner2.anchoredPosition = pos2;
+            
+            // Check if either banner needs to wrap around
+            if (direction > 0) // Scrolling right
+            {
+                if (pos1.x > bannerWidth)
+                {
+                    pos1.x = pos2.x - bannerWidth;
+                    banner1.anchoredPosition = pos1;
+                }
+                if (pos2.x > bannerWidth)
+                {
+                    pos2.x = pos1.x - bannerWidth;
+                    banner2.anchoredPosition = pos2;
+                }
+            }
+            else // Scrolling left
+            {
+                if (pos1.x < -bannerWidth)
+                {
+                    pos1.x = pos2.x + bannerWidth;
+                    banner1.anchoredPosition = pos1;
+                }
+                if (pos2.x < -bannerWidth)
+                {
+                    pos2.x = pos1.x + bannerWidth;
+                    banner2.anchoredPosition = pos2;
+                }
+            }
         }
-        else if (direction < 0 && pos.x < -bannerWidth / 2f)
+        else
         {
-            pos.x += bannerWidth;
+            // Fallback for single banner (will have gaps)
+            if (direction > 0 && pos1.x > bannerWidth / 2f)
+            {
+                pos1.x -= bannerWidth;
+                banner1.anchoredPosition = pos1;
+            }
+            else if (direction < 0 && pos1.x < -bannerWidth / 2f)
+            {
+                pos1.x += bannerWidth;
+                banner1.anchoredPosition = pos1;
+            }
         }
-        
-        banner.anchoredPosition = pos;
     }
     
     /// <summary>

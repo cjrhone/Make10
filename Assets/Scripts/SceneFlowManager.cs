@@ -145,6 +145,17 @@ public class SceneFlowManager : MonoBehaviour
         
         Debug.Log("LoadingSequence complete - transitioning to MainMenu");
         
+        // Start menu music
+        if (AudioManager.Instance != null)
+        {
+            Debug.Log("AudioManager found - calling PlayMenuMusic");
+            AudioManager.Instance.PlayMenuMusic();
+        }
+        else
+        {
+            Debug.LogWarning("AudioManager.Instance is NULL - cannot play menu music!");
+        }
+        
         // Transition to main menu
         yield return StartCoroutine(TransitionToPanel(loadingPanel, mainMenuPanel, true));
         CurrentState = GameState.MainMenu;
@@ -156,6 +167,10 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator TransitionToPanel(RectTransform fromPanel, RectTransform toPanel, bool slideLeft)
     {
+        // Play swipe sound
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayTransitionSwipe();
+        
         float direction = slideLeft ? -1f : 1f;
         
         // Position incoming panel
@@ -246,16 +261,34 @@ public class SceneFlowManager : MonoBehaviour
             Debug.LogWarning($"OnPlayPressed ignored - not in MainMenu state (currently {CurrentState})");
             return;
         }
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(PlaySequence());
     }
     
     private IEnumerator PlaySequence()
     {
+        // Stop menu music
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.StopMusic();
         // Transition to game panel first
         yield return StartCoroutine(TransitionToPanel(mainMenuPanel, gamePanel, true));
+        
+        // Spawn the grid immediately so it's visible behind tutorials
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        if (gridManager != null)
+        {
+            gridManager.ResetGame();
+        }
+        
+        // Small pause to let grid render
+        yield return new WaitForSeconds(0.1f);
+        
         CurrentState = GameState.Tutorial1;
         
-        // Show tutorial 1 (slide up from bottom or fade in)
+        // Show tutorial 1 (overlay on top of grid)
         yield return StartCoroutine(ShowTutorialPanel(tutorialPanel1));
     }
     
@@ -270,6 +303,10 @@ public class SceneFlowManager : MonoBehaviour
             Debug.LogWarning($"OnOptionsPressed ignored - not in MainMenu state");
             return;
         }
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(FadePanel(optionsPanel, true));
         CurrentState = GameState.Options;
     }
@@ -280,6 +317,10 @@ public class SceneFlowManager : MonoBehaviour
     public void OnOptionsClosePressed()
     {
         if (CurrentState != GameState.Options) return;
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(CloseOptionsSequence());
     }
     
@@ -300,6 +341,10 @@ public class SceneFlowManager : MonoBehaviour
             Debug.LogWarning("OnQuitPressed ignored - not in MainMenu state");
             return;
         }
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(QuitSequence());
     }
     
@@ -308,16 +353,20 @@ public class SceneFlowManager : MonoBehaviour
         yield return StartCoroutine(TransitionToPanel(mainMenuPanel, quitPanel, true));
         CurrentState = GameState.Quit;
         
-        // Wait a moment then open itch.io
-        yield return new WaitForSeconds(1.5f);
-        
-        // Open itch.io page (replace with your actual URL)
+        // Just show the panel - user can click the itch.io button manually
+        Debug.Log("Quit panel shown. User can click itch.io button.");
+    }
+    
+    /// <summary>
+    /// Called by itch.io button on quit panel.
+    /// </summary>
+    public void OnItchIOButtonPressed()
+    {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
+        Debug.Log("Opening itch.io...");
         Application.OpenURL("https://itch.io/"); // TODO: Replace with your game's itch.io URL
-        
-        // On standalone builds, quit the app
-        #if !UNITY_WEBGL
-        Application.Quit();
-        #endif
     }
     
     /// <summary>
@@ -326,6 +375,10 @@ public class SceneFlowManager : MonoBehaviour
     public void OnTutorial1OkPressed()
     {
         if (CurrentState != GameState.Tutorial1) return;
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(Tutorial1ToTutorial2());
     }
     
@@ -342,6 +395,10 @@ public class SceneFlowManager : MonoBehaviour
     public void OnTutorial2GotThisPressed()
     {
         if (CurrentState != GameState.Tutorial2) return;
+        
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+            
         StartCoroutine(Tutorial2ToCountdown());
     }
     
@@ -396,6 +453,7 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator CountdownSequence()
     {
+        Debug.Log("CountdownSequence started");
         SetPanelPosition(countdownPanel, 0);
         countdownPanel.localScale = Vector3.one;
         
@@ -406,6 +464,15 @@ public class SceneFlowManager : MonoBehaviour
             if (countdownText != null)
             {
                 countdownText.text = step;
+                
+                // Play countdown sound
+                if (AudioManager.Instance != null)
+                {
+                    if (step == "GO!")
+                        AudioManager.Instance.PlayCountdownGo();
+                    else
+                        AudioManager.Instance.PlayCountdownBeep();
+                }
                 
                 // Pop animation
                 countdownPanel.localScale = Vector3.one * 1.5f;
@@ -423,14 +490,35 @@ public class SceneFlowManager : MonoBehaviour
         }
         
         // Hide countdown, start game
+        Debug.Log("Countdown complete - hiding panel and starting game");
         yield return StartCoroutine(HideTutorialPanel(countdownPanel));
         CurrentState = GameState.Game;
+        Debug.Log("State changed to Game - about to play game music");
         
-        // Notify GameManager to start
+        // Start game music
+        if (AudioManager.Instance != null)
+        {
+            Debug.Log("Starting game music...");
+            AudioManager.Instance.PlayGameMusic();
+        }
+        else
+        {
+            Debug.LogWarning("AudioManager.Instance is NULL - cannot play game music!");
+        }
+        
+        // Grid is already spawned from PlaySequence - just activate the game
+        Debug.Log("About to call ActivateGame()");
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.StartNewGame();
+            // Don't call StartNewGame() - grid already exists
+            // Just make sure the game is active
+            GameManager.Instance.ActivateGame();
         }
+        else
+        {
+            Debug.LogWarning("GameManager.Instance is NULL!");
+        }
+        Debug.Log("CountdownSequence complete");
     }
     
     /// <summary>

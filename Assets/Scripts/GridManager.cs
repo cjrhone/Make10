@@ -34,12 +34,12 @@ public class GridManager : MonoBehaviour
     
     [Header("Tile Value Weights (must sum to 1.0)")]
     [SerializeField] private float weight0 = 0.15f; // 0 tiles - wildcard
-    [SerializeField] private float weight1 = 0.26f; // 1 tiles - common
-    [SerializeField] private float weight2 = 0.24f; // 2 tiles
-    [SerializeField] private float weight3 = 0.15f; // 3 tiles
-    [SerializeField] private float weight4 = 0.12f; // 4 tiles
-    [SerializeField] private float weight5 = 0.04f; // 5 tiles - rare
-    [SerializeField] private float weight6 = 0.04f; // 6 tiles - very rare
+    [SerializeField] private float weight1 = 0.27f; // 1 tiles - common
+    [SerializeField] private float weight2 = 0.26f; // 2 tiles - common
+    [SerializeField] private float weight3 = 0.17f; // 3 tiles
+    [SerializeField] private float weight4 = 0.13f; // 4 tiles
+    [SerializeField] private float weight5 = 0.01f; // 5 tiles - very rare
+    [SerializeField] private float weight6 = 0.01f; // 6 tiles - extremely rare (blockers)
 
     
     // The grid array
@@ -179,14 +179,20 @@ public class GridManager : MonoBehaviour
     /// </summary>
     private void HandleTileClicked(Tile tile)
     {
-        // Don't allow interaction while processing
+        // Don't allow interaction while processing or game not active
         if (isProcessing) return;
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
         if (selectedTile == null)
         {
             // First selection
             selectedTile = tile;
             tile.Select();
+            
+            // Play select sound
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlayTileSelect();
+            
             Debug.Log($"Selected: {tile}");
         }
         else if (selectedTile == tile)
@@ -242,8 +248,9 @@ public class GridManager : MonoBehaviour
     /// </summary>
     private void HandleTileSwiped(Tile tile, SwipeDirection direction)
     {
-        // Don't allow interaction while processing
+        // Don't allow interaction while processing or game not active
         if (isProcessing) return;
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
         // Calculate neighbor position based on swipe direction
         int neighborX = tile.GridX;
@@ -298,6 +305,10 @@ public class GridManager : MonoBehaviour
     private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB)
     {
         isProcessing = true;
+        
+        // Play swap sound
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySwapSound();
         
         // Get positions
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
@@ -386,6 +397,10 @@ public class GridManager : MonoBehaviour
             Debug.Log($"<color=yellow>MATCH {cascadeCount}!</color> " +
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
                     $"{result.TotalMatchedTiles} tiles");
+            
+            // Play match sound
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlayMatchSound();
             
             // 1. Animate tiles converging and show "10"
             yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));

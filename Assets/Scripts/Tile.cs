@@ -31,6 +31,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private float pulseMinScale = 1.05f;
     [SerializeField] private float pulseMaxScale = 1.12f;
     [SerializeField] private float pulseSpeed = 4f;
+    [SerializeField] private float floatAmount = 8f; // How much the tile floats up/down
+    [SerializeField] private float floatSpeed = 3f; // Speed of floating animation
     
     [Header("Swipe Settings")]
     [SerializeField] private float swipeThreshold = 30f; // Minimum distance to register swipe
@@ -47,6 +49,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     
     private RectTransform rectTransform;
     private Coroutine pulseCoroutine;
+    private Vector2 originalAnchoredPosition; // Store original position for floating
+    private bool wasFloating = false; // Track if we actually started floating
     
     // Swipe tracking
     private Vector2 swipeStartPos;
@@ -162,11 +166,15 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     }
     
     /// <summary>
-    /// Select this tile (visual highlight with pulse).
+    /// Select this tile (visual highlight with pulse and float).
     /// </summary>
     public void Select()
     {
         IsSelected = true;
+        
+        // Store original position for floating
+        originalAnchoredPosition = rectTransform.anchoredPosition;
+        wasFloating = true;
         
         if (selectionHighlight != null)
         {
@@ -196,6 +204,13 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         
         StopPulse();
         transform.localScale = Vector3.one;
+        
+        // Only restore position if we were actually floating
+        if (wasFloating && rectTransform != null)
+        {
+            rectTransform.anchoredPosition = originalAnchoredPosition;
+            wasFloating = false;
+        }
     }
     
     /// <summary>
@@ -220,7 +235,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     }
     
     /// <summary>
-    /// Pulsing scale and color animation while selected.
+    /// Pulsing scale, color, and floating animation while selected.
     /// </summary>
     private IEnumerator PulseCoroutine()
     {
@@ -239,6 +254,13 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             if (backgroundImage != null)
             {
                 backgroundImage.color = Color.Lerp(baseColor, brightColor, t);
+            }
+            
+            // Float up and down (using a different frequency for variety)
+            float floatOffset = Mathf.Sin(Time.time * floatSpeed) * floatAmount;
+            if (rectTransform != null)
+            {
+                rectTransform.anchoredPosition = originalAnchoredPosition + new Vector2(0, floatOffset);
             }
             
             yield return null;

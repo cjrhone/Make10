@@ -11,18 +11,28 @@ public class UIManager : MonoBehaviour
     [Header("Score Display")]
     [SerializeField] private TMP_Text scoreText;
     [SerializeField] private TMP_Text targetScoreText;
+    [SerializeField] private Slider scoreProgressSlider; // Progress toward win score
+    [SerializeField] private Image scoreProgressFillImage; // Optional fill image for color control
     
-    [Header("Motivation Bar")]
-    [SerializeField] private Slider motivationSlider;
-    [SerializeField] private Image motivationFillImage;
-    [SerializeField] private TMP_Text motivationText;
+    [Header("Score Progress Colors")]
+    [SerializeField] private Color scoreProgressStartColor = new Color(0.3f, 0.5f, 0.9f); // Blue
+    [SerializeField] private Color scoreProgressMidColor = new Color(0.9f, 0.7f, 0.2f);   // Gold
+    [SerializeField] private Color scoreProgressFullColor = new Color(0.3f, 0.9f, 0.3f);  // Green
     
-    [Header("Motivation Bar Colors")]
-    [SerializeField] private Color healthyColor = new Color(0.3f, 0.8f, 0.3f);
-    [SerializeField] private Color warningColor = new Color(0.9f, 0.7f, 0.2f);
-    [SerializeField] private Color dangerColor = new Color(0.9f, 0.2f, 0.2f);
-    [SerializeField] private float warningThreshold = 50f;
-    [SerializeField] private float dangerThreshold = 25f;
+    [Header("Timer Display")]
+    [SerializeField] private TMP_Text timerText;
+    [SerializeField] private TMP_Text timerShadowText; // Optional duplicate for drop shadow effect
+    [SerializeField] private Image timerFillImage; // Optional circular or bar fill
+    [SerializeField] private Slider timerSlider; // Optional slider display
+    
+    [Header("Timer Colors")]
+    [SerializeField] private bool useTimerTextColorChange = false; // Set false to keep your own text colors
+    [SerializeField] private bool useTimerFillColorChange = true; // Set true to change fill colors
+    [SerializeField] private Color timerHealthyColor = new Color(0.3f, 0.8f, 0.3f);
+    [SerializeField] private Color timerWarningColor = new Color(0.9f, 0.7f, 0.2f);
+    [SerializeField] private Color timerDangerColor = new Color(0.9f, 0.2f, 0.2f);
+    [SerializeField] private float timerWarningThreshold = 20f; // seconds
+    [SerializeField] private float timerDangerThreshold = 10f; // seconds
     
     [Header("Multiplier Bar (NEW)")]
     [SerializeField] private GameObject multiplierPanel;
@@ -45,6 +55,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject scorePopupPrefab;
     [SerializeField] private Transform scorePopupParent;
     
+    [Header("Game Over Settings")]
+    [SerializeField] private GameObject finishTextObject; // "FINISH" text that appears before win/lose
+    [SerializeField] private float finishTextDuration = 1.5f; // How long to show "FINISH"
+    
     [Header("Game Over Screens")]
     [SerializeField] private GameObject winScreen;
     [SerializeField] private GameObject loseScreen;
@@ -58,8 +72,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameManager gameManager;
     [SerializeField] private GridManager gridManager;
     
-    private Coroutine motivationPulseCoroutine;
+    private Coroutine timerPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
+    private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
     
     private void Awake()
@@ -101,7 +116,7 @@ public class UIManager : MonoBehaviour
         
         // Subscribe to GameManager events
         gameManager.OnScoreChanged += HandleScoreChanged;
-        gameManager.OnMotivationChanged += HandleMotivationChanged;
+        gameManager.OnTimeChanged += HandleTimeChanged;
         gameManager.OnMultiplierChanged += HandleMultiplierChanged;
         gameManager.OnGameWon += HandleGameWon;
         gameManager.OnGameLost += HandleGameLost;
@@ -124,7 +139,7 @@ public class UIManager : MonoBehaviour
         if (gameManager != null)
         {
             gameManager.OnScoreChanged -= HandleScoreChanged;
-            gameManager.OnMotivationChanged -= HandleMotivationChanged;
+            gameManager.OnTimeChanged -= HandleTimeChanged;
             gameManager.OnMultiplierChanged -= HandleMultiplierChanged;
             gameManager.OnGameWon -= HandleGameWon;
             gameManager.OnGameLost -= HandleGameLost;
@@ -141,9 +156,10 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void InitializeUI()
     {
-        // Hide game over screens
+        // Hide game over screens and finish text
         if (winScreen != null) winScreen.SetActive(false);
         if (loseScreen != null) loseScreen.SetActive(false);
+        if (finishTextObject != null) finishTextObject.SetActive(false);
         if (unsolvablePopup != null) unsolvablePopup.SetActive(false);
         
         // Hide multiplier panel initially
@@ -155,11 +171,19 @@ public class UIManager : MonoBehaviour
             targetScoreText.text = $"/ {gameManager.WinScore}";
         }
         
-        // Initialize motivation bar
-        if (motivationSlider != null)
+        // Initialize score progress bar
+        if (scoreProgressSlider != null && gameManager != null)
         {
-            motivationSlider.maxValue = 100f;
-            motivationSlider.value = 100f;
+            scoreProgressSlider.minValue = 0;
+            scoreProgressSlider.maxValue = gameManager.WinScore;
+            scoreProgressSlider.value = 0;
+        }
+        
+        // Initialize timer slider if present
+        if (timerSlider != null && gameManager != null)
+        {
+            timerSlider.maxValue = gameManager.GameDuration;
+            timerSlider.value = gameManager.GameDuration;
         }
         
         // Initialize multiplier bar - read duration from GameManager
@@ -170,7 +194,7 @@ public class UIManager : MonoBehaviour
         }
         
         UpdateScoreDisplay(0);
-        UpdateMotivationBar(100f);
+        UpdateTimerDisplay(gameManager != null ? gameManager.GameDuration : 60f);
     }
     
     /// <summary>
@@ -187,11 +211,11 @@ public class UIManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Handle motivation changes.
+    /// Handle time changes.
     /// </summary>
-    private void HandleMotivationChanged(float motivation)
+    private void HandleTimeChanged(float timeRemaining)
     {
-        UpdateMotivationBar(motivation);
+        UpdateTimerDisplay(timeRemaining);
     }
     
     /// <summary>
@@ -203,7 +227,7 @@ public class UIManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Update the score display.
+    /// Update the score display and progress bar.
     /// </summary>
     private void UpdateScoreDisplay(int score)
     {
@@ -212,39 +236,118 @@ public class UIManager : MonoBehaviour
             scoreText.text = score.ToString();
             StartCoroutine(PunchScale(scoreText.transform, 1.2f, 0.15f));
         }
-    }
-    
-    /// <summary>
-    /// Update the motivation bar.
-    /// </summary>
-    private void UpdateMotivationBar(float motivation)
-    {
-        if (motivationSlider != null)
+        
+        // Update progress bar
+        if (scoreProgressSlider != null)
         {
-            motivationSlider.value = motivation;
+            scoreProgressSlider.value = score;
         }
         
-        if (motivationText != null)
+        // Update progress bar color based on progress
+        if (scoreProgressFillImage != null && gameManager != null)
         {
-            motivationText.text = $"{Mathf.RoundToInt(motivation)}%";
-        }
-        
-        if (motivationFillImage != null)
-        {
-            if (motivation <= dangerThreshold)
+            float progress = (float)score / gameManager.WinScore;
+            
+            if (progress < 0.5f)
             {
-                motivationFillImage.color = dangerColor;
-                StartDangerPulse();
-            }
-            else if (motivation <= warningThreshold)
-            {
-                motivationFillImage.color = warningColor;
-                StopDangerPulse();
+                // Blue to Gold (0% to 50%)
+                float t = progress / 0.5f;
+                scoreProgressFillImage.color = Color.Lerp(scoreProgressStartColor, scoreProgressMidColor, t);
             }
             else
             {
-                motivationFillImage.color = healthyColor;
-                StopDangerPulse();
+                // Gold to Green (50% to 100%)
+                float t = (progress - 0.5f) / 0.5f;
+                scoreProgressFillImage.color = Color.Lerp(scoreProgressMidColor, scoreProgressFullColor, t);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Update the countdown timer display.
+    /// </summary>
+    private void UpdateTimerDisplay(float timeRemaining)
+    {
+        int seconds = Mathf.CeilToInt(timeRemaining);
+        
+        // Determine current danger state for sounds/pulse (regardless of color settings)
+        bool inDanger = timeRemaining <= timerDangerThreshold;
+        bool inWarning = timeRemaining <= timerWarningThreshold;
+        
+        // Handle pulse and warning sounds based on time state
+        if (inDanger)
+        {
+            StartTimerPulse();
+            
+            // Start warning sound if not already playing
+            if (!isTimeWarningPlaying && AudioManager.Instance != null)
+            {
+                AudioManager.Instance.StartTimeWarning();
+                isTimeWarningPlaying = true;
+            }
+        }
+        else
+        {
+            StopTimerPulse();
+            StopTimeWarningSound();
+        }
+        
+        // Update main text display
+        if (timerText != null)
+        {
+            timerText.text = seconds.ToString();
+            
+            // Only change text color if enabled
+            if (useTimerTextColorChange)
+            {
+                if (inDanger)
+                {
+                    timerText.color = timerDangerColor;
+                }
+                else if (inWarning)
+                {
+                    timerText.color = timerWarningColor;
+                }
+                else
+                {
+                    timerText.color = timerHealthyColor;
+                }
+            }
+        }
+        
+        // Update shadow text (if using duplicate approach)
+        if (timerShadowText != null)
+        {
+            timerShadowText.text = seconds.ToString();
+        }
+        
+        // Update optional slider
+        if (timerSlider != null)
+        {
+            timerSlider.value = timeRemaining;
+        }
+        
+        // Update optional fill image
+        if (timerFillImage != null && gameManager != null)
+        {
+            float fillAmount = timeRemaining / gameManager.GameDuration;
+            timerFillImage.fillAmount = fillAmount;
+            
+            // Only change fill color if enabled
+            if (useTimerFillColorChange)
+            {
+                if (inDanger)
+                {
+                    timerFillImage.color = timerDangerColor;
+                }
+                else if (inWarning)
+                {
+                    timerFillImage.color = timerWarningColor;
+                }
+                else
+                {
+                    timerFillImage.color = timerHealthyColor;
+                }
             }
         }
     }
@@ -362,45 +465,57 @@ public class UIManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Start pulsing the motivation bar when in danger.
+    /// Start pulsing the timer when in danger zone.
     /// </summary>
-    private void StartDangerPulse()
+    private void StartTimerPulse()
     {
-        if (motivationPulseCoroutine == null)
+        if (timerPulseCoroutine == null && timerText != null)
         {
-            motivationPulseCoroutine = StartCoroutine(DangerPulseCoroutine());
+            timerPulseCoroutine = StartCoroutine(TimerPulseCoroutine());
         }
     }
     
     /// <summary>
-    /// Stop the danger pulse.
+    /// Stop the timer pulse.
     /// </summary>
-    private void StopDangerPulse()
+    private void StopTimerPulse()
     {
-        if (motivationPulseCoroutine != null)
+        if (timerPulseCoroutine != null)
         {
-            StopCoroutine(motivationPulseCoroutine);
-            motivationPulseCoroutine = null;
+            StopCoroutine(timerPulseCoroutine);
+            timerPulseCoroutine = null;
             
-            if (motivationSlider != null)
+            if (timerText != null)
             {
-                motivationSlider.transform.localScale = Vector3.one;
+                timerText.transform.localScale = Vector3.one;
             }
         }
     }
     
     /// <summary>
-    /// Pulse animation for danger state.
+    /// Stop the time warning sound.
     /// </summary>
-    private IEnumerator DangerPulseCoroutine()
+    private void StopTimeWarningSound()
+    {
+        if (isTimeWarningPlaying && AudioManager.Instance != null)
+        {
+            AudioManager.Instance.StopTimeWarning();
+            isTimeWarningPlaying = false;
+        }
+    }
+    
+    /// <summary>
+    /// Pulse animation for danger state (low time).
+    /// </summary>
+    private IEnumerator TimerPulseCoroutine()
     {
         while (true)
         {
-            if (motivationSlider != null)
+            if (timerText != null)
             {
                 float t = (Mathf.Sin(Time.time * 8f) + 1f) / 2f;
-                float scale = Mathf.Lerp(1f, 1.05f, t);
-                motivationSlider.transform.localScale = Vector3.one * scale;
+                float scale = Mathf.Lerp(1f, 1.15f, t);
+                timerText.transform.localScale = Vector3.one * scale;
             }
             yield return null;
         }
@@ -489,30 +604,100 @@ public class UIManager : MonoBehaviour
     /// </summary>
     private void HandleGameWon()
     {
-        if (winScreen != null)
-        {
-            winScreen.SetActive(true);
-        }
+        // Stop warning sound
+        StopTimeWarningSound();
         
-        if (finalScoreText != null)
-        {
-            finalScoreText.text = $"Final Score: {gameManager.Score}";
-        }
+        // Show FINISH sequence
+        StartCoroutine(ShowFinishThenResult(true));
     }
     
     /// <summary>
-    /// Handle lose state.
+    /// Handle lose state (time ran out before reaching goal).
     /// </summary>
     private void HandleGameLost()
     {
-        if (loseScreen != null)
+        // Stop warning sound
+        StopTimeWarningSound();
+        
+        // Show FINISH sequence
+        StartCoroutine(ShowFinishThenResult(false));
+    }
+    
+    /// <summary>
+    /// Show "FINISH" text, then reveal win/lose screen.
+    /// </summary>
+    private IEnumerator ShowFinishThenResult(bool isWin)
+    {
+        // Play finish sound
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayFinishSound();
+        
+        // Show FINISH text with pop animation
+        if (finishTextObject != null)
         {
-            loseScreen.SetActive(true);
+            finishTextObject.SetActive(true);
+            finishTextObject.transform.localScale = Vector3.zero;
+            
+            // Pop in
+            float elapsed = 0f;
+            while (elapsed < 0.2f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.2f;
+                float scale = Mathf.Lerp(0f, 1.2f, t);
+                finishTextObject.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            
+            // Settle to normal
+            elapsed = 0f;
+            while (elapsed < 0.1f)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / 0.1f;
+                float scale = Mathf.Lerp(1.2f, 1f, t);
+                finishTextObject.transform.localScale = Vector3.one * scale;
+                yield return null;
+            }
+            
+            finishTextObject.transform.localScale = Vector3.one;
         }
         
-        if (finalScoreText != null)
+        // Wait for finish duration
+        yield return new WaitForSeconds(finishTextDuration);
+        
+        // Hide FINISH text
+        if (finishTextObject != null)
         {
-            finalScoreText.text = $"Score: {gameManager.Score}";
+            finishTextObject.SetActive(false);
+        }
+        
+        // Show appropriate result screen
+        if (isWin)
+        {
+            if (winScreen != null)
+            {
+                winScreen.SetActive(true);
+            }
+            
+            if (finalScoreText != null)
+            {
+                float timeLeft = gameManager != null ? gameManager.TimeRemaining : 0f;
+                finalScoreText.text = $"Score: {gameManager.Score}\nTime Left: {timeLeft:F1}s";
+            }
+        }
+        else
+        {
+            if (loseScreen != null)
+            {
+                loseScreen.SetActive(true);
+            }
+            
+            if (finalScoreText != null)
+            {
+                int target = gameManager != null ? gameManager.WinScore : 250;
+                finalScoreText.text = $"Score: {gameManager.Score} / {target}\nSo close!";
+            }
         }
     }
     
@@ -573,8 +758,16 @@ public class UIManager : MonoBehaviour
     /// </summary>
     public void OnRestartButtonClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayButtonClick();
+        
         if (winScreen != null) winScreen.SetActive(false);
         if (loseScreen != null) loseScreen.SetActive(false);
+        
+        // Stop any active pulses and sounds
+        StopTimerPulse();
+        StopMultiplierPulse();
+        StopTimeWarningSound();
         
         if (gameManager != null)
         {

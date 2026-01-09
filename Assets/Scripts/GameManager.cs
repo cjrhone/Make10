@@ -18,9 +18,7 @@ public class GameManager : MonoBehaviour
     [Header("Game Settings")]
     [SerializeField] private int winScore = 250;
     public int WinScore => winScore;
-    [SerializeField] private float startingMotivation = 100f;
-    [SerializeField] private float motivationDrainRate = 1f;
-    [SerializeField] private float motivationMatchReward = 15f;
+    [SerializeField] private float gameDuration = 60f; // Countdown timer in seconds
     [SerializeField] private float postWinDelay = 0.5f; // delay before win screen
     
     [Header("Scoring")]
@@ -38,10 +36,11 @@ public class GameManager : MonoBehaviour
     
     // Current state
     public int Score { get; private set; }
-    public float Motivation { get; private set; }
+    public float TimeRemaining { get; private set; }
+    public float GameDuration => gameDuration;
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
-    public bool IsSolveAnimationPlaying { get; set; } // Pause bars during solve animation
+    public bool IsSolveAnimationPlaying { get; set; } // Pause timer during solve animation
     
     // Multiplier state
     private int solveCount = 0;
@@ -58,7 +57,7 @@ public class GameManager : MonoBehaviour
     
     // Events for UI updates
     public event Action<int, int> OnScoreChanged; // current, delta
-    public event Action<float> OnMotivationChanged;
+    public event Action<float> OnTimeChanged; // time remaining
     public event Action<bool, float, float> OnMultiplierChanged; // active, multiplier (float), timer
     public event Action OnGameWon;
     public event Action OnGameLost;
@@ -92,13 +91,13 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         
-        // Don't drain anything during solve animations
+        // Don't drain time during solve animations
         if (IsSolveAnimationPlaying) return;
         
-        // Drain motivation while not processing
+        // Countdown timer (always drains, not just when idle)
         if (!IsProcessing)
         {
-            DrainMotivation(Time.deltaTime);
+            DrainTime(Time.deltaTime);
         }
         
         // Drain multiplier timer if active
@@ -126,7 +125,7 @@ public class GameManager : MonoBehaviour
     public void StartNewGame()
     {
         Score = 0;
-        Motivation = startingMotivation;
+        TimeRemaining = gameDuration;
         IsGameActive = true;
         IsProcessing = false;
         IsSolveAnimationPlaying = false;
@@ -139,7 +138,7 @@ public class GameManager : MonoBehaviour
         timeSinceLastSolve = 0f;
         
         OnScoreChanged?.Invoke(Score, 0);
-        OnMotivationChanged?.Invoke(Motivation);
+        OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
         // Tell GridManager to spawn/reset the grid
@@ -150,6 +149,32 @@ public class GameManager : MonoBehaviour
         }
         
         Debug.Log("Game started!");
+    }
+    
+    /// <summary>
+    /// Activate the game without resetting the grid (used when grid was pre-spawned).
+    /// </summary>
+    public void ActivateGame()
+    {
+        Score = 0;
+        TimeRemaining = gameDuration;
+        IsGameActive = true;
+        IsProcessing = false;
+        IsSolveAnimationPlaying = false;
+        
+        // Reset multiplier state
+        solveCount = 0;
+        currentMultiplier = 1f;
+        multiplierTimer = 0f;
+        multiplierActive = false;
+        timeSinceLastSolve = 0f;
+        
+        OnScoreChanged?.Invoke(Score, 0);
+        OnTimeChanged?.Invoke(TimeRemaining);
+        OnMultiplierChanged?.Invoke(false, 1f, 0f);
+        
+        // Don't reset grid - it's already spawned
+        Debug.Log("Game activated! (grid already exists)");
     }
     
     /// <summary>
@@ -231,8 +256,7 @@ public class GameManager : MonoBehaviour
         Score += pointsAwarded;
         OnScoreChanged?.Invoke(Score, pointsAwarded);
         
-        // Restore motivation
-        RestoreMotivation(motivationMatchReward);
+        // No motivation restoration - timer just keeps counting down!
         
         // Check win condition
         if (Score >= winScore)
@@ -285,30 +309,52 @@ public class GameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Drain motivation over time.
+    /// Drain the countdown timer.
     /// </summary>
-    private void DrainMotivation(float deltaTime)
+    private void DrainTime(float deltaTime)
     {
-        Motivation -= motivationDrainRate * deltaTime;
-        Motivation = Mathf.Max(0f, Motivation);
+        TimeRemaining -= deltaTime;
+        TimeRemaining = Mathf.Max(0f, TimeRemaining);
         
-        OnMotivationChanged?.Invoke(Motivation);
+        OnTimeChanged?.Invoke(TimeRemaining);
         
-        if (Motivation <= 0f)
+        if (TimeRemaining <= 0f)
         {
-            LoseGame();
+            TimeUp();
         }
     }
     
     /// <summary>
-    /// Restore motivation (from matches).
+    /// Time's up! Check if player reached goal.
     /// </summary>
-    private void RestoreMotivation(float amount)
+    private void TimeUp()
     {
-        Motivation += amount;
-        Motivation = Mathf.Min(startingMotivation, Motivation);
+        IsGameActive = false;
         
-        OnMotivationChanged?.Invoke(Motivation);
+        if (Score >= winScore)
+        {
+            // Player reached goal in time!
+            Debug.Log("<color=cyan>*** TIME'S UP - YOU WIN! ***</color>");
+            
+            if (SceneFlowManager.Instance != null)
+            {
+                SceneFlowManager.Instance.OnGameEnded(true);
+            }
+            
+            OnGameWon?.Invoke();
+        }
+        else
+        {
+            // Player didn't reach goal
+            Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{winScore}");
+            
+            if (SceneFlowManager.Instance != null)
+            {
+                SceneFlowManager.Instance.OnGameEnded(false);
+            }
+            
+            OnGameLost?.Invoke();
+        }
     }
     
     /// <summary>
@@ -321,12 +367,12 @@ public class GameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Player wins!
+    /// Player wins! (reached score goal before time ran out)
     /// </summary>
     private void WinGame()
     {
         IsGameActive = false;
-        Debug.Log("<color=cyan>*** YOU WIN! ***</color>");
+        Debug.Log($"<color=cyan>*** YOU WIN! ***</color> Score: {Score} | Time left: {TimeRemaining:F1}s");
         
         // Notify SceneFlowManager of state change
         if (SceneFlowManager.Instance != null)
@@ -335,23 +381,6 @@ public class GameManager : MonoBehaviour
         }
         
         OnGameWon?.Invoke();
-    }
-    
-    /// <summary>
-    /// Player loses (motivation depleted).
-    /// </summary>
-    private void LoseGame()
-    {
-        IsGameActive = false;
-        Debug.Log("<color=red>*** GAME OVER - Lost Motivation ***</color>");
-        
-        // Notify SceneFlowManager of state change
-        if (SceneFlowManager.Instance != null)
-        {
-            SceneFlowManager.Instance.OnGameEnded(false);
-        }
-        
-        OnGameLost?.Invoke();
     }
     
     /// <summary>

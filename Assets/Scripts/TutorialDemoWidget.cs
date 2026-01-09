@@ -270,12 +270,17 @@ public class TutorialDemoWidget : MonoBehaviour
                     demoBackgrounds[i].color = c;
                 }
                 
-                // Brighten then fade text
+                // Brighten then fade text (matching game behavior)
                 if (demoTexts[i] != null)
                 {
                     Color origColor = numberColors[demoValues[i]];
                     Color brightColor = Color.Lerp(origColor, Color.white, easedT);
-                    float alpha = easedT > 0.5f ? 1f - (easedT - 0.5f) * 2f : 1f;
+                    
+                    // Fade out alpha (start fading at 40% through animation)
+                    float fadeStart = 0.4f;
+                    float alphaT = Mathf.Clamp01((easedT - fadeStart) / (1f - fadeStart));
+                    float alpha = 1f - alphaT;
+                    
                     demoTexts[i].color = new Color(brightColor.r, brightColor.g, brightColor.b, alpha);
                 }
             }
