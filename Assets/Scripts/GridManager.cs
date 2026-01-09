@@ -96,6 +96,14 @@ public class GridManager : MonoBehaviour
     /// </summary>
     public void SpawnGrid()
     {
+        Debug.Log("GridManager.SpawnGrid() called");
+        
+        if (tilePrefab == null)
+        {
+            Debug.LogError("GridManager: tilePrefab is not assigned!");
+            return;
+        }
+        
         // Clear existing tiles if any
         ClearGrid();
         
@@ -1080,10 +1088,18 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-/// Reset the game (called by UIManager on restart).
-/// </summary>
+    /// Reset the game (called by UIManager on restart or GameManager on start).
+    /// </summary>
     public void ResetGame()
     {
+        Debug.Log("GridManager.ResetGame() called");
+        
+        if (gridContainer == null)
+        {
+            Debug.LogError("GridManager: gridContainer is not assigned!");
+            return;
+        }
+        
         // Clear existing grid
         ClearGrid();
         

@@ -55,7 +55,7 @@ public class AudioManager : MonoBehaviour
             return;
         }
         Instance = this;
-        DontDestroyOnLoad(gameObject);
+        // Note: DontDestroyOnLoad removed - using single scene architecture
         
         LoadVolumeSettings();
     }

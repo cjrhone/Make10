@@ -53,9 +53,16 @@ public class MainMenuUI : MonoBehaviour
     
     /// <summary>
     /// Setup button click listeners.
+    /// NOTE: Disabled - buttons are wired via Inspector onClick instead.
+    /// Keeping this code for reference if needed later.
     /// </summary>
     private void SetupButtons()
     {
+        // Buttons are wired in Inspector - don't double-wire here
+        // If you want to use code-based wiring instead, uncomment below
+        // and remove the Inspector onClick events
+        
+        /*
         if (playButton != null)
         {
             playButton.onClick.AddListener(() => {
@@ -79,6 +86,7 @@ public class MainMenuUI : MonoBehaviour
                     SceneFlowManager.Instance.OnQuitPressed();
             });
         }
+        */
     }
     
     /// <summary>

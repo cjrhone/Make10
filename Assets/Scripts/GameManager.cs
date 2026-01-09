@@ -142,6 +142,13 @@ public class GameManager : MonoBehaviour
         OnMotivationChanged?.Invoke(Motivation);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
+        // Tell GridManager to spawn/reset the grid
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        if (gridManager != null)
+        {
+            gridManager.ResetGame();
+        }
+        
         Debug.Log("Game started!");
     }
     

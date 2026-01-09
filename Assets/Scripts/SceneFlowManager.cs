@@ -127,6 +127,7 @@ public class SceneFlowManager : MonoBehaviour
     private IEnumerator LoadingSequence()
     {
         CurrentState = GameState.Loading;
+        Debug.Log("LoadingSequence started");
         
         float elapsed = 0f;
         while (elapsed < fakeLoadDuration)
@@ -142,9 +143,12 @@ public class SceneFlowManager : MonoBehaviour
             yield return null;
         }
         
+        Debug.Log("LoadingSequence complete - transitioning to MainMenu");
+        
         // Transition to main menu
         yield return StartCoroutine(TransitionToPanel(loadingPanel, mainMenuPanel, true));
         CurrentState = GameState.MainMenu;
+        Debug.Log($"Now in MainMenu state. CurrentState = {CurrentState}");
     }
     
     /// <summary>
@@ -185,10 +189,19 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private IEnumerator FadePanel(RectTransform panel, bool fadeIn)
     {
+        Debug.Log($"FadePanel called - fadeIn: {fadeIn}, panel: {(panel != null ? panel.name : "NULL")}");
+        
+        if (panel == null)
+        {
+            Debug.LogError("FadePanel: panel is null!");
+            yield break;
+        }
+        
         CanvasGroup canvasGroup = panel.GetComponent<CanvasGroup>();
         if (canvasGroup == null)
         {
             canvasGroup = panel.gameObject.AddComponent<CanvasGroup>();
+            Debug.Log("Added CanvasGroup to panel");
         }
         
         float startAlpha = fadeIn ? 0f : 1f;
@@ -197,6 +210,9 @@ public class SceneFlowManager : MonoBehaviour
         if (fadeIn)
         {
             panel.gameObject.SetActive(true);
+            // Make sure it's centered (not off-screen)
+            panel.anchoredPosition = Vector2.zero;
+            Debug.Log($"Panel activated and centered. Position: {panel.anchoredPosition}");
         }
         
         float elapsed = 0f;
@@ -209,6 +225,7 @@ public class SceneFlowManager : MonoBehaviour
         }
         
         canvasGroup.alpha = endAlpha;
+        Debug.Log($"FadePanel complete. Alpha: {endAlpha}");
         
         if (!fadeIn)
         {
@@ -223,7 +240,12 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     public void OnPlayPressed()
     {
-        if (CurrentState != GameState.MainMenu) return;
+        Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
+        if (CurrentState != GameState.MainMenu)
+        {
+            Debug.LogWarning($"OnPlayPressed ignored - not in MainMenu state (currently {CurrentState})");
+            return;
+        }
         StartCoroutine(PlaySequence());
     }
     
@@ -242,7 +264,12 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     public void OnOptionsPressed()
     {
-        if (CurrentState != GameState.MainMenu) return;
+        Debug.Log($"OnOptionsPressed called! CurrentState = {CurrentState}");
+        if (CurrentState != GameState.MainMenu)
+        {
+            Debug.LogWarning($"OnOptionsPressed ignored - not in MainMenu state");
+            return;
+        }
         StartCoroutine(FadePanel(optionsPanel, true));
         CurrentState = GameState.Options;
     }
@@ -267,7 +294,12 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     public void OnQuitPressed()
     {
-        if (CurrentState != GameState.MainMenu) return;
+        Debug.Log($"OnQuitPressed called! CurrentState = {CurrentState}");
+        if (CurrentState != GameState.MainMenu)
+        {
+            Debug.LogWarning("OnQuitPressed ignored - not in MainMenu state");
+            return;
+        }
         StartCoroutine(QuitSequence());
     }
     
