@@ -75,7 +75,17 @@ public class GameManager : MonoBehaviour
     
     private void Start()
     {
-        StartNewGame();
+        // Don't auto-start if SceneFlowManager exists - it will call StartNewGame()
+        // For backwards compatibility (testing without SceneFlowManager), auto-start
+        if (SceneFlowManager.Instance == null)
+        {
+            Debug.Log("GameManager: No SceneFlowManager found - auto-starting for testing");
+            StartNewGame();
+        }
+        else
+        {
+            IsGameActive = false;
+        }
     }
     
     private void Update()
@@ -310,6 +320,13 @@ public class GameManager : MonoBehaviour
     {
         IsGameActive = false;
         Debug.Log("<color=cyan>*** YOU WIN! ***</color>");
+        
+        // Notify SceneFlowManager of state change
+        if (SceneFlowManager.Instance != null)
+        {
+            SceneFlowManager.Instance.OnGameEnded(true);
+        }
+        
         OnGameWon?.Invoke();
     }
     
@@ -320,6 +337,13 @@ public class GameManager : MonoBehaviour
     {
         IsGameActive = false;
         Debug.Log("<color=red>*** GAME OVER - Lost Motivation ***</color>");
+        
+        // Notify SceneFlowManager of state change
+        if (SceneFlowManager.Instance != null)
+        {
+            SceneFlowManager.Instance.OnGameEnded(false);
+        }
+        
         OnGameLost?.Invoke();
     }
     

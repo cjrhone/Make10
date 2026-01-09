@@ -4,13 +4,13 @@ using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
-/// Manages the 6x6 grid of tiles, handles spawning, swapping, and grid operations.
+/// Manages the 5x5 grid of tiles, handles spawning, swapping, and grid operations.
 /// </summary>
 public class GridManager : MonoBehaviour
 {
     [Header("Grid Settings")]
-    [SerializeField] private int gridWidth = 6;
-    [SerializeField] private int gridHeight = 6;
+    [SerializeField] private int gridWidth = 5;
+    [SerializeField] private int gridHeight = 5;
     [SerializeField] private float tileSize = 100f;
     [SerializeField] private float tileSpacing = 10f;
     
@@ -80,10 +80,15 @@ public class GridManager : MonoBehaviour
     
     private void Start()
     {
-        SpawnGrid();
-        
-        // Check for any matches on initial board and clear them
-        StartCoroutine(ProcessMatchesCoroutine());
+        // Don't auto-spawn - wait for SceneFlowManager or GameManager to call ResetGame()
+        // This prevents the game from running during loading/menu/tutorial
+        // For backwards compatibility (testing without SceneFlowManager), spawn if no flow manager exists
+        if (SceneFlowManager.Instance == null)
+        {
+            Debug.Log("No SceneFlowManager found - auto-starting grid for testing");
+            SpawnGrid();
+            StartCoroutine(ProcessMatchesCoroutine());
+        }
     }
     
     /// <summary>
@@ -331,45 +336,8 @@ public class GridManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Swap two tiles in the grid.
-    /// </summary>
-    private void SwapTiles(Tile tileA, Tile tileB)
-    {
-        Debug.Log($"Swapping {tileA} with {tileB}");
-        
-        // Store positions
-        int axOld = tileA.GridX;
-        int ayOld = tileA.GridY;
-        int bxOld = tileB.GridX;
-        int byOld = tileB.GridY;
-        
-        // Swap in grid array
-        grid[axOld, ayOld] = tileB;
-        grid[bxOld, byOld] = tileA;
-        
-        // Swap grid coordinates on tiles
-        tileA.GridX = bxOld;
-        tileA.GridY = byOld;
-        tileB.GridX = axOld;
-        tileB.GridY = ayOld;
-        
-        // Swap visual positions
-        Vector2 posA = tileA.GetRectTransform().anchoredPosition;
-        Vector2 posB = tileB.GetRectTransform().anchoredPosition;
-        
-        tileA.SetPosition(posB);
-        tileB.SetPosition(posA);
-        
-        // Check for matches after swap
-        StartCoroutine(ProcessMatchesCoroutine());
-    }
-    
-    /// <summary>
     /// Main cascade loop: Check → Clear → Fall → Spawn → Repeat
     /// </summary>
-    /// <summary>
-/// Main cascade loop: Check → Clear → Fall → Spawn → Repeat
-/// </summary>
     private IEnumerator ProcessMatchesCoroutine()
     {
         isProcessing = true;
@@ -922,34 +890,26 @@ public class GridManager : MonoBehaviour
     
     /// <summary>
     /// Spawn new tiles at the top to fill empty spaces.
+    /// Tiles fall sequentially bottom-to-top for a stacking effect.
     /// </summary>
     private IEnumerator SpawnNewTilesCoroutine()
     {
-        List<Coroutine> spawnAnimations = new List<Coroutine>();
+        // Collect all empty positions, grouped by column, sorted bottom-to-top
+        List<(int x, int y, Tile tile)> tilesToDrop = new List<(int, int, Tile)>();
         
         // Check each column for empty spaces
         for (int x = 0; x < gridWidth; x++)
         {
-            int emptyCount = 0;
-            
-            // Count empty spaces in this column (from top)
-            for (int y = 0; y < gridHeight; y++)
-            {
-                if (grid[x, y] == null)
-                {
-                    emptyCount++;
-                }
-            }
-            
-            // Spawn tiles for empty spaces
+            // Count empties in this column to calculate spawn positions
             int spawnIndex = 0;
-            for (int y = 0; y < gridHeight; y++)
+            
+            // Find empties bottom-to-top
+            for (int y = gridHeight - 1; y >= 0; y--)
             {
                 if (grid[x, y] == null)
                 {
                     // Calculate spawn position (above the grid)
                     Vector2 spawnPos = GridToWorldPosition(x, -1 - spawnIndex);
-                    Vector2 targetPos = GridToWorldPosition(x, y);
                     
                     // Create the tile
                     GameObject tileObj = Instantiate(tilePrefab, gridContainer);
@@ -968,9 +928,8 @@ public class GridManager : MonoBehaviour
                         // Add to grid
                         grid[x, y] = newTile;
                         
-                        // Animate falling into place (with stagger delay)
-                        float delay = x * tileFallDelay;
-                        spawnAnimations.Add(StartCoroutine(AnimateNewTileFall(newTile, targetPos, delay)));
+                        // Queue for animation
+                        tilesToDrop.Add((x, y, newTile));
                     }
                     
                     spawnIndex++;
@@ -978,26 +937,29 @@ public class GridManager : MonoBehaviour
             }
         }
         
-        // Wait for all spawn animations
-        foreach (Coroutine c in spawnAnimations)
+        // Sort by y descending (bottom first), then by x (left to right)
+        tilesToDrop.Sort((a, b) => {
+            if (a.y != b.y) return b.y.CompareTo(a.y); // Bottom first (higher y)
+            return a.x.CompareTo(b.x); // Left to right
+        });
+        
+        // Drop tiles one at a time with small overlap for snappy feel
+        for (int i = 0; i < tilesToDrop.Count; i++)
         {
-            yield return c;
+            var (x, y, tile) = tilesToDrop[i];
+            Vector2 targetPos = GridToWorldPosition(x, y);
+            
+            // Start this tile falling
+            Coroutine fallCoroutine = StartCoroutine(AnimateTileFall(tile, targetPos));
+            
+            // Wait a tiny bit before starting next tile (creates stacking effect)
+            yield return new WaitForSeconds(tileFallDelay);
         }
+        
+        // Wait for the last tile to finish landing
+        yield return new WaitForSeconds(0.1f);
         
         Debug.Log("New tiles spawned");
-    }
-    
-    /// <summary>
-    /// Animate a newly spawned tile falling into place.
-    /// </summary>
-    private IEnumerator AnimateNewTileFall(Tile tile, Vector2 targetPosition, float delay)
-    {
-        if (delay > 0)
-        {
-            yield return new WaitForSeconds(delay);
-        }
-        
-        yield return StartCoroutine(AnimateTileFall(tile, targetPosition));
     }
     
     /// <summary>

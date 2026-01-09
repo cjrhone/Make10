@@ -60,16 +60,34 @@ public class UIManager : MonoBehaviour
     
     private Coroutine motivationPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
+    private bool isSubscribed = false;
+    
+    private void Awake()
+    {
+        // Try to subscribe immediately if managers exist
+        TrySubscribeToEvents();
+    }
     
     private void Start()
     {
-        StartCoroutine(InitializeAfterDelay());
+        // Retry subscription in case managers weren't ready in Awake
+        if (!isSubscribed)
+        {
+            TrySubscribeToEvents();
+        }
+        
+        InitializeUI();
+        Debug.Log("UIManager initialized successfully!");
     }
     
-    private IEnumerator InitializeAfterDelay()
+    /// <summary>
+    /// Attempt to subscribe to all manager events.
+    /// </summary>
+    private void TrySubscribeToEvents()
     {
-        yield return null;
+        if (isSubscribed) return;
         
+        // Find GameManager
         if (gameManager == null)
         {
             gameManager = GameManager.Instance;
@@ -77,30 +95,28 @@ public class UIManager : MonoBehaviour
         
         if (gameManager == null)
         {
-            Debug.LogError("UIManager: Could not find GameManager!");
-            yield break;
+            Debug.LogWarning("UIManager: GameManager not found yet, will retry...");
+            return;
         }
         
-        // Subscribe to events
+        // Subscribe to GameManager events
         gameManager.OnScoreChanged += HandleScoreChanged;
         gameManager.OnMotivationChanged += HandleMotivationChanged;
         gameManager.OnMultiplierChanged += HandleMultiplierChanged;
         gameManager.OnGameWon += HandleGameWon;
         gameManager.OnGameLost += HandleGameLost;
-    
-    // Subscribe to GridManager events
-    if (gridManager == null)
-    {
-        gridManager = FindFirstObjectByType<GridManager>();
-    }
-    if (gridManager != null)
-    {
-        gridManager.OnGridUnsolvable += HandleGridUnsolvable;
-    }
         
-        InitializeUI();
+        // Find and subscribe to GridManager events
+        if (gridManager == null)
+        {
+            gridManager = FindFirstObjectByType<GridManager>();
+        }
+        if (gridManager != null)
+        {
+            gridManager.OnGridUnsolvable += HandleGridUnsolvable;
+        }
         
-        Debug.Log("UIManager initialized successfully!");
+        isSubscribed = true;
     }
     
     private void OnDestroy()

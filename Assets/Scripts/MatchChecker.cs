@@ -176,8 +176,9 @@ public class MatchChecker : MonoBehaviour
     }
     
     /// <summary>
-    /// Check if any 6 tiles on the board can sum to 10.
+    /// Check if any row/column worth of tiles on the board can sum to 10.
     /// If not, the grid is unsolvable regardless of swaps.
+    /// Uses the actual grid width (for rows) since grid is square.
     /// </summary>
     public bool HasValidMoves()
     {
@@ -197,8 +198,10 @@ public class MatchChecker : MonoBehaviour
             }
         }
         
-        // Check if any combination of 5 tiles sums to 10
-        return CanSum(allValues, 5, targetSum, 0);
+        // Check if any combination of [gridWidth] tiles sums to 10
+        // For a 5x5 grid, we need 5 tiles to sum to 10
+        int tilesPerLine = gridSize.x; // Grid is square, so x == y
+        return CanSum(allValues, tilesPerLine, targetSum, 0);
     }
     
     /// <summary>
