@@ -533,23 +533,15 @@ public class UIManager : MonoBehaviour
     
     #region Public Methods
     
+    /// <summary>
+    /// Restart button clicked on win/lose screen.
+    /// </summary>
     public void OnRestartButtonClicked()
     {
         AudioManager.Instance?.PlayButtonClick();
         
-        // Hide game over screens
-        SetActiveIfNotNull(winScreen, false);
-        SetActiveIfNotNull(loseScreen, false);
-        SetActiveIfNotNull(finishTextObject, false);
-        
-        // Clean up any active effects
-        StopPulse(ref timerPulseCoroutine, timerText?.transform);
-        StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
-        StopTimeWarningSound();
-        DeactivateHotStreak();
-        
-        // Hide multiplier panel for fresh start
-        SetActiveIfNotNull(multiplierPanel, false);
+        // Clean up and restart
+        CleanupGameOverState();
         
         // Use SceneFlowManager to restart with countdown
         if (SceneFlowManager.Instance != null)
@@ -564,6 +556,53 @@ public class UIManager : MonoBehaviour
             GridManager grid = gridManager ?? FindFirstObjectByType<GridManager>();
             grid?.ResetGame();
         }
+    }
+    
+    /// <summary>
+    /// Main Menu button clicked on win/lose screen.
+    /// </summary>
+    public void OnMainMenuButtonClicked()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+        
+        // Clean up game over state
+        CleanupGameOverState();
+        
+        // Use SceneFlowManager's universal GoBack()
+        SceneFlowManager.Instance?.GoBack();
+    }
+    
+    /// <summary>
+    /// Hide all game over screens (called by SceneFlowManager when returning to menu).
+    /// </summary>
+    public void HideAllGameOverScreens()
+    {
+        SetActiveIfNotNull(winScreen, false);
+        SetActiveIfNotNull(loseScreen, false);
+        SetActiveIfNotNull(finishTextObject, false);
+        
+        // Also clean up effects
+        CleanupGameOverState();
+    }
+    
+    /// <summary>
+    /// Clean up all game over related state (effects, sounds, panels).
+    /// </summary>
+    private void CleanupGameOverState()
+    {
+        // Hide game over screens
+        SetActiveIfNotNull(winScreen, false);
+        SetActiveIfNotNull(loseScreen, false);
+        SetActiveIfNotNull(finishTextObject, false);
+        
+        // Clean up any active effects
+        StopPulse(ref timerPulseCoroutine, timerText?.transform);
+        StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
+        StopTimeWarningSound();
+        DeactivateHotStreak();
+        
+        // Hide multiplier panel for fresh start
+        SetActiveIfNotNull(multiplierPanel, false);
     }
     
     #endregion

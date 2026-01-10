@@ -1068,7 +1068,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &158306165
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1102,7 +1102,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2370,8 +2370,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278239487
+  m_fontColor: {r: 1, g: 0.75311047, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -4491,7 +4491,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.5372549}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5076,6 +5076,14 @@ MonoBehaviour:
   weight4: 0.12
   weight5: 0.08
   weight6: 0.08
+  enableHints: 1
+  hintDelay: 10
+  hintRepeatInterval: 3
+  hintParticleCount: 5
+  hintParticleSpeed: 120
+  hintParticleLifetime: 0.5
+  hintParticleSize: 12
+  hintParticleColor: {r: 1, g: 0.9, b: 0.3, a: 0.9}
 --- !u!1 &919049594
 GameObject:
   m_ObjectHideFlags: 0
@@ -8600,7 +8608,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.7, g: 0.7, b: 0.7, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -9195,7 +9203,7 @@ MonoBehaviour:
   tutorialPanel2: {fileID: 801159656}
   countdownPanel: {fileID: 158306165}
   quitPanel: {fileID: 747134862}
-  transitionDuration: 0.4
+  transitionDuration: 0.5
   transitionCurve:
     serializedVersion: 2
     m_Curve:
@@ -9419,7 +9427,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Motivation drains over time - but solving keeps you going! Good luck!
+  m_text: You have 60 Seconds to score as high as you can! Good luck!
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
   m_sharedMaterial: {fileID: -2455441069498650917, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
@@ -9962,7 +9970,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.5372549}
+  m_Color: {r: 0, g: 0, b: 0, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -10449,7 +10457,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.8, g: 0.8, b: 0.8, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -11617,10 +11625,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HotStreakEffect
   panelTransform: {fileID: 2128208160}
-  barFillTransform: {fileID: 1832537880}
   multiplierText: {fileID: 1816239544}
   barFillImage: {fileID: 1852814335}
-  barBackgroundImage: {fileID: 0}
   baseFlameCount: 8
   maxFlameCount: 20
   flameSpawnRate: 0.08
@@ -11645,8 +11651,6 @@ MonoBehaviour:
   emberColor: {r: 1, g: 0.6, b: 0.2, a: 1}
   barPulseColor: {r: 1, g: 0.4, b: 0.1, a: 1}
   colorPulseSpeed: 4
-  textFlameHeight: 20
-  textFlameCount: 6
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

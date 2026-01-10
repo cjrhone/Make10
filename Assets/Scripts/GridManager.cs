@@ -39,7 +39,7 @@ public class GridManager : MonoBehaviour
     [SerializeField] private Color tenGlowColor = new Color(1f, 0.9f, 0.3f);
     [SerializeField] private Color sparkleColor = new Color(1f, 0.95f, 0.6f);
     
-    [Header("Tile Value Weights (must sum to 1.0)")]
+    [Header("Tile Value Weights (fallback if no GameManager)")]
     [SerializeField] private float weight0 = 0.15f;
     [SerializeField] private float weight1 = 0.27f;
     [SerializeField] private float weight2 = 0.26f;
@@ -300,17 +300,34 @@ public class GridManager : MonoBehaviour
     
     private int GetWeightedRandomValue()
     {
+        // Get weights from GameManager (difficulty-based) or use fallback
+        float[] currentWeights = GetCurrentWeights();
+        
         float roll = Random.value;
         float cumulative = 0f;
         
-        for (int i = 0; i < weights.Length; i++)
+        for (int i = 0; i < currentWeights.Length; i++)
         {
-            cumulative += weights[i];
+            cumulative += currentWeights[i];
             if (roll <= cumulative)
                 return i;
         }
         
         return 2;
+    }
+    
+    /// <summary>
+    /// Get tile spawn weights from GameManager (difficulty-based) or use fallback.
+    /// </summary>
+    private float[] GetCurrentWeights()
+    {
+        if (GameManager.Instance != null)
+        {
+            return GameManager.Instance.GetCurrentWeights();
+        }
+        
+        // Fallback to serialized weights (for testing without GameManager)
+        return weights;
     }
     
     private void HandleTileClicked(Tile tile)

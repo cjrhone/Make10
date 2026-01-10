@@ -5,7 +5,6 @@ using System.Collections;
 /// <summary>
 /// Controls the flow between game states/panels.
 /// Handles transitions with smooth swipe animations.
-/// Refactored for cleaner code reuse.
 /// </summary>
 public class SceneFlowManager : MonoBehaviour
 {
@@ -14,6 +13,7 @@ public class SceneFlowManager : MonoBehaviour
     [Header("Panels")]
     [SerializeField] private RectTransform loadingPanel;
     [SerializeField] private RectTransform mainMenuPanel;
+    [SerializeField] private RectTransform difficultyPanel;
     [SerializeField] private RectTransform optionsPanel;
     [SerializeField] private RectTransform gamePanel;
     [SerializeField] private RectTransform tutorialPanel1;
@@ -40,7 +40,7 @@ public class SceneFlowManager : MonoBehaviour
     private float screenWidth;
     
     // Current state
-    public enum GameState { Loading, MainMenu, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, DifficultySelect, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
     
     #region Initialization
@@ -72,7 +72,7 @@ public class SceneFlowManager : MonoBehaviour
     private void InitializePanels()
     {
         // Position all panels off-screen except loading
-        RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, optionsPanel, 
+        RectTransform[] offScreenPanels = { mainMenuPanel, difficultyPanel, gamePanel, optionsPanel, 
             tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
         
         foreach (var panel in offScreenPanels)
@@ -83,6 +83,7 @@ public class SceneFlowManager : MonoBehaviour
         // Set active states
         SetPanelActive(loadingPanel, true);
         SetPanelActive(mainMenuPanel, true);
+        SetPanelActive(difficultyPanel, false); // Difficulty is overlay popup
         SetPanelActive(gamePanel, true);
         SetPanelActive(optionsPanel, false); // Options is overlay
         SetPanelActive(tutorialPanel1, true);
@@ -107,6 +108,173 @@ public class SceneFlowManager : MonoBehaviour
     {
         if (panel != null)
             panel.gameObject.SetActive(active);
+    }
+    
+    /// <summary>
+    /// Get the overlay panel for the current state (if any).
+    /// </summary>
+    private RectTransform GetCurrentOverlayPanel()
+    {
+        return CurrentState switch
+        {
+            GameState.DifficultySelect => difficultyPanel,
+            GameState.Options => optionsPanel,
+            _ => null
+        };
+    }
+    
+    /// <summary>
+    /// Get the slide panel for the current state (if any).
+    /// </summary>
+    private RectTransform GetCurrentSlidePanel()
+    {
+        return CurrentState switch
+        {
+            GameState.Quit => quitPanel,
+            GameState.Game => gamePanel,
+            _ => null
+        };
+    }
+    
+    /// <summary>
+    /// Check if current state uses an overlay (fade) transition.
+    /// </summary>
+    private bool IsOverlayState(GameState state)
+    {
+        return state == GameState.DifficultySelect || state == GameState.Options;
+    }
+    
+    /// <summary>
+    /// Check if current state uses a slide transition.
+    /// </summary>
+    private bool IsSlideState(GameState state)
+    {
+        return state == GameState.Quit || state == GameState.Game;
+    }
+    
+    #endregion
+    
+    #region Universal Navigation
+    
+    /// <summary>
+    /// Universal back button handler - call this from ANY back button.
+    /// Automatically determines the correct transition based on current state.
+    /// </summary>
+    public void GoBack()
+    {
+        Debug.Log($"GoBack() called from state: {CurrentState}");
+        AudioManager.Instance?.PlayButtonClick();
+        
+        switch (CurrentState)
+        {
+            // Overlay panels → fade out to MainMenu
+            case GameState.DifficultySelect:
+                StartCoroutine(CloseOverlayToMainMenu(difficultyPanel));
+                break;
+                
+            case GameState.Options:
+                StartCoroutine(CloseOverlayToMainMenu(optionsPanel));
+                break;
+            
+            // Slide panels → slide back to MainMenu
+            case GameState.Quit:
+                StartCoroutine(SlideBackToMainMenu(quitPanel));
+                break;
+            
+            // Game state → full cleanup and return to main menu
+            case GameState.Game:
+                StartCoroutine(ReturnToMainMenuFromGame());
+                break;
+            
+            // Tutorial states → could go back to difficulty or cancel entirely
+            case GameState.Tutorial1:
+            case GameState.Tutorial2:
+                StartCoroutine(CancelTutorialToMainMenu());
+                break;
+                
+            default:
+                Debug.LogWarning($"GoBack() not handled for state: {CurrentState}");
+                break;
+        }
+    }
+    
+    /// <summary>
+    /// Close an overlay panel with fade and return to main menu.
+    /// </summary>
+    private IEnumerator CloseOverlayToMainMenu(RectTransform overlayPanel)
+    {
+        yield return FadeTransition(overlayPanel, fadeIn: false);
+        CurrentState = GameState.MainMenu;
+        Debug.Log("Returned to MainMenu from overlay");
+    }
+    
+    /// <summary>
+    /// Slide a panel back and return to main menu.
+    /// </summary>
+    private IEnumerator SlideBackToMainMenu(RectTransform slidePanel)
+    {
+        yield return SlideTransition(slidePanel, mainMenuPanel, slideLeft: false);
+        CurrentState = GameState.MainMenu;
+        SetPanelPosition(slidePanel, screenWidth);
+        Debug.Log("Returned to MainMenu from slide panel");
+    }
+    
+    /// <summary>
+    /// Return to main menu from the game (handles cleanup).
+    /// </summary>
+    private IEnumerator ReturnToMainMenuFromGame()
+    {
+        Debug.Log("ReturnToMainMenuFromGame - cleaning up...");
+        
+        // Stop any music (game music, win/lose music)
+        AudioManager.Instance?.StopMusic();
+        
+        // Deactivate the game
+        GameManager.Instance?.DeactivateGame();
+        
+        // Clear the grid
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.ClearGrid();
+        
+        // Notify UIManager to hide any win/lose screens
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.HideAllGameOverScreens();
+        
+        // Slide back to main menu
+        yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
+        CurrentState = GameState.MainMenu;
+        SetPanelPosition(gamePanel, screenWidth);
+        
+        // Start menu music
+        AudioManager.Instance?.PlayMenuMusic();
+        
+        Debug.Log("Returned to MainMenu from Game");
+    }
+    
+    /// <summary>
+    /// Cancel from tutorials and return to main menu.
+    /// </summary>
+    private IEnumerator CancelTutorialToMainMenu()
+    {
+        Debug.Log("Canceling tutorial, returning to main menu...");
+        
+        // Hide current tutorial panel
+        RectTransform currentTutorial = CurrentState == GameState.Tutorial1 ? tutorialPanel1 : tutorialPanel2;
+        yield return HidePanel(currentTutorial);
+        
+        // Clear the grid (it was spawned for tutorials)
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.ClearGrid();
+        
+        // Slide back to main menu
+        yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
+        CurrentState = GameState.MainMenu;
+        SetPanelPosition(gamePanel, screenWidth);
+        
+        // Start menu music
+        AudioManager.Instance?.PlayMenuMusic();
+        
+        Debug.Log("Returned to MainMenu from Tutorial");
     }
     
     #endregion
@@ -148,8 +316,6 @@ public class SceneFlowManager : MonoBehaviour
         yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
         
         // Spawn grid (visible behind tutorials) but DON'T process matches yet!
-        // This lets the player see the grid during tutorials/countdown,
-        // and any "freebie" matches will happen AFTER "GO!" for maximum satisfaction
         FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
         
         yield return new WaitForSeconds(0.1f);
@@ -200,7 +366,6 @@ public class SceneFlowManager : MonoBehaviour
         GameManager.Instance?.ActivateGame();
         
         // NOW process matches - this is where the freebies happen!
-        // Player gets to watch and earn points from any initial matches
         Debug.Log("Starting match processing - let the freebies flow!");
         FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
         
@@ -225,9 +390,6 @@ public class SceneFlowManager : MonoBehaviour
     
     #region Transition Animations
     
-    /// <summary>
-    /// Slide transition between two panels.
-    /// </summary>
     private IEnumerator SlideTransition(RectTransform from, RectTransform to, bool slideLeft)
     {
         AudioManager.Instance?.PlayTransitionSwipe();
@@ -255,9 +417,6 @@ public class SceneFlowManager : MonoBehaviour
         to.anchoredPosition = toEnd;
     }
     
-    /// <summary>
-    /// Fade transition for overlay panels.
-    /// </summary>
     private IEnumerator FadeTransition(RectTransform panel, bool fadeIn)
     {
         if (panel == null) yield break;
@@ -278,18 +437,12 @@ public class SceneFlowManager : MonoBehaviour
             panel.gameObject.SetActive(false);
     }
     
-    /// <summary>
-    /// Show a panel with scale animation (for tutorials/popups).
-    /// </summary>
     private IEnumerator ShowPanel(RectTransform panel)
     {
         SetPanelPosition(panel, 0);
         yield return AnimationUtilities.ScaleIn(panel, transitionDuration, 1f, transitionCurve);
     }
     
-    /// <summary>
-    /// Hide a panel with scale animation.
-    /// </summary>
     private IEnumerator HidePanel(RectTransform panel)
     {
         yield return AnimationUtilities.ScaleOut(panel, transitionDuration * 0.5f);
@@ -300,7 +453,6 @@ public class SceneFlowManager : MonoBehaviour
     
     #region Button Handlers
     
-    // Helper to wrap button actions with click sound and state check
     private void HandleButton(GameState requiredState, System.Action action)
     {
         if (CurrentState != requiredState)
@@ -313,10 +465,68 @@ public class SceneFlowManager : MonoBehaviour
         action?.Invoke();
     }
     
+    /// <summary>
+    /// Play button pressed - show difficulty selection.
+    /// </summary>
     public void OnPlayPressed()
     {
         Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
-        HandleButton(GameState.MainMenu, () => StartCoroutine(PlaySequence()));
+        HandleButton(GameState.MainMenu, () =>
+        {
+            StartCoroutine(FadeTransition(difficultyPanel, fadeIn: true));
+            CurrentState = GameState.DifficultySelect;
+        });
+    }
+    
+    // Legacy method - now calls GoBack()
+    public void OnDifficultyBackPressed() => GoBack();
+    
+    /// <summary>
+    /// Easy difficulty selected.
+    /// </summary>
+    public void OnEasyPressed()
+    {
+        HandleButton(GameState.DifficultySelect, () =>
+        {
+            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Easy);
+            StartCoroutine(StartGameFromDifficulty());
+        });
+    }
+    
+    /// <summary>
+    /// Medium difficulty selected.
+    /// </summary>
+    public void OnMediumPressed()
+    {
+        HandleButton(GameState.DifficultySelect, () =>
+        {
+            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Medium);
+            StartCoroutine(StartGameFromDifficulty());
+        });
+    }
+    
+    /// <summary>
+    /// Hard difficulty selected.
+    /// </summary>
+    public void OnHardPressed()
+    {
+        HandleButton(GameState.DifficultySelect, () =>
+        {
+            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Hard);
+            StartCoroutine(StartGameFromDifficulty());
+        });
+    }
+    
+    /// <summary>
+    /// Start the game after difficulty is selected.
+    /// </summary>
+    private IEnumerator StartGameFromDifficulty()
+    {
+        // Hide difficulty panel
+        yield return FadeTransition(difficultyPanel, fadeIn: false);
+        
+        // Continue with normal play sequence
+        yield return PlaySequence();
     }
     
     public void OnOptionsPressed()
@@ -329,16 +539,8 @@ public class SceneFlowManager : MonoBehaviour
         });
     }
     
-    public void OnOptionsClosePressed()
-    {
-        HandleButton(GameState.Options, () => StartCoroutine(CloseOptions()));
-    }
-    
-    private IEnumerator CloseOptions()
-    {
-        yield return FadeTransition(optionsPanel, fadeIn: false);
-        CurrentState = GameState.MainMenu;
-    }
+    // Legacy method - now calls GoBack()
+    public void OnOptionsClosePressed() => GoBack();
     
     public void OnQuitPressed()
     {
@@ -353,11 +555,14 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log("Quit panel shown.");
     }
     
+    // Legacy method - now calls GoBack()
+    public void OnQuitBackPressed() => GoBack();
+    
     public void OnItchIOButtonPressed()
     {
         AudioManager.Instance?.PlayButtonClick();
         Debug.Log("Opening itch.io...");
-        Application.OpenURL("https://itch.io/"); // TODO: Replace with your game's URL
+        Application.OpenURL("https://itch.io/");
     }
     
     public void OnTutorial1OkPressed()
@@ -388,16 +593,12 @@ public class SceneFlowManager : MonoBehaviour
     
     #region Public Utilities
     
+    /// <summary>
+    /// Return to main menu from anywhere (legacy method, use GoBack() instead).
+    /// </summary>
     public void ReturnToMainMenu()
     {
-        StartCoroutine(ReturnToMainMenuSequence());
-    }
-    
-    private IEnumerator ReturnToMainMenuSequence()
-    {
-        yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
-        CurrentState = GameState.MainMenu;
-        SetPanelPosition(gamePanel, screenWidth);
+        GoBack();
     }
     
     public void OnGameEnded(bool won)
@@ -407,9 +608,6 @@ public class SceneFlowManager : MonoBehaviour
     
     public bool IsInGameplay() => CurrentState == GameState.Game;
     
-    /// <summary>
-    /// Restart the game with countdown sequence (called from UIManager on replay).
-    /// </summary>
     public void RestartWithCountdown()
     {
         StartCoroutine(RestartWithCountdownSequence());
@@ -422,6 +620,10 @@ public class SceneFlowManager : MonoBehaviour
         // Stop any current music (win/lose music)
         AudioManager.Instance?.StopMusic();
         
+        // Hide any win/lose screens first
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.HideAllGameOverScreens();
+        
         // Spawn the grid (visible during countdown) but DON'T process matches yet
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         gridManager?.SpawnGridOnly();
@@ -431,7 +633,7 @@ public class SceneFlowManager : MonoBehaviour
         
         yield return new WaitForSeconds(0.1f);
         
-        // Run countdown sequence (this will call ActivateGame AND StartMatchProcessing at the end)
+        // Run countdown sequence
         CurrentState = GameState.Countdown;
         yield return CountdownSequence();
     }

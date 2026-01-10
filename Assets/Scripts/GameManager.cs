@@ -3,33 +3,98 @@ using System;
 using System.Collections;
 
 /// <summary>
-/// Manages game state: scoring, motivation meter, win/lose conditions.
-/// NEW SCORING SYSTEM:
-/// - 10 pts per solve (base)
-/// - Solve #2 activates multiplier bar (x1.25 displayed, 5 sec timer)
-/// - Solve #3+ awards (10 × multiplier) + seconds remaining as bonus
-/// - Each solve resets timer to 5 sec and increases multiplier by 0.25
-/// - Bar hitting 0 hides panel and resets streak
+/// Manages game state: scoring, motivation meter, win/lose conditions, difficulty settings.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
     
+    #region Difficulty Settings
+    
+    public enum DifficultyLevel { Easy, Medium, Hard }
+    
+    [System.Serializable]
+    public class DifficultyPreset
+    {
+        public string name;
+        [Header("Tile Weights (must sum to 1.0)")]
+        [Range(0, 1)] public float weight0 = 0.15f;
+        [Range(0, 1)] public float weight1 = 0.22f;
+        [Range(0, 1)] public float weight2 = 0.22f;
+        [Range(0, 1)] public float weight3 = 0.17f;
+        [Range(0, 1)] public float weight4 = 0.12f;
+        [Range(0, 1)] public float weight5 = 0.06f;
+        [Range(0, 1)] public float weight6 = 0.06f;
+        
+        public float[] GetWeights()
+        {
+            return new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
+        }
+        
+        public float TotalWeight()
+        {
+            return weight0 + weight1 + weight2 + weight3 + weight4 + weight5 + weight6;
+        }
+    }
+    
+    [Header("Difficulty Presets")]
+    [SerializeField] private DifficultyPreset easyPreset = new DifficultyPreset
+    {
+        name = "Easy",
+        weight0 = 0.10f,  // Limited 0s (too many = unsolvable)
+        weight1 = 0.18f,  // Limited 1s (too many = unsolvable)
+        weight2 = 0.30f,  // Favor 2s
+        weight3 = 0.24f,  // Favor 3s
+        weight4 = 0.18f,  // Good amount of 4s
+        weight5 = 0.00f,  // No 5s
+        weight6 = 0.00f   // No 6s
+    };
+    
+    [SerializeField] private DifficultyPreset mediumPreset = new DifficultyPreset
+    {
+        name = "Medium",
+        weight0 = 0.14f,
+        weight1 = 0.24f,
+        weight2 = 0.24f,
+        weight3 = 0.18f,
+        weight4 = 0.12f,
+        weight5 = 0.08f,  // Some 5s
+        weight6 = 0.00f   // No 6s
+    };
+    
+    [SerializeField] private DifficultyPreset hardPreset = new DifficultyPreset
+    {
+        name = "Hard",
+        weight0 = 0.15f,
+        weight1 = 0.22f,
+        weight2 = 0.20f,
+        weight3 = 0.15f,
+        weight4 = 0.12f,
+        weight5 = 0.08f,  // 5s present
+        weight6 = 0.08f   // 6s present - challenging!
+    };
+    
+    [SerializeField] private DifficultyLevel currentDifficulty = DifficultyLevel.Medium;
+    
+    public DifficultyLevel CurrentDifficulty => currentDifficulty;
+    
+    #endregion
+    
     [Header("Game Settings")]
     [SerializeField] private int winScore = 250;
     public int WinScore => winScore;
-    [SerializeField] private float gameDuration = 60f; // Countdown timer in seconds
-    [SerializeField] private float postWinDelay = 0.5f; // delay before win screen
+    [SerializeField] private float gameDuration = 60f;
+    [SerializeField] private float postWinDelay = 0.5f;
     
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
     
     [Header("Multiplier Settings")]
-    [SerializeField] private float multiplierDuration = 10f; // seconds
-    [SerializeField] private float multiplierDrainRate = 1f; // per second
+    [SerializeField] private float multiplierDuration = 10f;
+    [SerializeField] private float multiplierDrainRate = 1f;
     [SerializeField] private float multiplierIncrement = 0.25f;
     [SerializeField] private float startingMultiplier = 1.25f;
-    [SerializeField] private float streakTimeout = 10f; // time allowed between solves before streak resets
+    [SerializeField] private float streakTimeout = 10f;
     
     [Header("References")]
     [SerializeField] private UIManager uiManager;
@@ -40,14 +105,14 @@ public class GameManager : MonoBehaviour
     public float GameDuration => gameDuration;
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
-    public bool IsSolveAnimationPlaying { get; set; } // Pause timer during solve animation
+    public bool IsSolveAnimationPlaying { get; set; }
     
     // Multiplier state
     private int solveCount = 0;
     private float currentMultiplier = 1f;
     private float multiplierTimer = 0f;
     private bool multiplierActive = false;
-    private float timeSinceLastSolve = 0f; // tracks time for streak timeout
+    private float timeSinceLastSolve = 0f;
     
     // Public accessors for UI
     public bool IsMultiplierActive => multiplierActive;
@@ -56,9 +121,9 @@ public class GameManager : MonoBehaviour
     public float MultiplierDuration => multiplierDuration;
     
     // Events for UI updates
-    public event Action<int, int> OnScoreChanged; // current, delta
-    public event Action<float> OnTimeChanged; // time remaining
-    public event Action<bool, float, float> OnMultiplierChanged; // active, multiplier (float), timer
+    public event Action<int, int> OnScoreChanged;
+    public event Action<float> OnTimeChanged;
+    public event Action<bool, float, float> OnMultiplierChanged;
     public event Action OnGameWon;
     public event Action OnGameLost;
     
@@ -74,8 +139,6 @@ public class GameManager : MonoBehaviour
     
     private void Start()
     {
-        // Don't auto-start if SceneFlowManager exists - it will call StartNewGame()
-        // For backwards compatibility (testing without SceneFlowManager), auto-start
         if (SceneFlowManager.Instance == null)
         {
             Debug.Log("GameManager: No SceneFlowManager found - auto-starting for testing");
@@ -90,34 +153,78 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         if (!IsGameActive) return;
-        
-        // Don't drain time during solve animations
         if (IsSolveAnimationPlaying) return;
         
-        // Countdown timer (always drains, not just when idle)
         if (!IsProcessing)
         {
             DrainTime(Time.deltaTime);
         }
         
-        // Drain multiplier timer if active
         if (multiplierActive)
         {
             DrainMultiplierTimer(Time.deltaTime);
         }
         else if (solveCount > 0)
         {
-            // Track streak timeout before multiplier is active
             timeSinceLastSolve += Time.deltaTime;
             if (timeSinceLastSolve >= streakTimeout)
             {
-                // Too long since last solve - reset streak
                 solveCount = 0;
                 timeSinceLastSolve = 0f;
                 Debug.Log("<color=red>Streak timeout!</color> Solve count reset.");
             }
         }
     }
+    
+    #region Difficulty Methods
+    
+    /// <summary>
+    /// Set the difficulty level. Call this before starting a game.
+    /// </summary>
+    public void SetDifficulty(DifficultyLevel level)
+    {
+        currentDifficulty = level;
+        Debug.Log($"<color=yellow>Difficulty set to: {level}</color>");
+        
+        // Log the weights for debugging
+        float[] weights = GetCurrentWeights();
+        string weightStr = $"Weights: ";
+        for (int i = 0; i < weights.Length; i++)
+            weightStr += $"[{i}]={weights[i]:F2} ";
+        Debug.Log(weightStr);
+    }
+    
+    /// <summary>
+    /// Get the tile spawn weights for the current difficulty.
+    /// </summary>
+    public float[] GetCurrentWeights()
+    {
+        return currentDifficulty switch
+        {
+            DifficultyLevel.Easy => easyPreset.GetWeights(),
+            DifficultyLevel.Medium => mediumPreset.GetWeights(),
+            DifficultyLevel.Hard => hardPreset.GetWeights(),
+            _ => mediumPreset.GetWeights()
+        };
+    }
+    
+    /// <summary>
+    /// Get a specific difficulty preset (for UI display, etc.)
+    /// </summary>
+    public DifficultyPreset GetPreset(DifficultyLevel level)
+    {
+        return level switch
+        {
+            DifficultyLevel.Easy => easyPreset,
+            DifficultyLevel.Medium => mediumPreset,
+            DifficultyLevel.Hard => hardPreset,
+            _ => mediumPreset
+        };
+    }
+    
+    #endregion
+    
+    #region Game Flow
     
     /// <summary>
     /// Start or restart the game.
@@ -130,7 +237,6 @@ public class GameManager : MonoBehaviour
         IsProcessing = false;
         IsSolveAnimationPlaying = false;
         
-        // Reset multiplier state
         solveCount = 0;
         currentMultiplier = 1f;
         multiplierTimer = 0f;
@@ -141,14 +247,22 @@ public class GameManager : MonoBehaviour
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
-        // Tell GridManager to spawn/reset the grid
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         if (gridManager != null)
         {
             gridManager.ResetGame();
         }
         
-        Debug.Log("Game started!");
+        Debug.Log($"Game started! Difficulty: {currentDifficulty}");
+    }
+    
+    /// <summary>
+    /// Deactivate the game (used when returning to main menu).
+    /// </summary>
+    public void DeactivateGame()
+    {
+        IsGameActive = false;
+        Debug.Log("Game deactivated");
     }
     
     /// <summary>
@@ -162,7 +276,6 @@ public class GameManager : MonoBehaviour
         IsProcessing = false;
         IsSolveAnimationPlaying = false;
         
-        // Reset multiplier state
         solveCount = 0;
         currentMultiplier = 1f;
         multiplierTimer = 0f;
@@ -173,118 +286,90 @@ public class GameManager : MonoBehaviour
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
-        // Don't reset grid - it's already spawned
-        Debug.Log("Game activated! (grid already exists)");
+        Debug.Log($"Game activated! Difficulty: {currentDifficulty}");
     }
     
-    /// <summary>
-    /// Called when a cascade sequence begins.
-    /// </summary>
     public void OnCascadeStart()
     {
         IsProcessing = true;
     }
     
-    /// <summary>
-    /// Called when a cascade sequence ends.
-    /// </summary>
     public void OnCascadeEnd()
     {
         IsProcessing = false;
     }
     
-    /// <summary>
-    /// Called when tiles are matched and cleared.
-    /// </summary>
     public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched)
     {
         if (!IsGameActive) return;
         
         int linesCleared = rowsMatched + columnsMatched;
         
-        // Process each line as a separate solve
         for (int i = 0; i < linesCleared; i++)
         {
             ProcessSingleSolve();
         }
     }
     
-    /// <summary>
-    /// Process a single "Make 10" solve.
-    /// </summary>
+    #endregion
+    
+    #region Scoring
+    
     private void ProcessSingleSolve()
     {
         solveCount++;
-        timeSinceLastSolve = 0f; // Reset streak timer
+        timeSinceLastSolve = 0f;
         
         int pointsAwarded = 0;
         int bonusSeconds = 0;
         
         if (solveCount == 1)
         {
-            // First solve: base points only
             pointsAwarded = baseMatchScore;
             Debug.Log($"<color=green>Solve #1:</color> +{pointsAwarded} pts (base)");
         }
         else if (solveCount == 2)
         {
-            // Second solve: base points, ACTIVATE multiplier bar
             pointsAwarded = baseMatchScore;
             ActivateMultiplierBar();
             Debug.Log($"<color=green>Solve #2:</color> +{pointsAwarded} pts | <color=yellow>MULTIPLIER ACTIVATED (x{currentMultiplier:F2} ready)</color>");
         }
         else
         {
-            // Third+ solve: multiplied points + bonus seconds
             bonusSeconds = Mathf.FloorToInt(multiplierTimer);
             int multipliedScore = Mathf.RoundToInt(baseMatchScore * currentMultiplier);
             pointsAwarded = multipliedScore + bonusSeconds;
             
             Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
             
-            // Increase multiplier for next solve
             currentMultiplier += multiplierIncrement;
-            
-            // Reset timer
             multiplierTimer = multiplierDuration;
             
-            // Notify UI of multiplier change
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         }
         
-        // Add score
         Score += pointsAwarded;
         OnScoreChanged?.Invoke(Score, pointsAwarded);
         
-        // No motivation restoration - timer just keeps counting down!
-        
-        // Check win condition
         if (Score >= winScore)
         {
             StartCoroutine(WinGameDelayed());
         }
     }
     
-    /// <summary>
-    /// Activate the multiplier bar (on solve #2).
-    /// </summary>
     private void ActivateMultiplierBar()
     {
         multiplierActive = true;
         multiplierTimer = multiplierDuration;
-        currentMultiplier = startingMultiplier; // x1.25 ready for next solve
+        currentMultiplier = startingMultiplier;
         
         OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
     }
     
-    /// <summary>
-    /// Drain the multiplier timer.
-    /// </summary>
     private void DrainMultiplierTimer(float deltaTime)
     {
         multiplierTimer -= multiplierDrainRate * deltaTime;
         
-        // Notify UI every frame for smooth bar update
         OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         
         if (multiplierTimer <= 0f)
@@ -293,24 +378,22 @@ public class GameManager : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Deactivate multiplier bar (timer expired).
-    /// </summary>
     private void DeactivateMultiplierBar()
     {
         multiplierActive = false;
         multiplierTimer = 0f;
         currentMultiplier = 1f;
-        solveCount = 0; // Reset streak
+        solveCount = 0;
         
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
         Debug.Log("<color=red>Multiplier expired!</color> Streak reset.");
     }
     
-    /// <summary>
-    /// Drain the countdown timer.
-    /// </summary>
+    #endregion
+    
+    #region Timer
+    
     private void DrainTime(float deltaTime)
     {
         TimeRemaining -= deltaTime;
@@ -324,68 +407,41 @@ public class GameManager : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Time's up! Check if player reached goal.
-    /// </summary>
     private void TimeUp()
     {
         IsGameActive = false;
         
         if (Score >= winScore)
         {
-            // Player reached goal in time!
             Debug.Log("<color=cyan>*** TIME'S UP - YOU WIN! ***</color>");
-            
-            if (SceneFlowManager.Instance != null)
-            {
-                SceneFlowManager.Instance.OnGameEnded(true);
-            }
-            
+            SceneFlowManager.Instance?.OnGameEnded(true);
             OnGameWon?.Invoke();
         }
         else
         {
-            // Player didn't reach goal
             Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{winScore}");
-            
-            if (SceneFlowManager.Instance != null)
-            {
-                SceneFlowManager.Instance.OnGameEnded(false);
-            }
-            
+            SceneFlowManager.Instance?.OnGameEnded(false);
             OnGameLost?.Invoke();
         }
     }
     
-    /// <summary>
-    /// Player wins with delay for animations to finish.
-    /// </summary>
     private IEnumerator WinGameDelayed()
     {
         yield return new WaitForSeconds(postWinDelay);
         WinGame();
     }
     
-    /// <summary>
-    /// Player wins! (reached score goal before time ran out)
-    /// </summary>
     private void WinGame()
     {
         IsGameActive = false;
         Debug.Log($"<color=cyan>*** YOU WIN! ***</color> Score: {Score} | Time left: {TimeRemaining:F1}s");
         
-        // Notify SceneFlowManager of state change
-        if (SceneFlowManager.Instance != null)
-        {
-            SceneFlowManager.Instance.OnGameEnded(true);
-        }
-        
+        SceneFlowManager.Instance?.OnGameEnded(true);
         OnGameWon?.Invoke();
     }
     
-    /// <summary>
-    /// Called when player performs a swap (for motivation purposes).
-    /// </summary>
+    #endregion
+    
     public void OnPlayerSwap()
     {
         // Could add small motivation boost for activity

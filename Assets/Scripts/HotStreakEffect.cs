@@ -11,6 +11,7 @@ using System.Collections.Generic;
 /// 
 /// SETUP: Add this component to your MultiplierPanel GameObject.
 /// It will auto-find references if not assigned.
+/// The panel will appear wherever you position it in the editor.
 /// </summary>
 public class HotStreakEffect : MonoBehaviour
 {
@@ -55,6 +56,7 @@ public class HotStreakEffect : MonoBehaviour
     private bool isActive = false;
     private float currentIntensity = 0f;
     private Vector2 panelOriginalPosition;
+    private bool hasOriginalPosition = false;
     private Color barOriginalColor;
     private RectTransform flameContainer;
     
@@ -106,8 +108,8 @@ public class HotStreakEffect : MonoBehaviour
     
     private void Start()
     {
-        if (panelTransform != null)
-            panelOriginalPosition = panelTransform.anchoredPosition;
+        // DON'T capture panel position here - we capture it in Activate()
+        // This ensures the panel appears wherever the user placed it in the editor
         
         if (barFillImage != null)
             barOriginalColor = barFillImage.color;
@@ -137,7 +139,7 @@ public class HotStreakEffect : MonoBehaviour
         float time = Time.time;
         
         // Panel floating & shake
-        if (panelTransform != null)
+        if (panelTransform != null && hasOriginalPosition)
         {
             float floatY = Mathf.Sin(time * floatSpeed) * floatAmount * currentIntensity;
             float shakeX = Mathf.Sin(time * shakeSpeed) * shakeIntensity * currentIntensity;
@@ -307,8 +309,13 @@ public class HotStreakEffect : MonoBehaviour
         {
             isActive = true;
             
+            // Capture original position NOW when the panel is being shown
+            // This respects wherever the user placed it in the editor
             if (panelTransform != null)
+            {
                 panelOriginalPosition = panelTransform.anchoredPosition;
+                hasOriginalPosition = true;
+            }
             
             if (flameContainer == null)
                 CreateFlameContainer();
@@ -353,8 +360,8 @@ public class HotStreakEffect : MonoBehaviour
                 Destroy(flame.transform.gameObject);
         textFlames.Clear();
         
-        // Reset panel
-        if (panelTransform != null)
+        // Reset panel to its original position
+        if (panelTransform != null && hasOriginalPosition)
         {
             panelTransform.anchoredPosition = panelOriginalPosition;
             panelTransform.localEulerAngles = Vector3.zero;
