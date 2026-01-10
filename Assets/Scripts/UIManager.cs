@@ -47,6 +47,10 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Color multiplierLowColor = new Color(1f, 0.3f, 0.2f);
     [SerializeField] private float multiplierLowThreshold = 2f;
     
+    [Header("Hot Streak Effect")]
+    [SerializeField] private HotStreakEffect hotStreakEffect;
+    [SerializeField] private bool enableHotStreak = true;
+    
     [Header("Pulse Settings")]
     [SerializeField] private float pulseMinScale = 1.0f;
     [SerializeField] private float pulseMaxScale = 1.3f;
@@ -76,6 +80,7 @@ public class UIManager : MonoBehaviour
     private Coroutine multiplierPulseCoroutine;
     private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
+    private bool hotStreakActive = false;
     
     #region Initialization
     
@@ -174,6 +179,10 @@ public class UIManager : MonoBehaviour
         
         UpdateScoreDisplay(0);
         UpdateTimerDisplay(gameManager?.GameDuration ?? 60f);
+        
+        // Auto-find HotStreakEffect if not assigned
+        if (hotStreakEffect == null && multiplierPanel != null)
+            hotStreakEffect = multiplierPanel.GetComponent<HotStreakEffect>();
     }
     
     #endregion
@@ -200,12 +209,14 @@ public class UIManager : MonoBehaviour
     private void HandleGameWon()
     {
         StopTimeWarningSound();
+        DeactivateHotStreak();
         StartCoroutine(ShowFinishThenResult(true));
     }
     
     private void HandleGameLost()
     {
         StopTimeWarningSound();
+        DeactivateHotStreak();
         StartCoroutine(ShowFinishThenResult(false));
     }
     
@@ -295,6 +306,9 @@ public class UIManager : MonoBehaviour
                 StartPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform, 
                     pulseMinScale, pulseMaxScale, pulseSpeed);
                 StartCoroutine(AnimationUtilities.PunchScale(multiplierPanel.transform, 1.15f, 0.2f));
+                
+                // Activate hot streak effect!
+                ActivateHotStreak(multiplier);
             }
             
             if (multiplierSlider != null)
@@ -306,18 +320,54 @@ public class UIManager : MonoBehaviour
             if (multiplierTimerText != null)
                 multiplierTimerText.text = $"{timer:F1}s";
             
-            if (multiplierFillImage != null)
+            // Color based on timer (only if hot streak not overriding)
+            if (multiplierFillImage != null && !enableHotStreak)
             {
                 multiplierFillImage.color = timer <= multiplierLowThreshold
                     ? Color.Lerp(multiplierLowColor, multiplierFullColor, timer / multiplierLowThreshold)
                     : multiplierFullColor;
             }
+            
+            // Update hot streak intensity as multiplier grows
+            UpdateHotStreakIntensity(multiplier);
         }
         else if (multiplierPanel.activeSelf)
         {
             StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
+            DeactivateHotStreak();
             multiplierPanel.SetActive(false);
         }
+    }
+    
+    #endregion
+    
+    #region Hot Streak
+    
+    private void ActivateHotStreak(float multiplier)
+    {
+        if (!enableHotStreak || hotStreakEffect == null) return;
+        
+        hotStreakEffect.Activate(multiplier);
+        hotStreakActive = true;
+        
+        Debug.Log($"<color=orange>🔥 HOT STREAK ACTIVATED!</color> x{multiplier:F2}");
+    }
+    
+    private void UpdateHotStreakIntensity(float multiplier)
+    {
+        if (!enableHotStreak || hotStreakEffect == null || !hotStreakActive) return;
+        
+        hotStreakEffect.UpdateIntensity(multiplier);
+    }
+    
+    private void DeactivateHotStreak()
+    {
+        if (hotStreakEffect == null || !hotStreakActive) return;
+        
+        hotStreakEffect.Deactivate();
+        hotStreakActive = false;
+        
+        Debug.Log("<color=gray>Hot streak ended.</color>");
     }
     
     #endregion
@@ -348,6 +398,9 @@ public class UIManager : MonoBehaviour
     
     private IEnumerator ShowFinishThenResult(bool isWin)
     {
+        // STOP game music immediately when FINISH appears
+        AudioManager.Instance?.StopMusic();
+        
         // Play finish sound
         AudioManager.Instance?.PlayFinishSound();
         
@@ -362,9 +415,10 @@ public class UIManager : MonoBehaviour
         
         SetActiveIfNotNull(finishTextObject, false);
         
-        // Show result screen
+        // Show result screen and play appropriate music
         if (isWin)
         {
+            AudioManager.Instance?.PlayWinMusic();
             SetActiveIfNotNull(winScreen, true);
             if (finalScoreText != null && gameManager != null)
             {
@@ -373,6 +427,7 @@ public class UIManager : MonoBehaviour
         }
         else
         {
+            AudioManager.Instance?.PlayLoseMusic();
             SetActiveIfNotNull(loseScreen, true);
             if (finalScoreText != null && gameManager != null)
             {
@@ -482,18 +537,33 @@ public class UIManager : MonoBehaviour
     {
         AudioManager.Instance?.PlayButtonClick();
         
+        // Hide game over screens
         SetActiveIfNotNull(winScreen, false);
         SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
         
+        // Clean up any active effects
         StopPulse(ref timerPulseCoroutine, timerText?.transform);
         StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
         StopTimeWarningSound();
+        DeactivateHotStreak();
         
-        gameManager?.StartNewGame();
+        // Hide multiplier panel for fresh start
+        SetActiveIfNotNull(multiplierPanel, false);
         
-        GridManager grid = gridManager ?? FindFirstObjectByType<GridManager>();
-        grid?.ResetGame();
+        // Use SceneFlowManager to restart with countdown
+        if (SceneFlowManager.Instance != null)
+        {
+            SceneFlowManager.Instance.RestartWithCountdown();
+        }
+        else
+        {
+            // Fallback if no SceneFlowManager (for testing)
+            Debug.LogWarning("No SceneFlowManager found - starting game directly");
+            gameManager?.StartNewGame();
+            GridManager grid = gridManager ?? FindFirstObjectByType<GridManager>();
+            grid?.ResetGame();
+        }
     }
     
     #endregion

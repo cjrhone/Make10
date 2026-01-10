@@ -47,11 +47,28 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float weight4 = 0.13f;
     [SerializeField] private float weight5 = 0.01f;
     [SerializeField] private float weight6 = 0.01f;
+    
+    [Header("Hint System")]
+    [SerializeField] private bool enableHints = true;
+    [SerializeField] private float hintDelay = 10f;
+    [SerializeField] private float hintRepeatInterval = 3f;
+    [SerializeField] private int hintParticleCount = 5;
+    [SerializeField] private float hintParticleSpeed = 120f;
+    [SerializeField] private float hintParticleLifetime = 0.5f;
+    [SerializeField] private float hintParticleSize = 12f;
+    [SerializeField] private Color hintParticleColor = new Color(1f, 0.9f, 0.3f, 0.9f);
 
     private Tile[,] grid;
     private Tile selectedTile;
     private float[] weights;
     private bool isProcessing = false;
+    
+    // Hint system state
+    private float timeSinceLastMove = 0f;
+    private float timeSinceLastHint = 0f;
+    private bool hintActive = false;
+    private HintMove currentHint = null;
+    private List<GameObject> activeHintParticles = new List<GameObject>();
     
     public event System.Action OnGridUnsolvable;
     
@@ -83,6 +100,154 @@ public class GridManager : MonoBehaviour
         }
     }
     
+    private void Update()
+    {
+        // Only track hint timer when game is active and not processing
+        if (!enableHints) return;
+        if (GameManager.Instance == null || !GameManager.Instance.IsGameActive) return;
+        if (isProcessing) return;
+        
+        timeSinceLastMove += Time.deltaTime;
+        
+        // Check if it's time to show a hint
+        if (timeSinceLastMove >= hintDelay)
+        {
+            timeSinceLastHint += Time.deltaTime;
+            
+            // Show hint periodically
+            if (!hintActive || timeSinceLastHint >= hintRepeatInterval)
+            {
+                ShowHint();
+                timeSinceLastHint = 0f;
+            }
+        }
+    }
+    
+    #region Hint System
+    
+    private void ResetHintTimer()
+    {
+        timeSinceLastMove = 0f;
+        timeSinceLastHint = 0f;
+        hintActive = false;
+        currentHint = null;
+        ClearHintParticles();
+    }
+    
+    private void ShowHint()
+    {
+        if (matchChecker == null) return;
+        
+        // Find a valid move
+        currentHint = matchChecker.FindHintMove();
+        
+        if (currentHint != null && currentHint.tile != null)
+        {
+            hintActive = true;
+            StartCoroutine(SpawnHintParticles(currentHint));
+            Debug.Log($"<color=yellow>HINT:</color> Swipe {currentHint.tile} {currentHint.direction}");
+        }
+    }
+    
+    private IEnumerator SpawnHintParticles(HintMove hint)
+    {
+        if (hint.tile == null) yield break;
+        
+        Vector2 tilePos = hint.tile.GetRectTransform().anchoredPosition;
+        Vector2 direction = hint.GetDirectionVector();
+        
+        // Spawn particles in a burst
+        for (int i = 0; i < hintParticleCount; i++)
+        {
+            SpawnSingleHintParticle(tilePos, direction, i * 0.06f);
+            yield return new WaitForSeconds(0.04f);
+        }
+    }
+    
+    private void SpawnSingleHintParticle(Vector2 startPos, Vector2 direction, float delay)
+    {
+        StartCoroutine(AnimateHintParticle(startPos, direction, delay));
+    }
+    
+    private IEnumerator AnimateHintParticle(Vector2 startPos, Vector2 direction, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        
+        // Create particle
+        GameObject particle = new GameObject("HintParticle");
+        particle.transform.SetParent(gridContainer, false);
+        activeHintParticles.Add(particle);
+        
+        RectTransform rt = particle.AddComponent<RectTransform>();
+        
+        // Start slightly behind center, end ahead
+        float startOffset = -20f;
+        float endOffset = 60f;
+        rt.anchoredPosition = startPos + direction * startOffset;
+        rt.sizeDelta = new Vector2(hintParticleSize, hintParticleSize);
+        rt.localEulerAngles = new Vector3(0, 0, 45f); // Diamond shape
+        
+        Image img = particle.AddComponent<Image>();
+        img.color = hintParticleColor;
+        img.raycastTarget = false;
+        
+        // Animate: move in direction, fade out, shrink
+        float elapsed = 0f;
+        Vector2 velocity = direction * hintParticleSpeed;
+        
+        // Add slight randomness
+        float wobble = Random.Range(-15f, 15f);
+        Vector2 perpendicular = new Vector2(-direction.y, direction.x);
+        
+        while (elapsed < hintParticleLifetime)
+        {
+            if (particle == null) yield break;
+            
+            elapsed += Time.deltaTime;
+            float t = elapsed / hintParticleLifetime;
+            
+            // Move forward
+            Vector2 pos = startPos + direction * Mathf.Lerp(startOffset, endOffset, t);
+            pos += perpendicular * Mathf.Sin(t * Mathf.PI * 2f) * wobble * (1f - t);
+            rt.anchoredPosition = pos;
+            
+            // Fade: appear quickly, fade out slowly
+            float alpha;
+            if (t < 0.2f)
+                alpha = t / 0.2f; // Fade in
+            else
+                alpha = 1f - ((t - 0.2f) / 0.8f); // Fade out
+            
+            img.color = new Color(hintParticleColor.r, hintParticleColor.g, hintParticleColor.b, 
+                                  hintParticleColor.a * alpha);
+            
+            // Scale: start small, grow, then shrink
+            float scale = Mathf.Sin(t * Mathf.PI) * 1.2f + 0.3f;
+            rt.localScale = Vector3.one * scale;
+            
+            yield return null;
+        }
+        
+        // Cleanup
+        if (particle != null)
+        {
+            activeHintParticles.Remove(particle);
+            Destroy(particle);
+        }
+    }
+    
+    private void ClearHintParticles()
+    {
+        foreach (GameObject p in activeHintParticles)
+        {
+            if (p != null)
+                Destroy(p);
+        }
+        activeHintParticles.Clear();
+    }
+    
+    #endregion
+    
     public void SpawnGrid()
     {
         Debug.Log("GridManager.SpawnGrid() called");
@@ -94,6 +259,7 @@ public class GridManager : MonoBehaviour
         }
         
         ClearGrid();
+        ResetHintTimer();
         
         float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
         float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
@@ -152,6 +318,9 @@ public class GridManager : MonoBehaviour
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
+        // Reset hint timer on any interaction
+        ResetHintTimer();
+        
         if (selectedTile == null)
         {
             selectedTile = tile;
@@ -197,6 +366,9 @@ public class GridManager : MonoBehaviour
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
+        // Reset hint timer on any interaction
+        ResetHintTimer();
+        
         int neighborX = tile.GridX;
         int neighborY = tile.GridY;
         
@@ -234,6 +406,7 @@ public class GridManager : MonoBehaviour
     private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB)
     {
         isProcessing = true;
+        ResetHintTimer();
         AudioManager.Instance?.PlaySwapSound();
         
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
@@ -297,8 +470,6 @@ public class GridManager : MonoBehaviour
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
                     $"{result.TotalMatchedTiles} tiles");
             
-            // NO SOUND HERE - moved to AnimateSolveSequence
-            
             yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));
             
             ClearMatchedTiles(result.allMatchedTiles);
@@ -316,6 +487,9 @@ public class GridManager : MonoBehaviour
         }
         
         GameManager.Instance?.OnCascadeEnd();
+        
+        // Reset hint timer after cascade completes
+        ResetHintTimer();
         
         if (matchChecker != null && !matchChecker.HasValidMoves())
         {
@@ -407,16 +581,11 @@ public class GridManager : MonoBehaviour
         StartCoroutine(ProcessMatchesCoroutine());
     }
     
-    /// <summary>
-    /// Solve animation: tiles converge to center and show spectacular "10".
-    /// CONVERGENCE SOUND plays at start, TEN POP SOUND plays when "10" appears.
-    /// </summary>
     private IEnumerator AnimateSolveSequence(HashSet<Tile> tiles, MatchResult result)
     {
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = true;
         
-        // *** CONVERGENCE SOUND ***
         AudioManager.Instance?.PlayConvergenceSound();
         
         Vector2 centerPos = CalculateMatchCenter(tiles, result);
@@ -435,7 +604,6 @@ public class GridManager : MonoBehaviour
             }
         }
         
-        // Phase 1: Converge tiles toward center with spiral motion
         float elapsed = 0f;
         while (elapsed < solveConvergeDuration)
         {
@@ -450,7 +618,6 @@ public class GridManager : MonoBehaviour
                     RectTransform rt = tile.GetRectTransform();
                     Vector2 startPos = originalPositions[tile];
                     
-                    // Add slight spiral motion
                     float spiralAngle = easedT * Mathf.PI * 0.5f;
                     Vector2 toCenter = centerPos - startPos;
                     float dist = toCenter.magnitude * (1f - easedT);
@@ -463,8 +630,6 @@ public class GridManager : MonoBehaviour
                     
                     float scale = Mathf.Lerp(1f, convergeShrinkAmount, easedT);
                     tile.transform.localScale = Vector3.one * scale;
-                    
-                    // Rotation as they converge
                     tile.transform.localEulerAngles = new Vector3(0, 0, easedT * 180f);
                     
                     Image img = tile.GetComponent<Image>();
@@ -485,7 +650,6 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
         
-        // Phase 2: Show spectacular "10" at center
         yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
         
         if (GameManager.Instance != null)
@@ -520,18 +684,12 @@ public class GridManager : MonoBehaviour
         return count > 0 ? sum / count : Vector2.zero;
     }
     
-    /// <summary>
-    /// SPECTACULAR "10" effect with sparkles, burst rings, glow, and magic!
-    /// </summary>
     private IEnumerator ShowTenEffectSpectacular(Vector2 position)
     {
-        // *** TEN POP SOUND ***
         AudioManager.Instance?.PlayTenPopSound();
         
-        // Container for all effect objects
         List<GameObject> effectObjects = new List<GameObject>();
         
-        // === MAIN "10" TEXT ===
         GameObject tenObj = new GameObject("TenEffect_Main");
         tenObj.transform.SetParent(gridContainer, false);
         effectObjects.Add(tenObj);
@@ -548,16 +706,15 @@ public class GridManager : MonoBehaviour
         tenText.alignment = TMPro.TextAlignmentOptions.Center;
         tenText.enableVertexGradient = true;
         tenText.colorGradient = new TMPro.VertexGradient(
-            new Color(1f, 1f, 0.8f),      // Top left - bright
-            new Color(1f, 1f, 0.8f),      // Top right - bright  
-            new Color(1f, 0.8f, 0.2f),    // Bottom left - golden
-            new Color(1f, 0.8f, 0.2f)     // Bottom right - golden
+            new Color(1f, 1f, 0.8f),
+            new Color(1f, 1f, 0.8f),
+            new Color(1f, 0.8f, 0.2f),
+            new Color(1f, 0.8f, 0.2f)
         );
         
-        // === GLOW BEHIND TEXT ===
         GameObject glowObj = new GameObject("TenEffect_Glow");
         glowObj.transform.SetParent(gridContainer, false);
-        glowObj.transform.SetSiblingIndex(tenObj.transform.GetSiblingIndex()); // Behind main text
+        glowObj.transform.SetSiblingIndex(tenObj.transform.GetSiblingIndex());
         effectObjects.Add(glowObj);
         
         RectTransform glowRT = glowObj.AddComponent<RectTransform>();
@@ -571,7 +728,6 @@ public class GridManager : MonoBehaviour
         glowText.color = new Color(1f, 0.95f, 0.5f, 0.4f);
         glowText.alignment = TMPro.TextAlignmentOptions.Center;
         
-        // === SPARKLE PARTICLES ===
         List<(RectTransform rt, Image img, Vector2 velocity, float rotSpeed)> sparkles = 
             new List<(RectTransform, Image, Vector2, float)>();
         
@@ -585,13 +741,12 @@ public class GridManager : MonoBehaviour
             sRT.anchoredPosition = position;
             float size = Random.Range(8f, 16f);
             sRT.sizeDelta = new Vector2(size, size);
-            sRT.localEulerAngles = new Vector3(0, 0, 45f); // Diamond shape
+            sRT.localEulerAngles = new Vector3(0, 0, 45f);
             
             Image sImg = sparkle.AddComponent<Image>();
             sImg.color = sparkleColor;
             sImg.raycastTarget = false;
             
-            // Random outward velocity
             float angle = (i / (float)sparkleCount) * Mathf.PI * 2f + Random.Range(-0.3f, 0.3f);
             float speed = Random.Range(150f, 300f);
             Vector2 vel = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * speed;
@@ -600,7 +755,6 @@ public class GridManager : MonoBehaviour
             sparkles.Add((sRT, sImg, vel, rotSpd));
         }
         
-        // === BURST RINGS ===
         List<(RectTransform rt, Image img, float delay)> rings = 
             new List<(RectTransform, Image, float)>();
         
@@ -608,7 +762,7 @@ public class GridManager : MonoBehaviour
         {
             GameObject ring = new GameObject($"Ring_{i}");
             ring.transform.SetParent(gridContainer, false);
-            ring.transform.SetSiblingIndex(0); // Behind everything
+            ring.transform.SetSiblingIndex(0);
             effectObjects.Add(ring);
             
             RectTransform rRT = ring.AddComponent<RectTransform>();
@@ -622,11 +776,9 @@ public class GridManager : MonoBehaviour
             rings.Add((rRT, rImg, i * 0.08f));
         }
         
-        // === ANIMATION ===
         tenObj.transform.localScale = Vector3.zero;
         glowObj.transform.localScale = Vector3.zero;
         
-        // Pop in with overshoot
         float popDuration = 0.12f;
         float elapsed = 0f;
         
@@ -634,8 +786,6 @@ public class GridManager : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float t = elapsed / popDuration;
-            
-            // Elastic overshoot
             float overshoot = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
             float scale = Mathf.Lerp(0f, 1f, t) * overshoot;
             
@@ -645,11 +795,9 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
         
-        // Settle to normal
         tenObj.transform.localScale = Vector3.one;
         glowObj.transform.localScale = Vector3.one * 1.2f;
         
-        // Main animation phase - sparkles fly out, rings expand, text pulses and floats
         float mainDuration = solveShowTenDuration;
         elapsed = 0f;
         Vector2 startPos = position;
@@ -661,7 +809,6 @@ public class GridManager : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = elapsed / mainDuration;
             
-            // Text floats up and pulses
             float floatY = Mathf.Sin(t * Mathf.PI) * 40f;
             float pulse = 1f + Mathf.Sin(elapsed * 15f) * 0.08f;
             
@@ -672,38 +819,31 @@ public class GridManager : MonoBehaviour
             float glowPulse = 1.2f + Mathf.Sin(elapsed * 12f) * 0.15f;
             glowObj.transform.localScale = Vector3.one * glowPulse;
             
-            // Glow gets brighter then fades
             float glowAlpha = t < 0.3f 
                 ? Mathf.Lerp(0.4f, 0.7f, t / 0.3f) 
                 : Mathf.Lerp(0.7f, 0f, (t - 0.3f) / 0.7f);
             glowText.color = new Color(startGlowColor.r, startGlowColor.g, startGlowColor.b, glowAlpha);
             
-            // Fade out main text in last 40%
             float textAlpha = t < 0.6f ? 1f : Mathf.Lerp(1f, 0f, (t - 0.6f) / 0.4f);
             tenText.color = new Color(startColor.r, startColor.g, startColor.b, textAlpha);
             
-            // Animate sparkles
             foreach (var (sRT, sImg, vel, rotSpd) in sparkles)
             {
                 if (sRT == null) continue;
                 
-                // Move outward with gravity
                 Vector2 currentPos = sRT.anchoredPosition;
                 Vector2 gravity = new Vector2(0, -200f) * Time.deltaTime;
                 sRT.anchoredPosition = currentPos + vel * Time.deltaTime + gravity;
                 
-                // Rotate
                 float currentRot = sRT.localEulerAngles.z;
                 sRT.localEulerAngles = new Vector3(0, 0, currentRot + rotSpd * Time.deltaTime);
                 
-                // Fade and shrink
                 float sparkleAlpha = 1f - t;
                 float sparkleScale = Mathf.Lerp(1f, 0.3f, t);
                 sRT.localScale = Vector3.one * sparkleScale;
                 sImg.color = new Color(sparkleColor.r, sparkleColor.g, sparkleColor.b, sparkleAlpha);
             }
             
-            // Animate burst rings
             foreach (var (rRT, rImg, delay) in rings)
             {
                 if (rRT == null) continue;
@@ -722,7 +862,6 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
         
-        // Cleanup all effect objects
         foreach (GameObject obj in effectObjects)
         {
             if (obj != null)
@@ -886,6 +1025,8 @@ public class GridManager : MonoBehaviour
     
     public void ClearGrid()
     {
+        ClearHintParticles();
+        
         if (grid != null)
         {
             for (int y = 0; y < gridHeight; y++)
@@ -935,10 +1076,16 @@ public class GridManager : MonoBehaviour
             Debug.Log($"Column {x} sum: {sum}" + (sum == 10 ? " ← MATCH!" : ""));
         }
     }
+    
+    [ContextMenu("Force Show Hint")]
+    public void DebugForceHint()
+    {
+        ShowHint();
+    }
 
     public void ResetGame()
     {
-        Debug.Log("GridManager.ResetGame() called");
+        Debug.Log("GridManager.ResetGame() called - full reset with match processing");
         
         if (gridContainer == null)
         {
@@ -948,6 +1095,27 @@ public class GridManager : MonoBehaviour
         
         ClearGrid();
         SpawnGrid();
+        StartCoroutine(ProcessMatchesCoroutine());
+    }
+    
+    public void SpawnGridOnly()
+    {
+        Debug.Log("GridManager.SpawnGridOnly() called - grid visible, no match processing yet");
+        
+        if (gridContainer == null)
+        {
+            Debug.LogError("GridManager: gridContainer is not assigned!");
+            return;
+        }
+        
+        ClearGrid();
+        SpawnGrid();
+    }
+    
+    public void StartMatchProcessing()
+    {
+        Debug.Log("GridManager.StartMatchProcessing() called - let the freebies flow!");
+        ResetHintTimer();
         StartCoroutine(ProcessMatchesCoroutine());
     }
 }

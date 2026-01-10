@@ -147,8 +147,10 @@ public class SceneFlowManager : MonoBehaviour
         // Transition to game panel
         yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
         
-        // Spawn grid (visible behind tutorials)
-        FindFirstObjectByType<GridManager>()?.ResetGame();
+        // Spawn grid (visible behind tutorials) but DON'T process matches yet!
+        // This lets the player see the grid during tutorials/countdown,
+        // and any "freebie" matches will happen AFTER "GO!" for maximum satisfaction
+        FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
         
         yield return new WaitForSeconds(0.1f);
         
@@ -193,9 +195,15 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log("Starting game music...");
         AudioManager.Instance?.PlayGameMusic();
         
-        // Activate gameplay
+        // Activate gameplay (starts timer, enables scoring)
         Debug.Log("Activating game...");
         GameManager.Instance?.ActivateGame();
+        
+        // NOW process matches - this is where the freebies happen!
+        // Player gets to watch and earn points from any initial matches
+        Debug.Log("Starting match processing - let the freebies flow!");
+        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+        
         Debug.Log("CountdownSequence complete");
     }
     
@@ -398,6 +406,35 @@ public class SceneFlowManager : MonoBehaviour
     }
     
     public bool IsInGameplay() => CurrentState == GameState.Game;
+    
+    /// <summary>
+    /// Restart the game with countdown sequence (called from UIManager on replay).
+    /// </summary>
+    public void RestartWithCountdown()
+    {
+        StartCoroutine(RestartWithCountdownSequence());
+    }
+    
+    private IEnumerator RestartWithCountdownSequence()
+    {
+        Debug.Log("RestartWithCountdown - spawning grid and starting countdown");
+        
+        // Stop any current music (win/lose music)
+        AudioManager.Instance?.StopMusic();
+        
+        // Spawn the grid (visible during countdown) but DON'T process matches yet
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.SpawnGridOnly();
+        
+        // Reset game state (score, timer, etc.) but don't activate yet
+        GameManager.Instance?.StartNewGame();
+        
+        yield return new WaitForSeconds(0.1f);
+        
+        // Run countdown sequence (this will call ActivateGame AND StartMatchProcessing at the end)
+        CurrentState = GameState.Countdown;
+        yield return CountdownSequence();
+    }
     
     public void StartGameImmediate()
     {

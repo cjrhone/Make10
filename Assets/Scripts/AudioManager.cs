@@ -28,6 +28,8 @@ public class AudioManager : MonoBehaviour
     [Header("Music Clips")]
     [SerializeField] private AudioClip menuMusic;
     [SerializeField] private AudioClip gameMusic;
+    [SerializeField] private AudioClip winMusic;
+    [SerializeField] private AudioClip loseMusic;
     
     [Header("SFX Clips")]
     [SerializeField] private AudioClip buttonClickSFX;
@@ -163,7 +165,7 @@ public class AudioManager : MonoBehaviour
     
     #region Music Playback
     
-    private void PlayMusic(AudioClip clip)
+    private void PlayMusic(AudioClip clip, bool loop = true)
     {
         if (musicSource == null || clip == null)
         {
@@ -173,13 +175,15 @@ public class AudioManager : MonoBehaviour
         
         musicSource.clip = clip;
         musicSource.volume = musicVolume;
-        musicSource.loop = true;
+        musicSource.loop = loop;
         musicSource.Play();
-        Debug.Log($"Playing music: {clip.name} at volume {musicVolume}");
+        Debug.Log($"Playing music: {clip.name} at volume {musicVolume} (loop={loop})");
     }
     
-    public void PlayMenuMusic() => PlayMusic(menuMusic);
-    public void PlayGameMusic() => PlayMusic(gameMusic);
+    public void PlayMenuMusic() => PlayMusic(menuMusic, loop: true);
+    public void PlayGameMusic() => PlayMusic(gameMusic, loop: true);
+    public void PlayWinMusic() => PlayMusic(winMusic, loop: false);
+    public void PlayLoseMusic() => PlayMusic(loseMusic, loop: false);
     
     public void StopMusic()
     {

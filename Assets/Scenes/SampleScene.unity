@@ -330,6 +330,7 @@ RectTransform:
   - {fileID: 1877129516}
   - {fileID: 512812418}
   - {fileID: 288641637}
+  - {fileID: 226206227}
   m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -1318,6 +1319,8 @@ MonoBehaviour:
   multiplierFullColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   multiplierLowColor: {r: 1, g: 0.3, b: 0.2, a: 1}
   multiplierLowThreshold: 3
+  hotStreakEffect: {fileID: 2128208163}
+  enableHotStreak: 1
   pulseMinScale: 1
   pulseMaxScale: 1.2
   pulseSpeed: 3
@@ -1488,6 +1491,79 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 209305901}
   m_CullTransparentMesh: 1
+--- !u!1 &226206226
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 226206227}
+  - component: {fileID: 226206228}
+  m_Layer: 5
+  m_Name: ParallaxContainer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &226206227
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226206226}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 68437846}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &226206228
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226206226}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b82cde5f43c946b1a84ef84e87bb5be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ParallaxBackground
+  container: {fileID: 226206227}
+  bounds: {x: 1200, y: 900}
+  deepCount: 6
+  deepSpeed: 15
+  deepScale: 120
+  deepAlpha: 0.06
+  deepColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
+  midCount: 20
+  midSpeedMin: 25
+  midSpeedMax: 45
+  midScaleMin: 24
+  midScaleMax: 40
+  midAlpha: 0.08
+  nearCount: 12
+  nearSpeedMin: 50
+  nearSpeedMax: 70
+  nearScaleMin: 16
+  nearScaleMax: 28
+  nearAlpha: 0.04
+  driftDirection: {x: -1, y: -0.3}
+  verticalWobbleAmount: 20
+  wobbleSpeed: 0.5
+  rotationDrift: 5
+  generateOnStart: 1
+  generateOnEnable: 0
 --- !u!1 &234280745
 GameObject:
   m_ObjectHideFlags: 0
@@ -4988,6 +5064,11 @@ MonoBehaviour:
   solveShowTenDuration: 0.5
   convergeShrinkAmount: 0.7
   tenTextPrefab: {fileID: 0}
+  sparkleCount: 12
+  sparkleDistance: 80
+  burstRingCount: 2
+  tenGlowColor: {r: 1, g: 0.9, b: 0.3, a: 1}
+  sparkleColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   weight0: 0.15
   weight1: 0.22
   weight2: 0.2
@@ -7038,6 +7119,79 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1403082113}
   m_CullTransparentMesh: 1
+--- !u!1 &1403321185
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1403321186}
+  - component: {fileID: 1403321187}
+  m_Layer: 5
+  m_Name: ParallaxContainer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1403321186
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1403321185}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1694822198}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1403321187
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1403321185}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b82cde5f43c946b1a84ef84e87bb5be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ParallaxBackground
+  container: {fileID: 1403321186}
+  bounds: {x: 1200, y: 900}
+  deepCount: 6
+  deepSpeed: 15
+  deepScale: 120
+  deepAlpha: 0.06
+  deepColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
+  midCount: 20
+  midSpeedMin: 25
+  midSpeedMax: 45
+  midScaleMin: 24
+  midScaleMax: 40
+  midAlpha: 0.08
+  nearCount: 12
+  nearSpeedMin: 50
+  nearSpeedMax: 70
+  nearScaleMin: 16
+  nearScaleMax: 28
+  nearAlpha: 0.04
+  driftDirection: {x: -1, y: -0.3}
+  verticalWobbleAmount: 20
+  wobbleSpeed: 0.5
+  rotationDrift: 5
+  generateOnStart: 1
+  generateOnEnable: 0
 --- !u!1 &1419440156
 GameObject:
   m_ObjectHideFlags: 0
@@ -8850,6 +9004,7 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 1403321186}
   - {fileID: 622586887}
   - {fileID: 1771787567}
   - {fileID: 1970017508}
@@ -8942,7 +9097,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0.25}
   m_AnchorMax: {x: 1, y: 0.75}
-  m_AnchoredPosition: {x: -5, y: 0}
+  m_AnchoredPosition: {x: -5.0000153, y: 0}
   m_SizeDelta: {x: -20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1720076971
@@ -9008,8 +9163,11 @@ MonoBehaviour:
   voiceSlider: {fileID: 9742309}
   menuMusic: {fileID: 8300000, guid: 320006c8a44c748edb6a9644dd71db0a, type: 3}
   gameMusic: {fileID: 8300000, guid: 9e6f5ec7fcca546c8b289c1a22d434f9, type: 3}
+  winMusic: {fileID: 8300000, guid: 8cf6ef0ba9a9d4cffb0103bec1327fb4, type: 3}
+  loseMusic: {fileID: 8300000, guid: 2c9bea1fd1252477ca3357106aee9e92, type: 3}
   buttonClickSFX: {fileID: 8300000, guid: f228806d6553a4d3587500b09a680a41, type: 3}
-  matchSFX: {fileID: 8300000, guid: dac30f359131148a6a292c03141085ef, type: 3}
+  convergenceSFX: {fileID: 8300000, guid: 0d226e6996b8f45e0bf556a8fde68d6f, type: 3}
+  tenPopSFX: {fileID: 8300000, guid: dac30f359131148a6a292c03141085ef, type: 3}
   swapSFX: {fileID: 8300000, guid: 1dccc2d5b9f3e4fd7a3e910912652c12, type: 3}
   countdownBeepSFX: {fileID: 8300000, guid: d248ca25b92b8479a9aa364df5c23767, type: 3}
   countdownGoSFX: {fileID: 8300000, guid: b9e1e7e7b9af348aaa6f8fd2990a349d, type: 3}
@@ -9485,8 +9643,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 304, y: -0.38373}
-  m_SizeDelta: {x: 431.1154, y: 126.45}
+  m_AnchoredPosition: {x: 233, y: -2.1372}
+  m_SizeDelta: {x: 165.1305, y: 75.7164}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1816239543
 CanvasRenderer:
@@ -9543,8 +9701,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 76.1
-  m_fontSizeBase: 76.1
+  m_fontSize: 58.32
+  m_fontSizeBase: 58.32
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -9623,8 +9781,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 1.0028}
-  m_SizeDelta: {x: 160, y: 123.6769}
+  m_AnchoredPosition: {x: 3.5877, y: 1.0028}
+  m_SizeDelta: {x: 265.6, y: 77.985}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1832537881
 MonoBehaviour:
@@ -11378,6 +11536,7 @@ GameObject:
   - component: {fileID: 2128208160}
   - component: {fileID: 2128208162}
   - component: {fileID: 2128208161}
+  - component: {fileID: 2128208163}
   m_Layer: 5
   m_Name: MultiplierPanel
   m_TagString: Untagged
@@ -11404,7 +11563,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -485.79993, y: 179}
+  m_AnchoredPosition: {x: -417, y: -10.005}
   m_SizeDelta: {x: -1021.58, y: -640.0092}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2128208161
@@ -11445,6 +11604,49 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2128208159}
   m_CullTransparentMesh: 1
+--- !u!114 &2128208163
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2128208159}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 008ab4c04f43746919ca65ef6c57ee10, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HotStreakEffect
+  panelTransform: {fileID: 2128208160}
+  barFillTransform: {fileID: 1832537880}
+  multiplierText: {fileID: 1816239544}
+  barFillImage: {fileID: 1852814335}
+  barBackgroundImage: {fileID: 0}
+  baseFlameCount: 8
+  maxFlameCount: 20
+  flameSpawnRate: 0.08
+  flameLifetime: 0.6
+  flameRiseSpeed: 120
+  flameWobbleAmount: 15
+  flameSizeRange: {x: 12, y: 24}
+  baseEmberCount: 4
+  maxEmberCount: 12
+  emberSpawnRate: 0.15
+  emberLifetime: 1.2
+  emberRiseSpeed: 60
+  emberDriftAmount: 30
+  emberSizeRange: {x: 4, y: 8}
+  floatAmount: 6
+  floatSpeed: 3
+  shakeIntensity: 2
+  shakeSpeed: 25
+  flameCore: {r: 1, g: 0.95, b: 0.4, a: 1}
+  flameMid: {r: 1, g: 0.5, b: 0.1, a: 1}
+  flameEdge: {r: 0.9, g: 0.2, b: 0.1, a: 1}
+  emberColor: {r: 1, g: 0.6, b: 0.2, a: 1}
+  barPulseColor: {r: 1, g: 0.4, b: 0.1, a: 1}
+  colorPulseSpeed: 4
+  textFlameHeight: 20
+  textFlameCount: 6
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
