@@ -65,7 +65,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float finishTextDuration = 1.5f;
     [SerializeField] private GameObject winScreen;
     [SerializeField] private GameObject loseScreen;
-    [SerializeField] private TMP_Text finalScoreText;
+    [SerializeField] private TMP_Text winScoreText;
+    [SerializeField] private TMP_Text loseScoreText;
     
     [Header("Unsolvable Grid Popup")]
     [SerializeField] private GameObject unsolvablePopup;
@@ -420,18 +421,18 @@ public class UIManager : MonoBehaviour
         {
             AudioManager.Instance?.PlayWinMusic();
             SetActiveIfNotNull(winScreen, true);
-            if (finalScoreText != null && gameManager != null)
+            if (winScoreText != null && gameManager != null)
             {
-                finalScoreText.text = $"Score: {gameManager.Score}\nTime Left: {gameManager.TimeRemaining:F1}s";
+                winScoreText.text = $"Score: {gameManager.Score}\nTime Left: {gameManager.TimeRemaining:F1}s";
             }
         }
         else
         {
             AudioManager.Instance?.PlayLoseMusic();
             SetActiveIfNotNull(loseScreen, true);
-            if (finalScoreText != null && gameManager != null)
+            if (loseScoreText != null && gameManager != null)
             {
-                finalScoreText.text = $"Score: {gameManager.Score} / {gameManager.WinScore}\nSo close!";
+                loseScoreText.text = $"Score: {gameManager.Score} / {gameManager.WinScore}\nSo close!";
             }
         }
     }
