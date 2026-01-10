@@ -79,9 +79,19 @@ public class UIManager : MonoBehaviour
     // Coroutine tracking
     private Coroutine timerPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
+    private Coroutine multiplierGlowCoroutine;
     private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
     private bool hotStreakActive = false;
+    
+    // Multiplier text animation
+    private float lastMultiplierValue = 1f;
+    private Color multiplierTextBaseColor = Color.white;
+    [Header("Multiplier Text Animation")]
+    [SerializeField] private Color multiplierGlowColor = new Color(1f, 0.9f, 0.3f);
+    [SerializeField] private float multiplierMinScale = 1f;
+    [SerializeField] private float multiplierMaxScale = 1.5f;
+    [SerializeField] private float multiplierScaleAtMax = 3f; // What multiplier value = max scale
     
     #region Initialization
     
@@ -304,19 +314,42 @@ public class UIManager : MonoBehaviour
             if (!multiplierPanel.activeSelf)
             {
                 multiplierPanel.SetActive(true);
-                StartPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform, 
-                    pulseMinScale, pulseMaxScale, pulseSpeed);
+                lastMultiplierValue = multiplier;
                 StartCoroutine(AnimationUtilities.PunchScale(multiplierPanel.transform, 1.15f, 0.2f));
                 
                 // Activate hot streak effect!
                 ActivateHotStreak(multiplier);
+                
+                // Store base color for glow effect
+                if (multiplierValueText != null)
+                    multiplierTextBaseColor = multiplierValueText.color;
             }
             
             if (multiplierSlider != null)
                 multiplierSlider.value = timer;
             
             if (multiplierValueText != null)
+            {
                 multiplierValueText.text = $"x{multiplier:F2}";
+                
+                // Scale text based on multiplier value (bigger multiplier = bigger text)
+                float scaleT = Mathf.InverseLerp(1f, multiplierScaleAtMax, multiplier);
+                float targetScale = Mathf.Lerp(multiplierMinScale, multiplierMaxScale, scaleT);
+                
+                // If multiplier increased, do a glow + punch animation
+                if (multiplier > lastMultiplierValue + 0.01f)
+                {
+                    TriggerMultiplierGlow(targetScale);
+                    AudioManager.Instance?.PlayMultiplierIncrease();
+                }
+                else
+                {
+                    // Just maintain the scale
+                    multiplierValueText.transform.localScale = Vector3.one * targetScale;
+                }
+                
+                lastMultiplierValue = multiplier;
+            }
             
             if (multiplierTimerText != null)
                 multiplierTimerText.text = $"{timer:F1}s";
@@ -335,9 +368,83 @@ public class UIManager : MonoBehaviour
         else if (multiplierPanel.activeSelf)
         {
             StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
+            StopMultiplierGlow();
             DeactivateHotStreak();
             multiplierPanel.SetActive(false);
+            lastMultiplierValue = 1f;
         }
+    }
+    
+    private void TriggerMultiplierGlow(float targetScale)
+    {
+        if (multiplierValueText == null) return;
+        
+        // Stop any existing glow
+        StopMultiplierGlow();
+        
+        multiplierGlowCoroutine = StartCoroutine(MultiplierGlowAnimation(targetScale));
+    }
+    
+    private void StopMultiplierGlow()
+    {
+        if (multiplierGlowCoroutine != null)
+        {
+            StopCoroutine(multiplierGlowCoroutine);
+            multiplierGlowCoroutine = null;
+        }
+    }
+    
+    private IEnumerator MultiplierGlowAnimation(float targetScale)
+    {
+        if (multiplierValueText == null) yield break;
+        
+        Transform textTransform = multiplierValueText.transform;
+        float startScale = textTransform.localScale.x;
+        float punchScale = targetScale * 1.3f; // Overshoot
+        
+        // Phase 1: Punch up with glow
+        float elapsed = 0f;
+        float punchDuration = 0.15f;
+        
+        while (elapsed < punchDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / punchDuration;
+            
+            // Scale punch
+            float scale = Mathf.Lerp(startScale, punchScale, t);
+            textTransform.localScale = Vector3.one * scale;
+            
+            // Color glow (white/gold flash)
+            multiplierValueText.color = Color.Lerp(multiplierTextBaseColor, multiplierGlowColor, t);
+            
+            yield return null;
+        }
+        
+        // Phase 2: Settle back with glow fade
+        elapsed = 0f;
+        float settleDuration = 0.25f;
+        
+        while (elapsed < settleDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / settleDuration;
+            float smoothT = 1f - Mathf.Pow(1f - t, 3f); // Ease out
+            
+            // Scale settle
+            float scale = Mathf.Lerp(punchScale, targetScale, smoothT);
+            textTransform.localScale = Vector3.one * scale;
+            
+            // Color fade back
+            multiplierValueText.color = Color.Lerp(multiplierGlowColor, multiplierTextBaseColor, smoothT);
+            
+            yield return null;
+        }
+        
+        // Final state
+        textTransform.localScale = Vector3.one * targetScale;
+        multiplierValueText.color = multiplierTextBaseColor;
+        multiplierGlowCoroutine = null;
     }
     
     #endregion

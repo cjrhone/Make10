@@ -94,6 +94,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float multiplierDrainRate = 1f;
     [SerializeField] private float multiplierIncrement = 0.25f;
     [SerializeField] private float startingMultiplier = 1.25f;
+    [SerializeField] private float maxMultiplier = 3f;
     [SerializeField] private float streakTimeout = 10f;
     
     [Header("References")]
@@ -343,6 +344,7 @@ public class GameManager : MonoBehaviour
             Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
             
             currentMultiplier += multiplierIncrement;
+            currentMultiplier = Mathf.Min(currentMultiplier, maxMultiplier); // Cap at max
             multiplierTimer = multiplierDuration;
             
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
@@ -351,10 +353,7 @@ public class GameManager : MonoBehaviour
         Score += pointsAwarded;
         OnScoreChanged?.Invoke(Score, pointsAwarded);
         
-        if (Score >= winScore)
-        {
-            StartCoroutine(WinGameDelayed());
-        }
+        // Don't end game early - let player keep playing until time runs out
     }
     
     private void ActivateMultiplierBar()

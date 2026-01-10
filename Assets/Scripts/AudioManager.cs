@@ -42,6 +42,7 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip tileSelectSFX;
     [SerializeField] private AudioClip timeWarningSFX;
     [SerializeField] private AudioClip finishSFX;
+    [SerializeField] private AudioClip multiplierIncreaseSFX; // Multiplier goes up
     
     // Volume state
     private float musicVolume;
@@ -212,6 +213,7 @@ public class AudioManager : MonoBehaviour
     public void PlayTransitionSwipe() => PlaySFX(transitionSwipeSFX);
     public void PlayTileSelect() => PlaySFX(tileSelectSFX);
     public void PlayFinishSound() => PlaySFX(finishSFX);
+    public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
     
     #endregion
     
