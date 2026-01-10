@@ -443,13 +443,14 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1403082114}
   m_Father: {fileID: 1694822198}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -13.766006, y: 296}
-  m_SizeDelta: {x: 143.8426, y: 128.18}
+  m_AnchoredPosition: {x: 0, y: 315.14}
+  m_SizeDelta: {x: 100.69, y: 89.728}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &80614454
 CanvasRenderer:
@@ -1302,7 +1303,8 @@ MonoBehaviour:
   timerShadowText: {fileID: 0}
   timerFillImage: {fileID: 80614455}
   timerSlider: {fileID: 1477288767}
-  useTimerColorChange: 1
+  useTimerTextColorChange: 0
+  useTimerFillColorChange: 1
   timerHealthyColor: {r: 0, g: 0, b: 0, a: 1}
   timerWarningColor: {r: 0.9, g: 0.7, b: 0.2, a: 1}
   timerDangerColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
@@ -1321,7 +1323,7 @@ MonoBehaviour:
   pulseSpeed: 3
   scorePopupPrefab: {fileID: 2626605845459652261, guid: 25feda4872fda43518ce56b653076193, type: 3}
   scorePopupParent: {fileID: 1771787567}
-  finishTextObject: {fileID: 0}
+  finishTextObject: {fileID: 1136515554}
   finishTextDuration: 1.5
   winScreen: {fileID: 118860725}
   loseScreen: {fileID: 695977311}
@@ -3271,7 +3273,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 239, y: 43}
+  m_AnchoredPosition: {x: 256, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &625274646
@@ -6929,12 +6931,12 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1694822198}
+  m_Father: {fileID: 80614453}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -17.366053, y: 288.07}
-  m_SizeDelta: {x: 224.361, y: 109.1224}
+  m_AnchoredPosition: {x: -0.000022888, y: -7}
+  m_SizeDelta: {x: 82.9021, y: 62.1224}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1403082115
 MonoBehaviour:
@@ -6983,8 +6985,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 66.15
-  m_fontSizeBase: 66.15
+  m_fontSize: 50.54
+  m_fontSizeBase: 50.54
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -8861,7 +8863,6 @@ RectTransform:
   - {fileID: 178623200}
   - {fileID: 1171771898}
   - {fileID: 80614453}
-  - {fileID: 1403082114}
   - {fileID: 1136515555}
   m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -9064,6 +9065,7 @@ MonoBehaviour:
   loadingProgressBar: {fileID: 1312649216}
   fakeLoadDuration: 2
   countdownText: {fileID: 433998901}
+  countdownStepDuration: 0.7
   mainCanvas: {fileID: 710881284}
 --- !u!1 &1756074267
 GameObject:

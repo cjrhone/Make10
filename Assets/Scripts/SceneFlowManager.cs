@@ -5,6 +5,7 @@ using System.Collections;
 /// <summary>
 /// Controls the flow between game states/panels.
 /// Handles transitions with smooth swipe animations.
+/// Refactored for cleaner code reuse.
 /// </summary>
 public class SceneFlowManager : MonoBehaviour
 {
@@ -18,7 +19,7 @@ public class SceneFlowManager : MonoBehaviour
     [SerializeField] private RectTransform tutorialPanel1;
     [SerializeField] private RectTransform tutorialPanel2;
     [SerializeField] private RectTransform countdownPanel;
-    [SerializeField] private RectTransform quitPanel; // "Thanks for playing" panel
+    [SerializeField] private RectTransform quitPanel;
     
     [Header("Transition Settings")]
     [SerializeField] private float transitionDuration = 0.4f;
@@ -30,6 +31,7 @@ public class SceneFlowManager : MonoBehaviour
     
     [Header("Countdown Settings")]
     [SerializeField] private TMPro.TMP_Text countdownText;
+    [SerializeField] private float countdownStepDuration = 0.7f;
     
     [Header("References")]
     [SerializeField] private Canvas mainCanvas;
@@ -41,6 +43,8 @@ public class SceneFlowManager : MonoBehaviour
     public enum GameState { Loading, MainMenu, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
     
+    #region Initialization
+    
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -49,481 +53,333 @@ public class SceneFlowManager : MonoBehaviour
             return;
         }
         Instance = this;
-        
         screenWidth = GetCanvasWidth();
     }
     
     private void Start()
     {
-        // Initialize all panels
         InitializePanels();
-        
-        // Start with loading screen
         StartCoroutine(LoadingSequence());
     }
     
-    /// <summary>
-    /// Get the canvas width for transitions.
-    /// </summary>
     private float GetCanvasWidth()
     {
         if (mainCanvas != null)
-        {
-            RectTransform canvasRect = mainCanvas.GetComponent<RectTransform>();
-            return canvasRect.rect.width;
-        }
-        return 1024f; // Default fallback
+            return mainCanvas.GetComponent<RectTransform>().rect.width;
+        return 1024f;
     }
     
-    /// <summary>
-    /// Set initial panel positions (all hidden except loading).
-    /// </summary>
     private void InitializePanels()
     {
-        // Hide all panels off-screen to the right
-        SetPanelPosition(mainMenuPanel, screenWidth);
-        SetPanelPosition(gamePanel, screenWidth);
-        SetPanelPosition(optionsPanel, screenWidth);
-        SetPanelPosition(tutorialPanel1, screenWidth);
-        SetPanelPosition(tutorialPanel2, screenWidth);
-        SetPanelPosition(countdownPanel, screenWidth);
-        SetPanelPosition(quitPanel, screenWidth);
+        // Position all panels off-screen except loading
+        RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, optionsPanel, 
+            tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
         
-        // Loading panel starts visible (centered)
+        foreach (var panel in offScreenPanels)
+            SetPanelPosition(panel, screenWidth);
+        
         SetPanelPosition(loadingPanel, 0);
         
-        // Make sure panels are active (just positioned off-screen)
+        // Set active states
         SetPanelActive(loadingPanel, true);
         SetPanelActive(mainMenuPanel, true);
         SetPanelActive(gamePanel, true);
-        SetPanelActive(optionsPanel, false); // Options is overlay, start hidden
+        SetPanelActive(optionsPanel, false); // Options is overlay
         SetPanelActive(tutorialPanel1, true);
         SetPanelActive(tutorialPanel2, true);
         SetPanelActive(countdownPanel, true);
         SetPanelActive(quitPanel, true);
     }
     
+    #endregion
+    
+    #region Panel Helpers
+    
     private void SetPanelPosition(RectTransform panel, float xPos)
     {
-        if (panel != null)
-        {
-            Vector2 pos = panel.anchoredPosition;
-            pos.x = xPos;
-            panel.anchoredPosition = pos;
-        }
+        if (panel == null) return;
+        Vector2 pos = panel.anchoredPosition;
+        pos.x = xPos;
+        panel.anchoredPosition = pos;
     }
     
     private void SetPanelActive(RectTransform panel, bool active)
     {
         if (panel != null)
-        {
             panel.gameObject.SetActive(active);
-        }
     }
     
-    /// <summary>
-    /// Fake loading sequence with progress bar.
-    /// </summary>
+    #endregion
+    
+    #region Core Sequences
+    
     private IEnumerator LoadingSequence()
     {
         CurrentState = GameState.Loading;
         Debug.Log("LoadingSequence started");
         
+        // Animate loading bar
         float elapsed = 0f;
         while (elapsed < fakeLoadDuration)
         {
             elapsed += Time.deltaTime;
-            float progress = elapsed / fakeLoadDuration;
-            
             if (loadingProgressBar != null)
-            {
-                loadingProgressBar.value = progress;
-            }
-            
+                loadingProgressBar.value = elapsed / fakeLoadDuration;
             yield return null;
         }
         
         Debug.Log("LoadingSequence complete - transitioning to MainMenu");
         
         // Start menu music
-        if (AudioManager.Instance != null)
-        {
-            Debug.Log("AudioManager found - calling PlayMenuMusic");
-            AudioManager.Instance.PlayMenuMusic();
-        }
-        else
-        {
-            Debug.LogWarning("AudioManager.Instance is NULL - cannot play menu music!");
-        }
+        PlayAudio(() => AudioManager.Instance?.PlayMenuMusic());
         
         // Transition to main menu
-        yield return StartCoroutine(TransitionToPanel(loadingPanel, mainMenuPanel, true));
+        yield return SlideTransition(loadingPanel, mainMenuPanel, slideLeft: true);
         CurrentState = GameState.MainMenu;
-        Debug.Log($"Now in MainMenu state. CurrentState = {CurrentState}");
-    }
-    
-    /// <summary>
-    /// Smooth swipe transition between panels.
-    /// </summary>
-    private IEnumerator TransitionToPanel(RectTransform fromPanel, RectTransform toPanel, bool slideLeft)
-    {
-        // Play swipe sound
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayTransitionSwipe();
-        
-        float direction = slideLeft ? -1f : 1f;
-        
-        // Position incoming panel
-        SetPanelPosition(toPanel, -direction * screenWidth);
-        
-        float elapsed = 0f;
-        Vector2 fromStart = fromPanel.anchoredPosition;
-        Vector2 toStart = toPanel.anchoredPosition;
-        
-        Vector2 fromEnd = new Vector2(direction * screenWidth, fromStart.y);
-        Vector2 toEnd = new Vector2(0, toStart.y);
-        
-        while (elapsed < transitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = transitionCurve.Evaluate(elapsed / transitionDuration);
-            
-            fromPanel.anchoredPosition = Vector2.Lerp(fromStart, fromEnd, t);
-            toPanel.anchoredPosition = Vector2.Lerp(toStart, toEnd, t);
-            
-            yield return null;
-        }
-        
-        // Snap to final positions
-        fromPanel.anchoredPosition = fromEnd;
-        toPanel.anchoredPosition = toEnd;
-    }
-    
-    /// <summary>
-    /// Fade transition for overlays (options panel).
-    /// </summary>
-    private IEnumerator FadePanel(RectTransform panel, bool fadeIn)
-    {
-        Debug.Log($"FadePanel called - fadeIn: {fadeIn}, panel: {(panel != null ? panel.name : "NULL")}");
-        
-        if (panel == null)
-        {
-            Debug.LogError("FadePanel: panel is null!");
-            yield break;
-        }
-        
-        CanvasGroup canvasGroup = panel.GetComponent<CanvasGroup>();
-        if (canvasGroup == null)
-        {
-            canvasGroup = panel.gameObject.AddComponent<CanvasGroup>();
-            Debug.Log("Added CanvasGroup to panel");
-        }
-        
-        float startAlpha = fadeIn ? 0f : 1f;
-        float endAlpha = fadeIn ? 1f : 0f;
-        
-        if (fadeIn)
-        {
-            panel.gameObject.SetActive(true);
-            // Make sure it's centered (not off-screen)
-            panel.anchoredPosition = Vector2.zero;
-            Debug.Log($"Panel activated and centered. Position: {panel.anchoredPosition}");
-        }
-        
-        float elapsed = 0f;
-        while (elapsed < transitionDuration * 0.5f)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / (transitionDuration * 0.5f);
-            canvasGroup.alpha = Mathf.Lerp(startAlpha, endAlpha, t);
-            yield return null;
-        }
-        
-        canvasGroup.alpha = endAlpha;
-        Debug.Log($"FadePanel complete. Alpha: {endAlpha}");
-        
-        if (!fadeIn)
-        {
-            panel.gameObject.SetActive(false);
-        }
-    }
-    
-    // === PUBLIC METHODS (called by buttons) ===
-    
-    /// <summary>
-    /// Called by Play button on main menu.
-    /// </summary>
-    public void OnPlayPressed()
-    {
-        Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
-        if (CurrentState != GameState.MainMenu)
-        {
-            Debug.LogWarning($"OnPlayPressed ignored - not in MainMenu state (currently {CurrentState})");
-            return;
-        }
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(PlaySequence());
+        Debug.Log($"Now in MainMenu state");
     }
     
     private IEnumerator PlaySequence()
     {
         // Stop menu music
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.StopMusic();
-        // Transition to game panel first
-        yield return StartCoroutine(TransitionToPanel(mainMenuPanel, gamePanel, true));
+        AudioManager.Instance?.StopMusic();
         
-        // Spawn the grid immediately so it's visible behind tutorials
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
-        if (gridManager != null)
-        {
-            gridManager.ResetGame();
-        }
+        // Transition to game panel
+        yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
         
-        // Small pause to let grid render
+        // Spawn grid (visible behind tutorials)
+        FindFirstObjectByType<GridManager>()?.ResetGame();
+        
         yield return new WaitForSeconds(0.1f);
         
+        // Show tutorials
         CurrentState = GameState.Tutorial1;
-        
-        // Show tutorial 1 (overlay on top of grid)
-        yield return StartCoroutine(ShowTutorialPanel(tutorialPanel1));
+        yield return ShowPanel(tutorialPanel1);
     }
     
-    /// <summary>
-    /// Called by Options button on main menu.
-    /// </summary>
-    public void OnOptionsPressed()
-    {
-        Debug.Log($"OnOptionsPressed called! CurrentState = {CurrentState}");
-        if (CurrentState != GameState.MainMenu)
-        {
-            Debug.LogWarning($"OnOptionsPressed ignored - not in MainMenu state");
-            return;
-        }
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(FadePanel(optionsPanel, true));
-        CurrentState = GameState.Options;
-    }
-    
-    /// <summary>
-    /// Called by Close button on options panel.
-    /// </summary>
-    public void OnOptionsClosePressed()
-    {
-        if (CurrentState != GameState.Options) return;
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(CloseOptionsSequence());
-    }
-    
-    private IEnumerator CloseOptionsSequence()
-    {
-        yield return StartCoroutine(FadePanel(optionsPanel, false));
-        CurrentState = GameState.MainMenu;
-    }
-    
-    /// <summary>
-    /// Called by Quit button on main menu.
-    /// </summary>
-    public void OnQuitPressed()
-    {
-        Debug.Log($"OnQuitPressed called! CurrentState = {CurrentState}");
-        if (CurrentState != GameState.MainMenu)
-        {
-            Debug.LogWarning("OnQuitPressed ignored - not in MainMenu state");
-            return;
-        }
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(QuitSequence());
-    }
-    
-    private IEnumerator QuitSequence()
-    {
-        yield return StartCoroutine(TransitionToPanel(mainMenuPanel, quitPanel, true));
-        CurrentState = GameState.Quit;
-        
-        // Just show the panel - user can click the itch.io button manually
-        Debug.Log("Quit panel shown. User can click itch.io button.");
-    }
-    
-    /// <summary>
-    /// Called by itch.io button on quit panel.
-    /// </summary>
-    public void OnItchIOButtonPressed()
-    {
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        Debug.Log("Opening itch.io...");
-        Application.OpenURL("https://itch.io/"); // TODO: Replace with your game's itch.io URL
-    }
-    
-    /// <summary>
-    /// Called by "Ok" button on Tutorial 1.
-    /// </summary>
-    public void OnTutorial1OkPressed()
-    {
-        if (CurrentState != GameState.Tutorial1) return;
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(Tutorial1ToTutorial2());
-    }
-    
-    private IEnumerator Tutorial1ToTutorial2()
-    {
-        yield return StartCoroutine(HideTutorialPanel(tutorialPanel1));
-        CurrentState = GameState.Tutorial2;
-        yield return StartCoroutine(ShowTutorialPanel(tutorialPanel2));
-    }
-    
-    /// <summary>
-    /// Called by "I've got this" button on Tutorial 2.
-    /// </summary>
-    public void OnTutorial2GotThisPressed()
-    {
-        if (CurrentState != GameState.Tutorial2) return;
-        
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayButtonClick();
-            
-        StartCoroutine(Tutorial2ToCountdown());
-    }
-    
-    private IEnumerator Tutorial2ToCountdown()
-    {
-        yield return StartCoroutine(HideTutorialPanel(tutorialPanel2));
-        CurrentState = GameState.Countdown;
-        yield return StartCoroutine(CountdownSequence());
-    }
-    
-    /// <summary>
-    /// Show tutorial panel with animation.
-    /// </summary>
-    private IEnumerator ShowTutorialPanel(RectTransform panel)
-    {
-        // Scale up from center
-        panel.localScale = Vector3.zero;
-        SetPanelPosition(panel, 0); // Center it
-        
-        float elapsed = 0f;
-        while (elapsed < transitionDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = transitionCurve.Evaluate(elapsed / transitionDuration);
-            panel.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, t);
-            yield return null;
-        }
-        
-        panel.localScale = Vector3.one;
-    }
-    
-    /// <summary>
-    /// Hide tutorial panel with animation.
-    /// </summary>
-    private IEnumerator HideTutorialPanel(RectTransform panel)
-    {
-        float elapsed = 0f;
-        while (elapsed < transitionDuration * 0.5f)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / (transitionDuration * 0.5f);
-            panel.localScale = Vector3.Lerp(Vector3.one, Vector3.zero, t);
-            yield return null;
-        }
-        
-        panel.localScale = Vector3.zero;
-        SetPanelPosition(panel, screenWidth); // Move off-screen
-    }
-    
-    /// <summary>
-    /// Countdown sequence: 3, 2, 1, GO!
-    /// </summary>
     private IEnumerator CountdownSequence()
     {
         Debug.Log("CountdownSequence started");
         SetPanelPosition(countdownPanel, 0);
         countdownPanel.localScale = Vector3.one;
         
-        string[] countdownSteps = { "3", "2", "1", "GO!" };
+        string[] steps = { "3", "2", "1", "GO!" };
         
-        foreach (string step in countdownSteps)
+        foreach (string step in steps)
         {
             if (countdownText != null)
             {
                 countdownText.text = step;
                 
-                // Play countdown sound
-                if (AudioManager.Instance != null)
-                {
-                    if (step == "GO!")
-                        AudioManager.Instance.PlayCountdownGo();
-                    else
-                        AudioManager.Instance.PlayCountdownBeep();
-                }
+                // Play sound
+                if (step == "GO!")
+                    AudioManager.Instance?.PlayCountdownGo();
+                else
+                    AudioManager.Instance?.PlayCountdownBeep();
                 
                 // Pop animation
-                countdownPanel.localScale = Vector3.one * 1.5f;
-                float elapsed = 0f;
-                while (elapsed < 0.15f)
-                {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / 0.15f;
-                    countdownPanel.localScale = Vector3.Lerp(Vector3.one * 1.5f, Vector3.one, t);
-                    yield return null;
-                }
+                yield return CountdownPop();
             }
             
-            yield return new WaitForSeconds(0.7f);
+            yield return new WaitForSeconds(countdownStepDuration);
         }
         
-        // Hide countdown, start game
-        Debug.Log("Countdown complete - hiding panel and starting game");
-        yield return StartCoroutine(HideTutorialPanel(countdownPanel));
+        // Hide countdown and start game
+        Debug.Log("Countdown complete - starting game");
+        yield return HidePanel(countdownPanel);
         CurrentState = GameState.Game;
-        Debug.Log("State changed to Game - about to play game music");
         
         // Start game music
-        if (AudioManager.Instance != null)
-        {
-            Debug.Log("Starting game music...");
-            AudioManager.Instance.PlayGameMusic();
-        }
-        else
-        {
-            Debug.LogWarning("AudioManager.Instance is NULL - cannot play game music!");
-        }
+        Debug.Log("Starting game music...");
+        AudioManager.Instance?.PlayGameMusic();
         
-        // Grid is already spawned from PlaySequence - just activate the game
-        Debug.Log("About to call ActivateGame()");
-        if (GameManager.Instance != null)
-        {
-            // Don't call StartNewGame() - grid already exists
-            // Just make sure the game is active
-            GameManager.Instance.ActivateGame();
-        }
-        else
-        {
-            Debug.LogWarning("GameManager.Instance is NULL!");
-        }
+        // Activate gameplay
+        Debug.Log("Activating game...");
+        GameManager.Instance?.ActivateGame();
         Debug.Log("CountdownSequence complete");
     }
     
+    private IEnumerator CountdownPop()
+    {
+        countdownPanel.localScale = Vector3.one * 1.5f;
+        float elapsed = 0f;
+        while (elapsed < 0.15f)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / 0.15f;
+            countdownPanel.localScale = Vector3.Lerp(Vector3.one * 1.5f, Vector3.one, t);
+            yield return null;
+        }
+        countdownPanel.localScale = Vector3.one;
+    }
+    
+    #endregion
+    
+    #region Transition Animations
+    
     /// <summary>
-    /// Return to main menu (e.g., after game over).
+    /// Slide transition between two panels.
     /// </summary>
+    private IEnumerator SlideTransition(RectTransform from, RectTransform to, bool slideLeft)
+    {
+        AudioManager.Instance?.PlayTransitionSwipe();
+        
+        float direction = slideLeft ? -1f : 1f;
+        SetPanelPosition(to, -direction * screenWidth);
+        
+        Vector2 fromStart = from.anchoredPosition;
+        Vector2 toStart = to.anchoredPosition;
+        Vector2 fromEnd = new Vector2(direction * screenWidth, fromStart.y);
+        Vector2 toEnd = new Vector2(0, toStart.y);
+        
+        float elapsed = 0f;
+        while (elapsed < transitionDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = transitionCurve.Evaluate(elapsed / transitionDuration);
+            
+            from.anchoredPosition = Vector2.Lerp(fromStart, fromEnd, t);
+            to.anchoredPosition = Vector2.Lerp(toStart, toEnd, t);
+            yield return null;
+        }
+        
+        from.anchoredPosition = fromEnd;
+        to.anchoredPosition = toEnd;
+    }
+    
+    /// <summary>
+    /// Fade transition for overlay panels.
+    /// </summary>
+    private IEnumerator FadeTransition(RectTransform panel, bool fadeIn)
+    {
+        if (panel == null) yield break;
+        
+        CanvasGroup group = panel.GetComponent<CanvasGroup>();
+        if (group == null)
+            group = panel.gameObject.AddComponent<CanvasGroup>();
+        
+        if (fadeIn)
+        {
+            panel.gameObject.SetActive(true);
+            panel.anchoredPosition = Vector2.zero;
+        }
+        
+        yield return AnimationUtilities.FadeCanvasGroup(group, fadeIn, transitionDuration * 0.5f);
+        
+        if (!fadeIn)
+            panel.gameObject.SetActive(false);
+    }
+    
+    /// <summary>
+    /// Show a panel with scale animation (for tutorials/popups).
+    /// </summary>
+    private IEnumerator ShowPanel(RectTransform panel)
+    {
+        SetPanelPosition(panel, 0);
+        yield return AnimationUtilities.ScaleIn(panel, transitionDuration, 1f, transitionCurve);
+    }
+    
+    /// <summary>
+    /// Hide a panel with scale animation.
+    /// </summary>
+    private IEnumerator HidePanel(RectTransform panel)
+    {
+        yield return AnimationUtilities.ScaleOut(panel, transitionDuration * 0.5f);
+        SetPanelPosition(panel, screenWidth);
+    }
+    
+    #endregion
+    
+    #region Button Handlers
+    
+    // Helper to wrap button actions with click sound and state check
+    private void HandleButton(GameState requiredState, System.Action action)
+    {
+        if (CurrentState != requiredState)
+        {
+            Debug.LogWarning($"Button ignored - not in {requiredState} state (currently {CurrentState})");
+            return;
+        }
+        
+        AudioManager.Instance?.PlayButtonClick();
+        action?.Invoke();
+    }
+    
+    public void OnPlayPressed()
+    {
+        Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
+        HandleButton(GameState.MainMenu, () => StartCoroutine(PlaySequence()));
+    }
+    
+    public void OnOptionsPressed()
+    {
+        Debug.Log($"OnOptionsPressed called! CurrentState = {CurrentState}");
+        HandleButton(GameState.MainMenu, () =>
+        {
+            StartCoroutine(FadeTransition(optionsPanel, fadeIn: true));
+            CurrentState = GameState.Options;
+        });
+    }
+    
+    public void OnOptionsClosePressed()
+    {
+        HandleButton(GameState.Options, () => StartCoroutine(CloseOptions()));
+    }
+    
+    private IEnumerator CloseOptions()
+    {
+        yield return FadeTransition(optionsPanel, fadeIn: false);
+        CurrentState = GameState.MainMenu;
+    }
+    
+    public void OnQuitPressed()
+    {
+        Debug.Log($"OnQuitPressed called! CurrentState = {CurrentState}");
+        HandleButton(GameState.MainMenu, () => StartCoroutine(QuitSequence()));
+    }
+    
+    private IEnumerator QuitSequence()
+    {
+        yield return SlideTransition(mainMenuPanel, quitPanel, slideLeft: true);
+        CurrentState = GameState.Quit;
+        Debug.Log("Quit panel shown.");
+    }
+    
+    public void OnItchIOButtonPressed()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+        Debug.Log("Opening itch.io...");
+        Application.OpenURL("https://itch.io/"); // TODO: Replace with your game's URL
+    }
+    
+    public void OnTutorial1OkPressed()
+    {
+        HandleButton(GameState.Tutorial1, () => StartCoroutine(Tutorial1To2()));
+    }
+    
+    private IEnumerator Tutorial1To2()
+    {
+        yield return HidePanel(tutorialPanel1);
+        CurrentState = GameState.Tutorial2;
+        yield return ShowPanel(tutorialPanel2);
+    }
+    
+    public void OnTutorial2GotThisPressed()
+    {
+        HandleButton(GameState.Tutorial2, () => StartCoroutine(Tutorial2ToCountdown()));
+    }
+    
+    private IEnumerator Tutorial2ToCountdown()
+    {
+        yield return HidePanel(tutorialPanel2);
+        CurrentState = GameState.Countdown;
+        yield return CountdownSequence();
+    }
+    
+    #endregion
+    
+    #region Public Utilities
+    
     public void ReturnToMainMenu()
     {
         StartCoroutine(ReturnToMainMenuSequence());
@@ -531,38 +387,18 @@ public class SceneFlowManager : MonoBehaviour
     
     private IEnumerator ReturnToMainMenuSequence()
     {
-        yield return StartCoroutine(TransitionToPanel(gamePanel, mainMenuPanel, false));
+        yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
         CurrentState = GameState.MainMenu;
-        
-        // Reset game panel position for next play
         SetPanelPosition(gamePanel, screenWidth);
     }
     
-    /// <summary>
-    /// Called by GameManager when the game ends (win or lose).
-    /// Syncs the flow state with game state.
-    /// </summary>
     public void OnGameEnded(bool won)
     {
-        // Update our state to reflect game is no longer active
-        // The actual win/lose UI is handled by UIManager
         Debug.Log($"SceneFlowManager: Game ended - {(won ? "WIN" : "LOSE")}");
-        
-        // We stay in Game state but mark that the game session is over
-        // Player can then choose to restart or return to menu
     }
     
-    /// <summary>
-    /// Check if we're in a playable game state.
-    /// </summary>
-    public bool IsInGameplay()
-    {
-        return CurrentState == GameState.Game;
-    }
+    public bool IsInGameplay() => CurrentState == GameState.Game;
     
-    /// <summary>
-    /// Skip tutorials and go straight to game (for testing or replay).
-    /// </summary>
     public void StartGameImmediate()
     {
         if (CurrentState != GameState.MainMenu) return;
@@ -571,12 +407,19 @@ public class SceneFlowManager : MonoBehaviour
     
     private IEnumerator StartGameImmediateSequence()
     {
-        yield return StartCoroutine(TransitionToPanel(mainMenuPanel, gamePanel, true));
+        yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
         CurrentState = GameState.Game;
-        
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.StartNewGame();
-        }
+        GameManager.Instance?.StartNewGame();
     }
+    
+    #endregion
+    
+    #region Audio Helper
+    
+    private void PlayAudio(System.Action playAction)
+    {
+        playAction?.Invoke();
+    }
+    
+    #endregion
 }

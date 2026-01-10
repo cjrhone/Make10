@@ -1,10 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Audio;
 
 /// <summary>
 /// Centralized audio management with volume controls.
 /// Persists settings using PlayerPrefs.
+/// Refactored for cleaner organization.
 /// </summary>
 public class AudioManager : MonoBehaviour
 {
@@ -15,33 +15,33 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioSource sfxSource;
     [SerializeField] private AudioSource voiceSource;
     
-    [Header("Volume Settings")]
-    [Range(0f, 1f)]
-    [SerializeField] private float defaultMusicVolume = 0.7f;
-    [Range(0f, 1f)]
-    [SerializeField] private float defaultSFXVolume = 1f;
-    [Range(0f, 1f)]
-    [SerializeField] private float defaultVoiceVolume = 1f;
+    [Header("Volume Defaults")]
+    [Range(0f, 1f)] [SerializeField] private float defaultMusicVolume = 0.7f;
+    [Range(0f, 1f)] [SerializeField] private float defaultSFXVolume = 1f;
+    [Range(0f, 1f)] [SerializeField] private float defaultVoiceVolume = 1f;
     
-    [Header("UI References")]
+    [Header("UI Sliders")]
     [SerializeField] private Slider musicSlider;
     [SerializeField] private Slider sfxSlider;
     [SerializeField] private Slider voiceSlider;
     
-    [Header("Audio Clips")]
+    [Header("Music Clips")]
     [SerializeField] private AudioClip menuMusic;
     [SerializeField] private AudioClip gameMusic;
+    
+    [Header("SFX Clips")]
     [SerializeField] private AudioClip buttonClickSFX;
-    [SerializeField] private AudioClip matchSFX;
+    [SerializeField] private AudioClip convergenceSFX;   // Tiles converging together
+    [SerializeField] private AudioClip tenPopSFX;        // "10" appears after solve
     [SerializeField] private AudioClip swapSFX;
     [SerializeField] private AudioClip countdownBeepSFX;
     [SerializeField] private AudioClip countdownGoSFX;
     [SerializeField] private AudioClip transitionSwipeSFX;
     [SerializeField] private AudioClip tileSelectSFX;
-    [SerializeField] private AudioClip timeWarningSFX; // Looping warning when time is low
-    [SerializeField] private AudioClip finishSFX; // Plays when time runs out
+    [SerializeField] private AudioClip timeWarningSFX;
+    [SerializeField] private AudioClip finishSFX;
     
-    // Current volumes
+    // Volume state
     private float musicVolume;
     private float sfxVolume;
     private float voiceVolume;
@@ -51,6 +51,8 @@ public class AudioManager : MonoBehaviour
     private const string SFX_VOL_KEY = "SFXVolume";
     private const string VOICE_VOL_KEY = "VoiceVolume";
     
+    #region Initialization
+    
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -59,8 +61,6 @@ public class AudioManager : MonoBehaviour
             return;
         }
         Instance = this;
-        // Note: DontDestroyOnLoad removed - using single scene architecture
-        
         LoadVolumeSettings();
     }
     
@@ -68,42 +68,26 @@ public class AudioManager : MonoBehaviour
     {
         SetupSliders();
         ApplyVolumeSettings();
-        
-        // Check for AudioListener
-        AudioListener listener = FindFirstObjectByType<AudioListener>();
-        if (listener == null)
-        {
-            Debug.LogError("AudioManager: No AudioListener found in scene! Audio won't play.");
-        }
-        else
-        {
-            Debug.Log($"AudioManager: AudioListener found on {listener.gameObject.name}");
-        }
+        ValidateAudioListener();
     }
     
-    /// <summary>
-    /// Load saved volume settings or use defaults.
-    /// </summary>
     private void LoadVolumeSettings()
     {
         musicVolume = PlayerPrefs.GetFloat(MUSIC_VOL_KEY, defaultMusicVolume);
         sfxVolume = PlayerPrefs.GetFloat(SFX_VOL_KEY, defaultSFXVolume);
         voiceVolume = PlayerPrefs.GetFloat(VOICE_VOL_KEY, defaultVoiceVolume);
         
-        // Safety check: if music volume is 0, reset to default (user may have accidentally muted)
+        // Reset if accidentally muted
         if (musicVolume <= 0.01f)
         {
-            Debug.LogWarning($"Music volume was {musicVolume}, resetting to default {defaultMusicVolume}");
+            Debug.LogWarning($"Music volume was {musicVolume}, resetting to default");
             musicVolume = defaultMusicVolume;
             SaveVolumeSettings();
         }
         
-        Debug.Log($"AudioManager loaded volumes - Music: {musicVolume}, SFX: {sfxVolume}, Voice: {voiceVolume}");
+        Debug.Log($"AudioManager loaded: Music={musicVolume:F2}, SFX={sfxVolume:F2}, Voice={voiceVolume:F2}");
     }
     
-    /// <summary>
-    /// Save volume settings to PlayerPrefs.
-    /// </summary>
     private void SaveVolumeSettings()
     {
         PlayerPrefs.SetFloat(MUSIC_VOL_KEY, musicVolume);
@@ -112,9 +96,6 @@ public class AudioManager : MonoBehaviour
         PlayerPrefs.Save();
     }
     
-    /// <summary>
-    /// Apply current volume settings to audio sources.
-    /// </summary>
     private void ApplyVolumeSettings()
     {
         if (musicSource != null) musicSource.volume = musicVolume;
@@ -122,33 +103,29 @@ public class AudioManager : MonoBehaviour
         if (voiceSource != null) voiceSource.volume = voiceVolume;
     }
     
-    /// <summary>
-    /// Setup slider listeners and initial values.
-    /// </summary>
     private void SetupSliders()
     {
-        if (musicSlider != null)
-        {
-            musicSlider.value = musicVolume;
-            musicSlider.onValueChanged.AddListener(SetMusicVolume);
-        }
-        
-        if (sfxSlider != null)
-        {
-            sfxSlider.value = sfxVolume;
-            sfxSlider.onValueChanged.AddListener(SetSFXVolume);
-        }
-        
-        if (voiceSlider != null)
-        {
-            voiceSlider.value = voiceVolume;
-            voiceSlider.onValueChanged.AddListener(SetVoiceVolume);
-        }
+        SetupSlider(musicSlider, musicVolume, SetMusicVolume);
+        SetupSlider(sfxSlider, sfxVolume, SetSFXVolume);
+        SetupSlider(voiceSlider, voiceVolume, SetVoiceVolume);
     }
     
-    /// <summary>
-    /// Refresh sliders if options panel is reopened.
-    /// </summary>
+    private void SetupSlider(Slider slider, float value, UnityEngine.Events.UnityAction<float> callback)
+    {
+        if (slider == null) return;
+        slider.value = value;
+        slider.onValueChanged.AddListener(callback);
+    }
+    
+    private void ValidateAudioListener()
+    {
+        var listener = FindFirstObjectByType<AudioListener>();
+        if (listener == null)
+            Debug.LogError("AudioManager: No AudioListener found! Audio won't play.");
+        else
+            Debug.Log($"AudioManager: AudioListener on {listener.gameObject.name}");
+    }
+    
     public void RefreshSliders()
     {
         if (musicSlider != null) musicSlider.value = musicVolume;
@@ -156,7 +133,9 @@ public class AudioManager : MonoBehaviour
         if (voiceSlider != null) voiceSlider.value = voiceVolume;
     }
     
-    // === VOLUME SETTERS ===
+    #endregion
+    
+    #region Volume Setters
     
     public void SetMusicVolume(float volume)
     {
@@ -170,9 +149,7 @@ public class AudioManager : MonoBehaviour
         sfxVolume = volume;
         if (sfxSource != null) sfxSource.volume = volume;
         SaveVolumeSettings();
-        
-        // Play test sound
-        PlaySFX(buttonClickSFX);
+        PlayButtonClick(); // Test sound
     }
     
     public void SetVoiceVolume(float volume)
@@ -182,178 +159,87 @@ public class AudioManager : MonoBehaviour
         SaveVolumeSettings();
     }
     
-    // === PLAYBACK METHODS ===
+    #endregion
     
-    /// <summary>
-    /// Play background music (loops).
-    /// </summary>
-    public void PlayMusic(AudioClip clip)
+    #region Music Playback
+    
+    private void PlayMusic(AudioClip clip)
     {
-        if (musicSource != null && clip != null)
+        if (musicSource == null || clip == null)
         {
-            Debug.Log($"PlayMusic: Playing clip '{clip.name}' at volume {musicVolume}");
-            musicSource.clip = clip;
-            musicSource.volume = musicVolume; // Ensure volume is set
-            musicSource.loop = true;
-            musicSource.Play();
-            Debug.Log($"PlayMusic: musicSource.isPlaying = {musicSource.isPlaying}");
+            Debug.LogWarning($"PlayMusic failed: source={musicSource != null}, clip={clip != null}");
+            return;
         }
-        else
-        {
-            Debug.LogWarning($"PlayMusic failed: musicSource={musicSource}, clip={clip}");
-        }
+        
+        musicSource.clip = clip;
+        musicSource.volume = musicVolume;
+        musicSource.loop = true;
+        musicSource.Play();
+        Debug.Log($"Playing music: {clip.name} at volume {musicVolume}");
     }
     
-    /// <summary>
-    /// Play menu music.
-    /// </summary>
-    public void PlayMenuMusic()
-    {
-        Debug.Log($"PlayMenuMusic called. menuMusic={menuMusic}, musicSource={musicSource}");
-        if (menuMusic == null)
-        {
-            Debug.LogWarning("PlayMenuMusic: menuMusic clip is not assigned!");
-        }
-        if (musicSource == null)
-        {
-            Debug.LogWarning("PlayMenuMusic: musicSource is not assigned!");
-        }
-        PlayMusic(menuMusic);
-    }
+    public void PlayMenuMusic() => PlayMusic(menuMusic);
+    public void PlayGameMusic() => PlayMusic(gameMusic);
     
-    /// <summary>
-    /// Play game music.
-    /// </summary>
-    public void PlayGameMusic()
-    {
-        Debug.Log($"PlayGameMusic called. gameMusic={gameMusic}, musicSource={musicSource}");
-        if (gameMusic == null)
-        {
-            Debug.LogWarning("PlayGameMusic: gameMusic clip is not assigned!");
-        }
-        PlayMusic(gameMusic);
-    }
-    
-    /// <summary>
-    /// Stop music.
-    /// </summary>
     public void StopMusic()
     {
         if (musicSource != null)
-        {
             musicSource.Stop();
-        }
     }
     
-    /// <summary>
-    /// Play a one-shot sound effect.
-    /// </summary>
-    public void PlaySFX(AudioClip clip)
+    #endregion
+    
+    #region SFX Playback
+    
+    private void PlaySFX(AudioClip clip)
     {
         if (sfxSource != null && clip != null)
-        {
             sfxSource.PlayOneShot(clip, sfxVolume);
-        }
     }
     
-    /// <summary>
-    /// Play button click sound.
-    /// </summary>
-    public void PlayButtonClick()
-    {
-        PlaySFX(buttonClickSFX);
-    }
+    // One-liner SFX methods
+    public void PlayButtonClick() => PlaySFX(buttonClickSFX);
+    public void PlayConvergenceSound() => PlaySFX(convergenceSFX);
+    public void PlayTenPopSound() => PlaySFX(tenPopSFX);
+    public void PlayMatchSound() => PlaySFX(tenPopSFX); // Legacy alias for compatibility
+    public void PlaySwapSound() => PlaySFX(swapSFX);
+    public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);
+    public void PlayCountdownGo() => PlaySFX(countdownGoSFX);
+    public void PlayTransitionSwipe() => PlaySFX(transitionSwipeSFX);
+    public void PlayTileSelect() => PlaySFX(tileSelectSFX);
+    public void PlayFinishSound() => PlaySFX(finishSFX);
     
-    /// <summary>
-    /// Play match/solve sound.
-    /// </summary>
-    public void PlayMatchSound()
-    {
-        PlaySFX(matchSFX);
-    }
+    #endregion
     
-    /// <summary>
-    /// Play swap sound.
-    /// </summary>
-    public void PlaySwapSound()
-    {
-        PlaySFX(swapSFX);
-    }
+    #region Looping SFX (Time Warning)
     
-    /// <summary>
-    /// Play countdown beep.
-    /// </summary>
-    public void PlayCountdownBeep()
-    {
-        PlaySFX(countdownBeepSFX);
-    }
-    
-    /// <summary>
-    /// Play countdown "GO!" sound.
-    /// </summary>
-    public void PlayCountdownGo()
-    {
-        PlaySFX(countdownGoSFX);
-    }
-    
-    /// <summary>
-    /// Play transition swipe sound.
-    /// </summary>
-    public void PlayTransitionSwipe()
-    {
-        PlaySFX(transitionSwipeSFX);
-    }
-    
-    /// <summary>
-    /// Play tile select sound.
-    /// </summary>
-    public void PlayTileSelect()
-    {
-        PlaySFX(tileSelectSFX);
-    }
-    
-    /// <summary>
-    /// Play finish sound (time's up).
-    /// </summary>
-    public void PlayFinishSound()
-    {
-        PlaySFX(finishSFX);
-    }
-    
-    /// <summary>
-    /// Start looping time warning sound.
-    /// </summary>
     public void StartTimeWarning()
     {
-        if (sfxSource != null && timeWarningSFX != null && !sfxSource.isPlaying)
-        {
-            sfxSource.clip = timeWarningSFX;
-            sfxSource.loop = true;
-            sfxSource.Play();
-        }
+        if (sfxSource == null || timeWarningSFX == null || sfxSource.isPlaying) return;
+        
+        sfxSource.clip = timeWarningSFX;
+        sfxSource.loop = true;
+        sfxSource.Play();
     }
     
-    /// <summary>
-    /// Stop the looping time warning sound.
-    /// </summary>
     public void StopTimeWarning()
     {
-        if (sfxSource != null && sfxSource.clip == timeWarningSFX)
-        {
-            sfxSource.Stop();
-            sfxSource.loop = false;
-            sfxSource.clip = null;
-        }
+        if (sfxSource == null || sfxSource.clip != timeWarningSFX) return;
+        
+        sfxSource.Stop();
+        sfxSource.loop = false;
+        sfxSource.clip = null;
     }
     
-    /// <summary>
-    /// Play voice over clip.
-    /// </summary>
+    #endregion
+    
+    #region Voice Playback
+    
     public void PlayVoice(AudioClip clip)
     {
         if (voiceSource != null && clip != null)
-        {
             voiceSource.PlayOneShot(clip, voiceVolume);
-        }
     }
+    
+    #endregion
 }

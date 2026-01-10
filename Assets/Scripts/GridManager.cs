@@ -24,45 +24,40 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float tileFallDelay = 0.05f;
     [SerializeField] private float postClearDelay = 0.1f;
     [SerializeField] private float tileSwapDuration = 0.15f;
-    [SerializeField] private float unsolvableResetDelay = 1f; // delay before auto-reset
+    [SerializeField] private float unsolvableResetDelay = 1f;
     
     [Header("Solve Animation Settings")]
     [SerializeField] private float solveConvergeDuration = 0.25f;
-    [SerializeField] private float solveShowTenDuration = 0.3f;
-    [SerializeField] private float convergeShrinkAmount = 0.7f; // 1.0 = no shrink, 0.3 = lots of shrink
-    [SerializeField] private GameObject tenTextPrefab; // Prefab for showing "10" text
+    [SerializeField] private float solveShowTenDuration = 0.5f;
+    [SerializeField] private float convergeShrinkAmount = 0.7f;
+    [SerializeField] private GameObject tenTextPrefab;
+    
+    [Header("Ten Effect Magic Settings")]
+    [SerializeField] private int sparkleCount = 12;
+    [SerializeField] private float sparkleDistance = 80f;
+    [SerializeField] private float burstRingCount = 2;
+    [SerializeField] private Color tenGlowColor = new Color(1f, 0.9f, 0.3f);
+    [SerializeField] private Color sparkleColor = new Color(1f, 0.95f, 0.6f);
     
     [Header("Tile Value Weights (must sum to 1.0)")]
-    [SerializeField] private float weight0 = 0.15f; // 0 tiles - wildcard
-    [SerializeField] private float weight1 = 0.27f; // 1 tiles - common
-    [SerializeField] private float weight2 = 0.26f; // 2 tiles - common
-    [SerializeField] private float weight3 = 0.17f; // 3 tiles
-    [SerializeField] private float weight4 = 0.13f; // 4 tiles
-    [SerializeField] private float weight5 = 0.01f; // 5 tiles - very rare
-    [SerializeField] private float weight6 = 0.01f; // 6 tiles - extremely rare (blockers)
+    [SerializeField] private float weight0 = 0.15f;
+    [SerializeField] private float weight1 = 0.27f;
+    [SerializeField] private float weight2 = 0.26f;
+    [SerializeField] private float weight3 = 0.17f;
+    [SerializeField] private float weight4 = 0.13f;
+    [SerializeField] private float weight5 = 0.01f;
+    [SerializeField] private float weight6 = 0.01f;
 
-    
-    // The grid array
     private Tile[,] grid;
-    
-    // Currently selected tile (null if none)
     private Tile selectedTile;
-    
-    // Cached weights array
     private float[] weights;
-    
-    // Is the grid currently processing (animating, clearing, etc.)
     private bool isProcessing = false;
     
-    // Event for unsolvable grid notification
     public event System.Action OnGridUnsolvable;
     
     private void Awake()
     {
-        // Cache weights
         weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
-        
-        // Initialize grid array
         grid = new Tile[gridWidth, gridHeight];
     }
     
@@ -80,9 +75,6 @@ public class GridManager : MonoBehaviour
     
     private void Start()
     {
-        // Don't auto-spawn - wait for SceneFlowManager or GameManager to call ResetGame()
-        // This prevents the game from running during loading/menu/tutorial
-        // For backwards compatibility (testing without SceneFlowManager), spawn if no flow manager exists
         if (SceneFlowManager.Instance == null)
         {
             Debug.Log("No SceneFlowManager found - auto-starting grid for testing");
@@ -91,9 +83,6 @@ public class GridManager : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Spawn the initial grid of tiles.
-    /// </summary>
     public void SpawnGrid()
     {
         Debug.Log("GridManager.SpawnGrid() called");
@@ -104,14 +93,10 @@ public class GridManager : MonoBehaviour
             return;
         }
         
-        // Clear existing tiles if any
         ClearGrid();
         
-        // Calculate total grid dimensions
         float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
         float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
-        
-        // Starting position (top-left of grid, centered in container)
         float startX = -totalWidth / 2f + tileSize / 2f;
         float startY = totalHeight / 2f - tileSize / 2f;
         
@@ -119,11 +104,8 @@ public class GridManager : MonoBehaviour
         {
             for (int x = 0; x < gridWidth; x++)
             {
-                // Calculate position
                 float posX = startX + x * (tileSize + tileSpacing);
                 float posY = startY - y * (tileSize + tileSpacing);
-                
-                // Create tile
                 Tile tile = CreateTile(x, y, new Vector2(posX, posY));
                 grid[x, y] = tile;
             }
@@ -132,9 +114,6 @@ public class GridManager : MonoBehaviour
         Debug.Log($"Grid spawned: {gridWidth}x{gridHeight}");
     }
     
-    /// <summary>
-    /// Create a single tile at the specified grid position.
-    /// </summary>
     private Tile CreateTile(int gridX, int gridY, Vector2 position)
     {
         GameObject tileObj = Instantiate(tilePrefab, gridContainer);
@@ -146,7 +125,6 @@ public class GridManager : MonoBehaviour
             tile.Initialize(value, gridX, gridY);
             tile.SetPosition(position);
             
-            // Set size
             RectTransform rt = tile.GetRectTransform();
             rt.sizeDelta = new Vector2(tileSize, tileSize);
         }
@@ -154,9 +132,6 @@ public class GridManager : MonoBehaviour
         return tile;
     }
     
-    /// <summary>
-    /// Get a random tile value (0-4) based on weighted distribution.
-    /// </summary>
     private int GetWeightedRandomValue()
     {
         float roll = Random.value;
@@ -166,48 +141,34 @@ public class GridManager : MonoBehaviour
         {
             cumulative += weights[i];
             if (roll <= cumulative)
-            {
                 return i;
-            }
         }
         
-        return 2; // Fallback to most common
+        return 2;
     }
     
-    /// <summary>
-    /// Handle tile click events.
-    /// </summary>
     private void HandleTileClicked(Tile tile)
     {
-        // Don't allow interaction while processing or game not active
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
         if (selectedTile == null)
         {
-            // First selection
             selectedTile = tile;
             tile.Select();
-            
-            // Play select sound
-            if (AudioManager.Instance != null)
-                AudioManager.Instance.PlayTileSelect();
-            
+            AudioManager.Instance?.PlayTileSelect();
             Debug.Log($"Selected: {tile}");
         }
         else if (selectedTile == tile)
         {
-            // Clicked same tile - deselect
             tile.Deselect();
             selectedTile = null;
             Debug.Log("Deselected");
         }
         else
         {
-            // Second selection - check if adjacent
             if (!IsAdjacent(selectedTile, tile))
             {
-                // Not adjacent - deselect old, select new
                 selectedTile.Deselect();
                 selectedTile = tile;
                 tile.Select();
@@ -215,71 +176,44 @@ public class GridManager : MonoBehaviour
                 return;
             }
             
-            // Adjacent - perform swap
             Tile firstTile = selectedTile;
             Tile secondTile = tile;
-            
-            // Clear selection reference
             selectedTile = null;
-            
-            // Reset visual state on BOTH tiles before swap
             firstTile.Deselect();
             secondTile.Deselect();
-            
-            // Now perform the animated swap
             StartCoroutine(AnimatedSwapCoroutine(firstTile, secondTile));
         }
     }
     
-    /// <summary>
-    /// Check if two tiles are adjacent (up, down, left, right only).
-    /// </summary>
     private bool IsAdjacent(Tile a, Tile b)
     {
         int dx = Mathf.Abs(a.GridX - b.GridX);
         int dy = Mathf.Abs(a.GridY - b.GridY);
-        
-        // Adjacent means exactly 1 step in one direction, 0 in the other
         return (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
     }
     
-    /// <summary>
-    /// Handle swipe gestures on tiles.
-    /// </summary>
     private void HandleTileSwiped(Tile tile, SwipeDirection direction)
     {
-        // Don't allow interaction while processing or game not active
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
-        // Calculate neighbor position based on swipe direction
         int neighborX = tile.GridX;
         int neighborY = tile.GridY;
         
         switch (direction)
         {
-            case SwipeDirection.Up:
-                neighborY -= 1; // Up in grid = lower Y index
-                break;
-            case SwipeDirection.Down:
-                neighborY += 1; // Down in grid = higher Y index
-                break;
-            case SwipeDirection.Left:
-                neighborX -= 1;
-                break;
-            case SwipeDirection.Right:
-                neighborX += 1;
-                break;
+            case SwipeDirection.Up: neighborY -= 1; break;
+            case SwipeDirection.Down: neighborY += 1; break;
+            case SwipeDirection.Left: neighborX -= 1; break;
+            case SwipeDirection.Right: neighborX += 1; break;
         }
         
-        // Check bounds
         if (neighborX < 0 || neighborX >= gridWidth || neighborY < 0 || neighborY >= gridHeight)
         {
             Debug.Log($"Swipe {direction} blocked - no tile in that direction");
             return;
         }
         
-        // Get neighbor tile
         Tile neighborTile = grid[neighborX, neighborY];
         if (neighborTile == null)
         {
@@ -287,90 +221,60 @@ public class GridManager : MonoBehaviour
             return;
         }
         
-        // Clear any existing selection
         if (selectedTile != null)
         {
             selectedTile.Deselect();
             selectedTile = null;
         }
         
-        // Perform the swap
         Debug.Log($"Swipe swap: {tile} <-> {neighborTile}");
         StartCoroutine(AnimatedSwapCoroutine(tile, neighborTile));
     }
     
-    /// <summary>
-    /// Animate the swap then process matches.
-    /// </summary>
     private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB)
     {
         isProcessing = true;
+        AudioManager.Instance?.PlaySwapSound();
         
-        // Play swap sound
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlaySwapSound();
-        
-        // Get positions
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
         Vector2 posB = tileB.GetRectTransform().anchoredPosition;
         
-        // Animate both tiles moving to each other's positions
         float elapsed = 0f;
         while (elapsed < tileSwapDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / tileSwapDuration;
-            
-            // Smooth step for nicer feel
             float smoothT = t * t * (3f - 2f * t);
             
             tileA.GetRectTransform().anchoredPosition = Vector2.Lerp(posA, posB, smoothT);
             tileB.GetRectTransform().anchoredPosition = Vector2.Lerp(posB, posA, smoothT);
-            
             yield return null;
         }
         
-        // Snap to final positions
         tileA.GetRectTransform().anchoredPosition = posB;
         tileB.GetRectTransform().anchoredPosition = posA;
         
-        // Update grid array
-        int axOld = tileA.GridX;
-        int ayOld = tileA.GridY;
-        int bxOld = tileB.GridX;
-        int byOld = tileB.GridY;
+        int axOld = tileA.GridX, ayOld = tileA.GridY;
+        int bxOld = tileB.GridX, byOld = tileB.GridY;
         
         grid[axOld, ayOld] = tileB;
         grid[bxOld, byOld] = tileA;
-        
-        tileA.GridX = bxOld;
-        tileA.GridY = byOld;
-        tileB.GridX = axOld;
-        tileB.GridY = ayOld;
+        tileA.GridX = bxOld; tileA.GridY = byOld;
+        tileB.GridX = axOld; tileB.GridY = ayOld;
         
         isProcessing = false;
-        
-        // Check for matches after swap
         StartCoroutine(ProcessMatchesCoroutine());
     }
     
-    /// <summary>
-    /// Main cascade loop: Check → Clear → Fall → Spawn → Repeat
-    /// </summary>
     private IEnumerator ProcessMatchesCoroutine()
     {
         isProcessing = true;
         int cascadeCount = 0;
         
-        // Notify GameManager cascade is starting
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.OnCascadeStart();
-        }
+        GameManager.Instance?.OnCascadeStart();
         
         while (true)
         {
-            // Check for matches
             if (matchChecker == null)
             {
                 Debug.LogWarning("MatchChecker not assigned!");
@@ -381,15 +285,10 @@ public class GridManager : MonoBehaviour
             
             if (!result.HasMatches)
             {
-                // No matches, we're done
                 if (cascadeCount > 0)
-                {
                     Debug.Log($"Cascade complete! {cascadeCount} chain(s)");
-                }
                 else
-                {
                     Debug.Log("No matches found.");
-                }
                 break;
             }
             
@@ -398,47 +297,26 @@ public class GridManager : MonoBehaviour
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
                     $"{result.TotalMatchedTiles} tiles");
             
-            // Play match sound
-            if (AudioManager.Instance != null)
-                AudioManager.Instance.PlayMatchSound();
+            // NO SOUND HERE - moved to AnimateSolveSequence
             
-            // 1. Animate tiles converging and show "10"
             yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));
             
-            // 2. Clear matched tiles
             ClearMatchedTiles(result.allMatchedTiles);
             
-            // 3. Notify GameManager for scoring
-            if (GameManager.Instance != null)
-            {
-                GameManager.Instance.OnMatchCleared(
-                    result.TotalMatchedTiles,
-                    result.matchedRows.Count,
-                    result.matchedColumns.Count
-                );
-            }
+            GameManager.Instance?.OnMatchCleared(
+                result.TotalMatchedTiles,
+                result.matchedRows.Count,
+                result.matchedColumns.Count
+            );
             
             yield return new WaitForSeconds(postClearDelay);
-            
-            // 3. Drop remaining tiles down
             yield return StartCoroutine(DropTilesCoroutine());
-            
-            // 4. Spawn new tiles at top
             yield return StartCoroutine(SpawnNewTilesCoroutine());
-            
-            // Small pause before next check
             yield return new WaitForSeconds(0.1f);
-            
-            // Loop continues to check for chain reactions
         }
         
-        // Notify GameManager cascade is complete
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.OnCascadeEnd();
-        }
+        GameManager.Instance?.OnCascadeEnd();
         
-        // Check if grid is solvable
         if (matchChecker != null && !matchChecker.HasValidMoves())
         {
             Debug.Log("<color=red>GRID UNSOLVABLE!</color> No valid moves available. Resetting...");
@@ -452,41 +330,27 @@ public class GridManager : MonoBehaviour
         PrintGridState();
     }
     
-    /// <summary>
-    /// Reset the grid without awarding points (for unsolvable situations).
-    /// </summary>
     private void ResetGridSilent()
     {
         StartCoroutine(ResetGridWithEffect());
     }
     
-    /// <summary>
-    /// Visual effect for resetting unsolvable grid.
-    /// </summary>
     private IEnumerator ResetGridWithEffect()
     {
         Debug.Log("<color=yellow>Grid reset with visual effect (no points awarded)</color>");
         
-        // Collect all current tiles
         List<Tile> allTiles = new List<Tile>();
         for (int y = 0; y < gridHeight; y++)
-        {
             for (int x = 0; x < gridWidth; x++)
-            {
                 if (grid[x, y] != null)
-                {
                     allTiles.Add(grid[x, y]);
-                }
-            }
-        }
         
-        // Flash all tiles red
         float flashDuration = 0.3f;
         float elapsed = 0f;
         while (elapsed < flashDuration)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.PingPong(elapsed * 8f, 1f); // Fast flicker
+            float t = Mathf.PingPong(elapsed * 8f, 1f);
             Color flashColor = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.3f), t);
             
             foreach (Tile tile in allTiles)
@@ -500,19 +364,13 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
         
-        // Shake and fall animation
         float fallDuration = 0.4f;
         elapsed = 0f;
         
-        // Store original positions
         Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
         foreach (Tile tile in allTiles)
-        {
             if (tile != null)
-            {
                 originalPositions[tile] = tile.GetRectTransform().anchoredPosition;
-            }
-        }
         
         while (elapsed < fallDuration)
         {
@@ -525,16 +383,11 @@ public class GridManager : MonoBehaviour
                 {
                     RectTransform rt = tile.GetRectTransform();
                     Vector2 originalPos = originalPositions[tile];
-                    
-                    // Shake horizontally
                     float shake = Mathf.Sin(elapsed * 50f) * 5f * (1f - t);
-                    
-                    // Fall down with acceleration
                     float fallDistance = 800f * t * t;
                     
                     rt.anchoredPosition = originalPos + new Vector2(shake, -fallDistance);
                     
-                    // Fade out
                     Image img = tile.GetComponent<Image>();
                     if (img != null)
                     {
@@ -543,37 +396,31 @@ public class GridManager : MonoBehaviour
                         img.color = c;
                     }
                     
-                    // Shrink slightly
                     tile.transform.localScale = Vector3.one * (1f - t * 0.3f);
                 }
             }
             yield return null;
         }
         
-        // Clear and respawn
         ClearGrid();
         SpawnGrid();
-        
-        // Check for initial matches
         StartCoroutine(ProcessMatchesCoroutine());
     }
     
     /// <summary>
-    /// Solve animation: tiles converge to center and show "10".
-    /// Numbers brighten and fade as backgrounds disappear.
+    /// Solve animation: tiles converge to center and show spectacular "10".
+    /// CONVERGENCE SOUND plays at start, TEN POP SOUND plays when "10" appears.
     /// </summary>
     private IEnumerator AnimateSolveSequence(HashSet<Tile> tiles, MatchResult result)
     {
-        // Pause progress bars during animation
         if (GameManager.Instance != null)
-        {
             GameManager.Instance.IsSolveAnimationPlaying = true;
-        }
         
-        // Calculate center point based on whether it's a row or column match
+        // *** CONVERGENCE SOUND ***
+        AudioManager.Instance?.PlayConvergenceSound();
+        
         Vector2 centerPos = CalculateMatchCenter(tiles, result);
         
-        // Store original positions and colors for animation
         Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
         Dictionary<Tile, Color> originalTextColors = new Dictionary<Tile, Color>();
         
@@ -582,27 +429,19 @@ public class GridManager : MonoBehaviour
             if (tile != null)
             {
                 originalPositions[tile] = tile.GetRectTransform().anchoredPosition;
-                
-                // Store original text color
                 TMPro.TMP_Text numText = tile.GetComponentInChildren<TMPro.TMP_Text>();
                 if (numText != null)
-                {
                     originalTextColors[tile] = numText.color;
-                }
             }
         }
         
-        // Phase 1: Converge tiles toward center
+        // Phase 1: Converge tiles toward center with spiral motion
         float elapsed = 0f;
         while (elapsed < solveConvergeDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / solveConvergeDuration;
-            
-            // Ease in-out for smooth converge
-            float easedT = t < 0.5f 
-                ? 2f * t * t 
-                : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
+            float easedT = t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
             
             foreach (Tile tile in tiles)
             {
@@ -611,64 +450,56 @@ public class GridManager : MonoBehaviour
                     RectTransform rt = tile.GetRectTransform();
                     Vector2 startPos = originalPositions[tile];
                     
-                    // Move toward center
-                    rt.anchoredPosition = Vector2.Lerp(startPos, centerPos, easedT);
+                    // Add slight spiral motion
+                    float spiralAngle = easedT * Mathf.PI * 0.5f;
+                    Vector2 toCenter = centerPos - startPos;
+                    float dist = toCenter.magnitude * (1f - easedT);
+                    Vector2 spiralOffset = new Vector2(
+                        Mathf.Sin(spiralAngle) * dist * 0.1f,
+                        Mathf.Cos(spiralAngle) * dist * 0.1f
+                    );
                     
-                    // Gentle shrink as they converge
+                    rt.anchoredPosition = Vector2.Lerp(startPos, centerPos, easedT) + spiralOffset * (1f - easedT);
+                    
                     float scale = Mathf.Lerp(1f, convergeShrinkAmount, easedT);
                     tile.transform.localScale = Vector3.one * scale;
                     
-                    // Fade out tile background (show only numbers)
+                    // Rotation as they converge
+                    tile.transform.localEulerAngles = new Vector3(0, 0, easedT * 180f);
+                    
                     Image img = tile.GetComponent<Image>();
                     if (img != null)
-                    {
                         img.color = new Color(0.85f, 0.85f, 0.85f, 1f - easedT);
-                    }
                     
-                    // Brighten number text then fade it out
                     TMPro.TMP_Text numText = tile.GetComponentInChildren<TMPro.TMP_Text>();
                     if (numText != null && originalTextColors.ContainsKey(tile))
                     {
                         Color originalColor = originalTextColors[tile];
-                        
-                        // Brighten toward white in first half, then fade alpha in second half
                         Color brightenedColor = Color.Lerp(originalColor, Color.white, easedT);
-                        
-                        // Fade out alpha (start fading at 40% through animation)
                         float fadeStart = 0.4f;
                         float alphaT = Mathf.Clamp01((easedT - fadeStart) / (1f - fadeStart));
-                        float alpha = 1f - alphaT;
-                        
-                        numText.color = new Color(brightenedColor.r, brightenedColor.g, brightenedColor.b, alpha);
+                        numText.color = new Color(brightenedColor.r, brightenedColor.g, brightenedColor.b, 1f - alphaT);
                     }
                 }
             }
             yield return null;
         }
         
-        // Phase 2: Show "10" at center
-        yield return StartCoroutine(ShowTenEffect(centerPos));
+        // Phase 2: Show spectacular "10" at center
+        yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
         
-        // Resume progress bars
         if (GameManager.Instance != null)
-        {
             GameManager.Instance.IsSolveAnimationPlaying = false;
-        }
     }
     
-    /// <summary>
-    /// Calculate the center point of matched tiles.
-    /// </summary>
     private Vector2 CalculateMatchCenter(HashSet<Tile> tiles, MatchResult result)
     {
-        // If it's a row match, center is middle of that row
         if (result.matchedRows.Count > 0)
         {
             int row = result.matchedRows[0];
             int midX = gridWidth / 2;
             return GridToWorldPosition(midX, row);
         }
-        // If it's a column match, center is middle of that column
         else if (result.matchedColumns.Count > 0)
         {
             int col = result.matchedColumns[0];
@@ -676,7 +507,6 @@ public class GridManager : MonoBehaviour
             return GridToWorldPosition(col, midY);
         }
         
-        // Fallback: average position of all tiles
         Vector2 sum = Vector2.zero;
         int count = 0;
         foreach (Tile tile in tiles)
@@ -691,174 +521,267 @@ public class GridManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Show "10" text effect at the center.
+    /// SPECTACULAR "10" effect with sparkles, burst rings, glow, and magic!
     /// </summary>
-    private IEnumerator ShowTenEffect(Vector2 position)
+    private IEnumerator ShowTenEffectSpectacular(Vector2 position)
     {
-        GameObject tenObj = null;
+        // *** TEN POP SOUND ***
+        AudioManager.Instance?.PlayTenPopSound();
         
-        // Create "10" text if we have a prefab, otherwise use a simple approach
-        if (tenTextPrefab != null)
+        // Container for all effect objects
+        List<GameObject> effectObjects = new List<GameObject>();
+        
+        // === MAIN "10" TEXT ===
+        GameObject tenObj = new GameObject("TenEffect_Main");
+        tenObj.transform.SetParent(gridContainer, false);
+        effectObjects.Add(tenObj);
+        
+        RectTransform tenRT = tenObj.AddComponent<RectTransform>();
+        tenRT.anchoredPosition = position;
+        tenRT.sizeDelta = new Vector2(200f, 120f);
+        
+        TMPro.TMP_Text tenText = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
+        tenText.text = "10";
+        tenText.fontSize = 82;
+        tenText.fontStyle = TMPro.FontStyles.Bold;
+        tenText.color = tenGlowColor;
+        tenText.alignment = TMPro.TextAlignmentOptions.Center;
+        tenText.enableVertexGradient = true;
+        tenText.colorGradient = new TMPro.VertexGradient(
+            new Color(1f, 1f, 0.8f),      // Top left - bright
+            new Color(1f, 1f, 0.8f),      // Top right - bright  
+            new Color(1f, 0.8f, 0.2f),    // Bottom left - golden
+            new Color(1f, 0.8f, 0.2f)     // Bottom right - golden
+        );
+        
+        // === GLOW BEHIND TEXT ===
+        GameObject glowObj = new GameObject("TenEffect_Glow");
+        glowObj.transform.SetParent(gridContainer, false);
+        glowObj.transform.SetSiblingIndex(tenObj.transform.GetSiblingIndex()); // Behind main text
+        effectObjects.Add(glowObj);
+        
+        RectTransform glowRT = glowObj.AddComponent<RectTransform>();
+        glowRT.anchoredPosition = position;
+        glowRT.sizeDelta = new Vector2(200f, 120f);
+        
+        TMPro.TMP_Text glowText = glowObj.AddComponent<TMPro.TextMeshProUGUI>();
+        glowText.text = "10";
+        glowText.fontSize = 90;
+        glowText.fontStyle = TMPro.FontStyles.Bold;
+        glowText.color = new Color(1f, 0.95f, 0.5f, 0.4f);
+        glowText.alignment = TMPro.TextAlignmentOptions.Center;
+        
+        // === SPARKLE PARTICLES ===
+        List<(RectTransform rt, Image img, Vector2 velocity, float rotSpeed)> sparkles = 
+            new List<(RectTransform, Image, Vector2, float)>();
+        
+        for (int i = 0; i < sparkleCount; i++)
         {
-            tenObj = Instantiate(tenTextPrefab, gridContainer);
-            RectTransform rt = tenObj.GetComponent<RectTransform>();
-            if (rt != null)
-            {
-                rt.anchoredPosition = position;
-            }
-        }
-        else
-        {
-            // Fallback: create a simple text object
-            tenObj = new GameObject("TenEffect");
-            tenObj.transform.SetParent(gridContainer, false);
+            GameObject sparkle = new GameObject($"Sparkle_{i}");
+            sparkle.transform.SetParent(gridContainer, false);
+            effectObjects.Add(sparkle);
             
-            RectTransform rt = tenObj.AddComponent<RectTransform>();
-            rt.anchoredPosition = position;
-            rt.sizeDelta = new Vector2(200f, 100f);
+            RectTransform sRT = sparkle.AddComponent<RectTransform>();
+            sRT.anchoredPosition = position;
+            float size = Random.Range(8f, 16f);
+            sRT.sizeDelta = new Vector2(size, size);
+            sRT.localEulerAngles = new Vector3(0, 0, 45f); // Diamond shape
             
-            TMPro.TMP_Text text = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = "10";
-            text.fontSize = 72;
-            text.fontStyle = TMPro.FontStyles.Bold;
-            text.color = new Color(1f, 0.85f, 0.2f); // Golden color
-            text.alignment = TMPro.TextAlignmentOptions.Center;
+            Image sImg = sparkle.AddComponent<Image>();
+            sImg.color = sparkleColor;
+            sImg.raycastTarget = false;
+            
+            // Random outward velocity
+            float angle = (i / (float)sparkleCount) * Mathf.PI * 2f + Random.Range(-0.3f, 0.3f);
+            float speed = Random.Range(150f, 300f);
+            Vector2 vel = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * speed;
+            float rotSpd = Random.Range(-360f, 360f);
+            
+            sparkles.Add((sRT, sImg, vel, rotSpd));
         }
         
-        // Animate the "10" - pop in, hold, fade out
-        if (tenObj != null)
+        // === BURST RINGS ===
+        List<(RectTransform rt, Image img, float delay)> rings = 
+            new List<(RectTransform, Image, float)>();
+        
+        for (int i = 0; i < burstRingCount; i++)
         {
-            RectTransform tenRT = tenObj.GetComponent<RectTransform>();
-            TMPro.TMP_Text tenText = tenObj.GetComponent<TMPro.TMP_Text>();
+            GameObject ring = new GameObject($"Ring_{i}");
+            ring.transform.SetParent(gridContainer, false);
+            ring.transform.SetSiblingIndex(0); // Behind everything
+            effectObjects.Add(ring);
             
-            // Pop in (snappy)
-            float popInDuration = 0.08f;
-            float elapsed = 0f;
-            while (elapsed < popInDuration)
+            RectTransform rRT = ring.AddComponent<RectTransform>();
+            rRT.anchoredPosition = position;
+            rRT.sizeDelta = new Vector2(20f, 20f);
+            
+            Image rImg = ring.AddComponent<Image>();
+            rImg.color = new Color(tenGlowColor.r, tenGlowColor.g, tenGlowColor.b, 0.6f);
+            rImg.raycastTarget = false;
+            
+            rings.Add((rRT, rImg, i * 0.08f));
+        }
+        
+        // === ANIMATION ===
+        tenObj.transform.localScale = Vector3.zero;
+        glowObj.transform.localScale = Vector3.zero;
+        
+        // Pop in with overshoot
+        float popDuration = 0.12f;
+        float elapsed = 0f;
+        
+        while (elapsed < popDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / popDuration;
+            
+            // Elastic overshoot
+            float overshoot = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
+            float scale = Mathf.Lerp(0f, 1f, t) * overshoot;
+            
+            tenObj.transform.localScale = Vector3.one * scale;
+            glowObj.transform.localScale = Vector3.one * scale * 1.3f;
+            
+            yield return null;
+        }
+        
+        // Settle to normal
+        tenObj.transform.localScale = Vector3.one;
+        glowObj.transform.localScale = Vector3.one * 1.2f;
+        
+        // Main animation phase - sparkles fly out, rings expand, text pulses and floats
+        float mainDuration = solveShowTenDuration;
+        elapsed = 0f;
+        Vector2 startPos = position;
+        Color startColor = tenText.color;
+        Color startGlowColor = glowText.color;
+        
+        while (elapsed < mainDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / mainDuration;
+            
+            // Text floats up and pulses
+            float floatY = Mathf.Sin(t * Mathf.PI) * 40f;
+            float pulse = 1f + Mathf.Sin(elapsed * 15f) * 0.08f;
+            
+            tenRT.anchoredPosition = startPos + new Vector2(0, floatY);
+            tenObj.transform.localScale = Vector3.one * pulse;
+            
+            glowRT.anchoredPosition = startPos + new Vector2(0, floatY);
+            float glowPulse = 1.2f + Mathf.Sin(elapsed * 12f) * 0.15f;
+            glowObj.transform.localScale = Vector3.one * glowPulse;
+            
+            // Glow gets brighter then fades
+            float glowAlpha = t < 0.3f 
+                ? Mathf.Lerp(0.4f, 0.7f, t / 0.3f) 
+                : Mathf.Lerp(0.7f, 0f, (t - 0.3f) / 0.7f);
+            glowText.color = new Color(startGlowColor.r, startGlowColor.g, startGlowColor.b, glowAlpha);
+            
+            // Fade out main text in last 40%
+            float textAlpha = t < 0.6f ? 1f : Mathf.Lerp(1f, 0f, (t - 0.6f) / 0.4f);
+            tenText.color = new Color(startColor.r, startColor.g, startColor.b, textAlpha);
+            
+            // Animate sparkles
+            foreach (var (sRT, sImg, vel, rotSpd) in sparkles)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / popInDuration;
-                float scale = Mathf.Lerp(0f, 1.15f, t);
-                tenObj.transform.localScale = Vector3.one * scale;
-                yield return null;
+                if (sRT == null) continue;
+                
+                // Move outward with gravity
+                Vector2 currentPos = sRT.anchoredPosition;
+                Vector2 gravity = new Vector2(0, -200f) * Time.deltaTime;
+                sRT.anchoredPosition = currentPos + vel * Time.deltaTime + gravity;
+                
+                // Rotate
+                float currentRot = sRT.localEulerAngles.z;
+                sRT.localEulerAngles = new Vector3(0, 0, currentRot + rotSpd * Time.deltaTime);
+                
+                // Fade and shrink
+                float sparkleAlpha = 1f - t;
+                float sparkleScale = Mathf.Lerp(1f, 0.3f, t);
+                sRT.localScale = Vector3.one * sparkleScale;
+                sImg.color = new Color(sparkleColor.r, sparkleColor.g, sparkleColor.b, sparkleAlpha);
             }
             
-            // Settle
-            tenObj.transform.localScale = Vector3.one;
-            
-            // Brief hold
-            yield return new WaitForSeconds(solveShowTenDuration * 0.4f);
-            
-            // Fade out and float up
-            float fadeOutDuration = solveShowTenDuration * 0.6f;
-            elapsed = 0f;
-            Vector2 startPos = tenRT.anchoredPosition;
-            Color startColor = tenText != null ? tenText.color : Color.white;
-            
-            while (elapsed < fadeOutDuration)
+            // Animate burst rings
+            foreach (var (rRT, rImg, delay) in rings)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / fadeOutDuration;
+                if (rRT == null) continue;
                 
-                // Float up
-                tenRT.anchoredPosition = startPos + new Vector2(0f, 30f * t);
-                
-                // Scale up slightly
-                tenObj.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.3f, t);
-                
-                // Fade out
-                if (tenText != null)
+                float ringT = Mathf.Clamp01((elapsed - delay) / (mainDuration * 0.6f));
+                if (ringT > 0)
                 {
-                    tenText.color = new Color(startColor.r, startColor.g, startColor.b, 1f - t);
+                    float ringSize = Mathf.Lerp(20f, 200f, ringT);
+                    rRT.sizeDelta = new Vector2(ringSize, ringSize);
+                    
+                    float ringAlpha = Mathf.Lerp(0.6f, 0f, ringT);
+                    rImg.color = new Color(rImg.color.r, rImg.color.g, rImg.color.b, ringAlpha);
                 }
-                
-                yield return null;
             }
             
-            Destroy(tenObj);
+            yield return null;
+        }
+        
+        // Cleanup all effect objects
+        foreach (GameObject obj in effectObjects)
+        {
+            if (obj != null)
+                Destroy(obj);
         }
     }
     
-    /// <summary>
-    /// Remove matched tiles from the grid.
-    /// </summary>
     private void ClearMatchedTiles(HashSet<Tile> tiles)
     {
         foreach (Tile tile in tiles)
         {
             if (tile != null)
             {
-                // Clear from grid array
                 grid[tile.GridX, tile.GridY] = null;
-                
-                // Destroy the GameObject
                 Destroy(tile.gameObject);
             }
         }
-        
         Debug.Log($"Cleared {tiles.Count} tiles");
     }
     
-    /// <summary>
-    /// Drop tiles down to fill empty spaces (simulated physics).
-    /// </summary>
     private IEnumerator DropTilesCoroutine()
     {
         bool anyTileDropped = true;
         
-        // Keep dropping until no more movement
         while (anyTileDropped)
         {
             anyTileDropped = false;
             List<Coroutine> dropAnimations = new List<Coroutine>();
             
-            // Process each column
             for (int x = 0; x < gridWidth; x++)
             {
-                // Start from bottom, find empty spaces
                 for (int y = gridHeight - 1; y >= 0; y--)
                 {
                     if (grid[x, y] == null)
                     {
-                        // Found empty space, look for tile above to drop
                         for (int above = y - 1; above >= 0; above--)
                         {
                             if (grid[x, above] != null)
                             {
-                                // Found a tile to drop
                                 Tile tileToMove = grid[x, above];
-                                
-                                // Update grid array
                                 grid[x, y] = tileToMove;
                                 grid[x, above] = null;
-                                
-                                // Update tile's grid position
-                                int oldY = tileToMove.GridY;
                                 tileToMove.GridY = y;
                                 
-                                // Animate the fall
                                 Vector2 targetPos = GridToWorldPosition(x, y);
                                 dropAnimations.Add(StartCoroutine(AnimateTileFall(tileToMove, targetPos)));
-                                
                                 anyTileDropped = true;
-                                break; // Move to next empty space
+                                break;
                             }
                         }
                     }
                 }
             }
             
-            // Wait for all drop animations to complete
             foreach (Coroutine c in dropAnimations)
-            {
                 yield return c;
-            }
         }
     }
     
-    /// <summary>
-    /// Animate a single tile falling to target position.
-    /// </summary>
     private IEnumerator AnimateTileFall(Tile tile, Vector2 targetPosition)
     {
         if (tile == null) yield break;
@@ -869,72 +792,43 @@ public class GridManager : MonoBehaviour
         float duration = distance / tileFallSpeed;
         
         float elapsed = 0f;
-        
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
-            
-            // Ease out bounce effect (simplified)
-            float easedT = 1f - Mathf.Pow(1f - t, 2f); // Ease out quad
-            
+            float easedT = 1f - Mathf.Pow(1f - t, 2f);
             rt.anchoredPosition = Vector2.Lerp(startPos, targetPosition, easedT);
             yield return null;
         }
         
-        // Snap to final position
         rt.anchoredPosition = targetPosition;
-        
-        // Small bounce at the end
         yield return StartCoroutine(TileLandBounce(tile));
     }
     
-    /// <summary>
-    /// Small bounce effect when tile lands.
-    /// </summary>
     private IEnumerator TileLandBounce(Tile tile)
     {
         if (tile == null) yield break;
         
-        // Quick squash and stretch
         Transform t = tile.transform;
-        
-        // Squash
         t.localScale = new Vector3(1.1f, 0.9f, 1f);
         yield return new WaitForSeconds(0.05f);
-        
-        // Stretch
         t.localScale = new Vector3(0.95f, 1.05f, 1f);
         yield return new WaitForSeconds(0.05f);
-        
-        // Settle
         t.localScale = Vector3.one;
     }
     
-    /// <summary>
-    /// Spawn new tiles at the top to fill empty spaces.
-    /// Tiles fall sequentially bottom-to-top for a stacking effect.
-    /// </summary>
     private IEnumerator SpawnNewTilesCoroutine()
     {
-        // Collect all empty positions, grouped by column, sorted bottom-to-top
         List<(int x, int y, Tile tile)> tilesToDrop = new List<(int, int, Tile)>();
         
-        // Check each column for empty spaces
         for (int x = 0; x < gridWidth; x++)
         {
-            // Count empties in this column to calculate spawn positions
             int spawnIndex = 0;
-            
-            // Find empties bottom-to-top
             for (int y = gridHeight - 1; y >= 0; y--)
             {
                 if (grid[x, y] == null)
                 {
-                    // Calculate spawn position (above the grid)
                     Vector2 spawnPos = GridToWorldPosition(x, -1 - spawnIndex);
-                    
-                    // Create the tile
                     GameObject tileObj = Instantiate(tilePrefab, gridContainer);
                     Tile newTile = tileObj.GetComponent<Tile>();
                     
@@ -943,119 +837,68 @@ public class GridManager : MonoBehaviour
                         int value = GetWeightedRandomValue();
                         newTile.Initialize(value, x, y);
                         newTile.SetPosition(spawnPos);
-                        
-                        // Set size
-                        RectTransform rt = newTile.GetRectTransform();
-                        rt.sizeDelta = new Vector2(tileSize, tileSize);
-                        
-                        // Add to grid
+                        newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
                         grid[x, y] = newTile;
-                        
-                        // Queue for animation
                         tilesToDrop.Add((x, y, newTile));
                     }
-                    
                     spawnIndex++;
                 }
             }
         }
         
-        // Sort by y descending (bottom first), then by x (left to right)
         tilesToDrop.Sort((a, b) => {
-            if (a.y != b.y) return b.y.CompareTo(a.y); // Bottom first (higher y)
-            return a.x.CompareTo(b.x); // Left to right
+            if (a.y != b.y) return b.y.CompareTo(a.y);
+            return a.x.CompareTo(b.x);
         });
         
-        // Drop tiles one at a time with small overlap for snappy feel
         for (int i = 0; i < tilesToDrop.Count; i++)
         {
             var (x, y, tile) = tilesToDrop[i];
             Vector2 targetPos = GridToWorldPosition(x, y);
-            
-            // Start this tile falling
-            Coroutine fallCoroutine = StartCoroutine(AnimateTileFall(tile, targetPos));
-            
-            // Wait a tiny bit before starting next tile (creates stacking effect)
+            StartCoroutine(AnimateTileFall(tile, targetPos));
             yield return new WaitForSeconds(tileFallDelay);
         }
         
-        // Wait for the last tile to finish landing
         yield return new WaitForSeconds(0.1f);
-        
         Debug.Log("New tiles spawned");
     }
     
-    /// <summary>
-    /// Get tile at grid position.
-    /// </summary>
     public Tile GetTile(int x, int y)
     {
         if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight)
-        {
             return grid[x, y];
-        }
         return null;
     }
     
-    /// <summary>
-    /// Get the entire grid array (for MatchChecker).
-    /// </summary>
-    public Tile[,] GetGrid()
-    {
-        return grid;
-    }
+    public Tile[,] GetGrid() => grid;
+    public Vector2Int GetGridSize() => new Vector2Int(gridWidth, gridHeight);
     
-    /// <summary>
-    /// Get grid dimensions.
-    /// </summary>
-    public Vector2Int GetGridSize()
-    {
-        return new Vector2Int(gridWidth, gridHeight);
-    }
-    
-    /// <summary>
-    /// Calculate world position for a grid coordinate.
-    /// </summary>
     public Vector2 GridToWorldPosition(int gridX, int gridY)
     {
         float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
         float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
-        
         float startX = -totalWidth / 2f + tileSize / 2f;
         float startY = totalHeight / 2f - tileSize / 2f;
-        
         float posX = startX + gridX * (tileSize + tileSpacing);
         float posY = startY - gridY * (tileSize + tileSpacing);
-        
         return new Vector2(posX, posY);
     }
     
-    /// <summary>
-    /// Clear all tiles from the grid.
-    /// </summary>
     public void ClearGrid()
     {
         if (grid != null)
         {
             for (int y = 0; y < gridHeight; y++)
-            {
                 for (int x = 0; x < gridWidth; x++)
-                {
                     if (grid[x, y] != null)
                     {
                         Destroy(grid[x, y].gameObject);
                         grid[x, y] = null;
                     }
-                }
-            }
         }
-        
         selectedTile = null;
     }
     
-    /// <summary>
-    /// Debug: Print current grid state to console.
-    /// </summary>
     [ContextMenu("Print Grid State")]
     public void PrintGridState()
     {
@@ -1073,38 +916,26 @@ public class GridManager : MonoBehaviour
         Debug.Log(output);
     }
     
-    /// <summary>
-    /// Debug: Check row/column sums.
-    /// </summary>
     [ContextMenu("Check Sums")]
     public void DebugCheckSums()
     {
-        // Check rows
         for (int y = 0; y < gridHeight; y++)
         {
             int sum = 0;
             for (int x = 0; x < gridWidth; x++)
-            {
                 sum += grid[x, y].Value;
-            }
             Debug.Log($"Row {y} sum: {sum}" + (sum == 10 ? " ← MATCH!" : ""));
         }
         
-        // Check columns
         for (int x = 0; x < gridWidth; x++)
         {
             int sum = 0;
             for (int y = 0; y < gridHeight; y++)
-            {
                 sum += grid[x, y].Value;
-            }
             Debug.Log($"Column {x} sum: {sum}" + (sum == 10 ? " ← MATCH!" : ""));
         }
     }
 
-    /// <summary>
-    /// Reset the game (called by UIManager on restart or GameManager on start).
-    /// </summary>
     public void ResetGame()
     {
         Debug.Log("GridManager.ResetGame() called");
@@ -1115,13 +946,8 @@ public class GridManager : MonoBehaviour
             return;
         }
         
-        // Clear existing grid
         ClearGrid();
-        
-        // Spawn new grid
         SpawnGrid();
-        
-        // Check for initial matches
         StartCoroutine(ProcessMatchesCoroutine());
     }
 }
