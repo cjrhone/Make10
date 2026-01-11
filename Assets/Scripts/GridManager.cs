@@ -634,6 +634,9 @@ public class GridManager : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = true;
         
+        // Trigger avatar solve animation immediately when converge starts
+        AvatarManager.Instance?.OnSolve();
+        
         AudioManager.Instance?.PlayConvergenceSound();
         
         Vector2 centerPos = CalculateMatchCenter(tiles, result);

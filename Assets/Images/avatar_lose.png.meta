@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 90e386fafa87343eeb695a2469215452
+guid: 7f71b0021b5964a3ca09baf4d45ff2e8
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -8517788233712302181
-    second: make10_avatar_facepalm_0
+      213: 1535134168725310428
+    second: Untitled_Artwork 8_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,12 +113,12 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: make10_avatar_facepalm_0
+      name: Untitled_Artwork 8_0
       rect:
         serializedVersion: 2
-        x: 246
+        x: 240
         y: 0
-        width: 1500
+        width: 1523
         height: 2010
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: b9783990bbcbac980800000000000000
-      internalID: -8517788233712302181
+      spriteID: cdbcf699464ed4510800000000000000
+      internalID: 1535134168725310428
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      make10_avatar_facepalm_0: -8517788233712302181
+      Untitled_Artwork 8_0: 1535134168725310428
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

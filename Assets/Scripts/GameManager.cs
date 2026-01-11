@@ -329,6 +329,9 @@ public class GameManager : MonoBehaviour
             gridManager.ResetGame();
         }
         
+        // Reset avatar to default state
+        AvatarManager.Instance?.ResetToDefault();
+        
         Debug.Log($"Game started! Difficulty: {currentDifficulty}, Target: {WinScore}");
     }
     
@@ -367,6 +370,9 @@ public class GameManager : MonoBehaviour
         // Refresh UI for new difficulty settings
         if (uiManager != null)
             uiManager.RefreshTargetScore();
+        
+        // Reset avatar to default state
+        AvatarManager.Instance?.ResetToDefault();
         
         Debug.Log($"Game activated! Difficulty: {currentDifficulty}, Target: {WinScore}");
     }
@@ -502,6 +508,9 @@ public class GameManager : MonoBehaviour
         // Fire event for UI to show intro
         OnHotStreakStarted?.Invoke();
         
+        // Trigger avatar hot streak mode
+        AvatarManager.Instance?.OnHotStreakStart();
+        
         // Also update multiplier display
         OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
         
@@ -520,6 +529,9 @@ public class GameManager : MonoBehaviour
         
         // Fire event for UI cleanup
         OnHotStreakEnded?.Invoke();
+        
+        // Return avatar to default struggling state
+        AvatarManager.Instance?.OnHotStreakEnd();
     }
     
     /// <summary>
