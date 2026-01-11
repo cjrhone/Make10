@@ -4,15 +4,20 @@ using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
-/// Manages the 5x5 grid of tiles, handles spawning, swapping, and grid operations.
+/// Manages the grid of tiles, handles spawning, swapping, and grid operations.
+/// Grid size is dynamically set based on difficulty.
 /// </summary>
 public class GridManager : MonoBehaviour
 {
     [Header("Grid Settings")]
     [SerializeField] private int gridWidth = 5;
     [SerializeField] private int gridHeight = 5;
-    [SerializeField] private float tileSize = 100f;
+    [SerializeField] private float baseTileSize = 100f;
     [SerializeField] private float tileSpacing = 10f;
+    [SerializeField] private float maxGridWidth = 550f; // Max width to fit container
+    
+    // Actual tile size (calculated based on grid size)
+    private float tileSize;
     
     [Header("References")]
     [SerializeField] private GameObject tilePrefab;
@@ -34,7 +39,6 @@ public class GridManager : MonoBehaviour
     
     [Header("Ten Effect Magic Settings")]
     [SerializeField] private int sparkleCount = 12;
-    [SerializeField] private float sparkleDistance = 80f;
     [SerializeField] private float burstRingCount = 2;
     [SerializeField] private Color tenGlowColor = new Color(1f, 0.9f, 0.3f);
     [SerializeField] private Color sparkleColor = new Color(1f, 0.95f, 0.6f);
@@ -75,6 +79,7 @@ public class GridManager : MonoBehaviour
     private void Awake()
     {
         weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
+        tileSize = baseTileSize;
         grid = new Tile[gridWidth, gridHeight];
     }
     
@@ -258,6 +263,9 @@ public class GridManager : MonoBehaviour
             return;
         }
         
+        // Get grid size from GameManager (difficulty-based)
+        UpdateGridSizeFromDifficulty();
+        
         ClearGrid();
         ResetHintTimer();
         
@@ -277,7 +285,30 @@ public class GridManager : MonoBehaviour
             }
         }
         
-        Debug.Log($"Grid spawned: {gridWidth}x{gridHeight}");
+        Debug.Log($"Grid spawned: {gridWidth}x{gridHeight} (tile size: {tileSize:F0})");
+    }
+    
+    /// <summary>
+    /// Update grid size based on current difficulty setting.
+    /// </summary>
+    private void UpdateGridSizeFromDifficulty()
+    {
+        if (GameManager.Instance != null)
+        {
+            int newSize = GameManager.Instance.GetCurrentGridSize();
+            if (newSize != gridWidth || newSize != gridHeight)
+            {
+                gridWidth = newSize;
+                gridHeight = newSize;
+                grid = new Tile[gridWidth, gridHeight];
+                
+                // Calculate tile size to fit within max grid width
+                float totalSpacing = (gridWidth - 1) * tileSpacing;
+                tileSize = (maxGridWidth - totalSpacing) / gridWidth;
+                
+                Debug.Log($"<color=cyan>Grid size updated to {gridWidth}x{gridHeight}, tile size: {tileSize:F0}</color>");
+            }
+        }
     }
     
     private Tile CreateTile(int gridX, int gridY, Vector2 position)

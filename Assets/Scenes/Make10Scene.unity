@@ -1193,9 +1193,6 @@ MonoBehaviour:
   hotStreakFireColor1: {r: 1, g: 0.3, b: 0.1, a: 1}
   hotStreakFireColor2: {r: 1, g: 0.9, b: 0.2, a: 1}
   hotStreakPulseSpeed: 8
-  pulseMinScale: 1
-  pulseMaxScale: 1.2
-  pulseSpeed: 3
   scorePopupPrefab: {fileID: 2626605845459652261, guid: 25feda4872fda43518ce56b653076193, type: 3}
   scorePopupParent: {fileID: 1771787567}
   finishTextObject: {fileID: 1136515554}
@@ -1705,7 +1702,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialDemoWidget
   tileSize: 60
   tileSpacing: 8
-  swapDuration: 0.3
   pauseBetweenSteps: 1
   convergeDuration: 0.3
   showTenDuration: 0.6
@@ -6262,8 +6258,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GridManager
   gridWidth: 5
   gridHeight: 5
-  tileSize: 100
+  baseTileSize: 100
   tileSpacing: 10
+  maxGridWidth: 550
   tilePrefab: {fileID: 6642934317941504149, guid: 495dab5cc8fad4cdea2ea54844c28c5f, type: 3}
   gridContainer: {fileID: 622586887}
   matchChecker: {fileID: 22128014}
@@ -6277,7 +6274,6 @@ MonoBehaviour:
   convergeShrinkAmount: 0.7
   tenTextPrefab: {fileID: 0}
   sparkleCount: 12
-  sparkleDistance: 80
   burstRingCount: 2
   tenGlowColor: {r: 1, g: 0.9, b: 0.3, a: 1}
   sparkleColor: {r: 1, g: 0.95, b: 0.6, a: 1}
@@ -7834,6 +7830,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
   easyPreset:
     name: Easy
+    gridSize: 4
+    winScore: 250
     weight0: 0.138
     weight1: 0.201
     weight2: 0.3
@@ -7843,6 +7841,8 @@ MonoBehaviour:
     weight6: 0
   mediumPreset:
     name: Medium
+    gridSize: 5
+    winScore: 300
     weight0: 0.14
     weight1: 0.24
     weight2: 0.24
@@ -7852,6 +7852,8 @@ MonoBehaviour:
     weight6: 0
   hardPreset:
     name: Hard
+    gridSize: 6
+    winScore: 500
     weight0: 0.15
     weight1: 0.22
     weight2: 0.2
@@ -7860,7 +7862,6 @@ MonoBehaviour:
     weight5: 0.08
     weight6: 0.08
   currentDifficulty: 1
-  winScore: 250
   gameDuration: 60
   postWinDelay: 0.5
   baseMatchScore: 10
@@ -7870,9 +7871,8 @@ MonoBehaviour:
   startingMultiplier: 1.25
   maxMultiplier: 3
   streakTimeout: 10
-  hotStreakDuration: 10
+  hotStreakDuration: 15
   hotStreakMultiplier: 5
-  hotStreakIntroDelay: 1.5
   uiManager: {fileID: 178623199}
 --- !u!4 &1333256940
 Transform:
@@ -11417,7 +11417,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.11372549}
+  m_Color: {r: 1, g: 1, b: 1, a: 0.015686275}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -12175,8 +12175,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 113.621, y: -90.41792}
-  m_SizeDelta: {x: 301.9588, y: 140.8943}
+  m_AnchoredPosition: {x: 15.805, y: -90}
+  m_SizeDelta: {x: 241.17, y: 140.8943}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1816239543
 CanvasRenderer:

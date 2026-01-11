@@ -57,11 +57,6 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Color hotStreakFireColor2 = new Color(1f, 0.9f, 0.2f); // Yellow
     [SerializeField] private float hotStreakPulseSpeed = 8f;
     
-    [Header("Pulse Settings")]
-    [SerializeField] private float pulseMinScale = 1.0f;
-    [SerializeField] private float pulseMaxScale = 1.3f;
-    [SerializeField] private float pulseSpeed = 4f;
-    
     [Header("Score Popup")]
     [SerializeField] private GameObject scorePopupPrefab;
     [SerializeField] private Transform scorePopupParent;
@@ -884,6 +879,28 @@ public class UIManager : MonoBehaviour
         
         // Also clean up effects
         CleanupGameOverState();
+    }
+    
+    /// <summary>
+    /// Refresh the target score display based on current difficulty.
+    /// Call this when difficulty changes or game starts.
+    /// </summary>
+    public void RefreshTargetScore()
+    {
+        if (gameManager == null) return;
+        
+        int winScore = gameManager.WinScore;
+        
+        if (targetScoreText != null)
+            targetScoreText.text = $"/ {winScore}";
+        
+        if (scoreProgressSlider != null)
+        {
+            scoreProgressSlider.maxValue = winScore;
+            scoreProgressSlider.value = gameManager.Score;
+        }
+        
+        Debug.Log($"<color=cyan>Target score updated to {winScore}</color>");
     }
     
     /// <summary>

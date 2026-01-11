@@ -14,7 +14,6 @@ public class TutorialDemoWidget : MonoBehaviour
     [SerializeField] private float tileSpacing = 8f;
     
     [Header("Animation Settings")]
-    [SerializeField] private float swapDuration = 0.3f;
     [SerializeField] private float pauseBetweenSteps = 1f;
     [SerializeField] private float convergeDuration = 0.3f;
     [SerializeField] private float showTenDuration = 0.6f;
@@ -67,8 +66,6 @@ public class TutorialDemoWidget : MonoBehaviour
     
     private int[] demoValues = { 2, 3, 2, 2, 1 }; // Sum = 10
     
-    private bool isAnimating = false;
-    
     private void OnEnable()
     {
         StartCoroutine(RunDemoLoop());
@@ -77,7 +74,6 @@ public class TutorialDemoWidget : MonoBehaviour
     private void OnDisable()
     {
         StopAllCoroutines();
-        isAnimating = false;
     }
     
     /// <summary>

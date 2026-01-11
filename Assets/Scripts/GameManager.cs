@@ -17,6 +17,13 @@ public class GameManager : MonoBehaviour
     public class DifficultyPreset
     {
         public string name;
+        
+        [Header("Grid Settings")]
+        public int gridSize = 5;
+        
+        [Header("Win Condition")]
+        public int winScore = 250;
+        
         [Header("Tile Weights (must sum to 1.0)")]
         [Range(0, 1)] public float weight0 = 0.15f;
         [Range(0, 1)] public float weight1 = 0.22f;
@@ -41,37 +48,43 @@ public class GameManager : MonoBehaviour
     [SerializeField] private DifficultyPreset easyPreset = new DifficultyPreset
     {
         name = "Easy",
-        weight0 = 0.10f,  // Limited 0s (too many = unsolvable)
-        weight1 = 0.18f,  // Limited 1s (too many = unsolvable)
-        weight2 = 0.30f,  // Favor 2s
-        weight3 = 0.24f,  // Favor 3s
-        weight4 = 0.18f,  // Good amount of 4s
-        weight5 = 0.00f,  // No 5s
-        weight6 = 0.00f   // No 6s
+        gridSize = 4,     // 4x4 grid - 4 tiles sum to 10 (avg 2.5)
+        winScore = 250,
+        weight0 = 0.05f,  // Low - too many zeros = unsolvable
+        weight1 = 0.15f,  // Moderate
+        weight2 = 0.30f,  // High - very versatile
+        weight3 = 0.25f,  // High - key for 4-tile sums
+        weight4 = 0.20f,  // High - important for reaching 10
+        weight5 = 0.04f,  // Rare
+        weight6 = 0.01f   // Very rare
     };
     
     [SerializeField] private DifficultyPreset mediumPreset = new DifficultyPreset
     {
         name = "Medium",
-        weight0 = 0.14f,
+        gridSize = 5,     // 5x5 grid - 5 tiles sum to 10 (avg 2.0)
+        winScore = 300,
+        weight0 = 0.12f,
         weight1 = 0.24f,
-        weight2 = 0.24f,
-        weight3 = 0.18f,
+        weight2 = 0.26f,
+        weight3 = 0.20f,
         weight4 = 0.12f,
-        weight5 = 0.08f,  // Some 5s
-        weight6 = 0.00f   // No 6s
+        weight5 = 0.05f,
+        weight6 = 0.01f
     };
     
     [SerializeField] private DifficultyPreset hardPreset = new DifficultyPreset
     {
         name = "Hard",
-        weight0 = 0.15f,
+        gridSize = 5,     // 5x5 grid - same as medium, but harder weights
+        winScore = 500,
+        weight0 = 0.15f,  // More zeros = trickier
         weight1 = 0.22f,
-        weight2 = 0.20f,
-        weight3 = 0.15f,
+        weight2 = 0.22f,
+        weight3 = 0.17f,
         weight4 = 0.12f,
-        weight5 = 0.08f,  // 5s present
-        weight6 = 0.08f   // 6s present - challenging!
+        weight5 = 0.07f,  // 5s present
+        weight6 = 0.05f   // 6s present - challenging!
     };
     
     [SerializeField] private DifficultyLevel currentDifficulty = DifficultyLevel.Medium;
@@ -81,8 +94,7 @@ public class GameManager : MonoBehaviour
     #endregion
     
     [Header("Game Settings")]
-    [SerializeField] private int winScore = 250;
-    public int WinScore => winScore;
+    public int WinScore => GetCurrentPreset().winScore;
     [SerializeField] private float gameDuration = 60f;
     [SerializeField] private float postWinDelay = 0.5f;
     
@@ -100,7 +112,6 @@ public class GameManager : MonoBehaviour
     [Header("Hot Streak Mode")]
     [SerializeField] private float hotStreakDuration = 10f;
     [SerializeField] private float hotStreakMultiplier = 5f;
-    [SerializeField] private float hotStreakIntroDelay = 1.5f; // Time for "HOT-STREAK" text to show
     
     [Header("References")]
     [SerializeField] private UIManager uiManager;
@@ -155,6 +166,13 @@ public class GameManager : MonoBehaviour
     
     private void Start()
     {
+        // Ensure hard mode uses 5x5 (in case old serialized value of 6 persists)
+        if (hardPreset.gridSize != 5)
+        {
+            hardPreset.gridSize = 5;
+            Debug.Log("<color=yellow>Hard preset grid size corrected to 5x5</color>");
+        }
+        
         if (SceneFlowManager.Instance == null)
         {
             Debug.Log("GameManager: No SceneFlowManager found - auto-starting for testing");
@@ -213,7 +231,8 @@ public class GameManager : MonoBehaviour
     public void SetDifficulty(DifficultyLevel level)
     {
         currentDifficulty = level;
-        Debug.Log($"<color=yellow>Difficulty set to: {level}</color>");
+        var preset = GetPreset(level);
+        Debug.Log($"<color=yellow>Difficulty set to: {level}</color> (Grid: {preset.gridSize}x{preset.gridSize}, Target: {preset.winScore})");
         
         // Log the weights for debugging
         float[] weights = GetCurrentWeights();
@@ -234,6 +253,28 @@ public class GameManager : MonoBehaviour
             DifficultyLevel.Medium => mediumPreset.GetWeights(),
             DifficultyLevel.Hard => hardPreset.GetWeights(),
             _ => mediumPreset.GetWeights()
+        };
+    }
+    
+    /// <summary>
+    /// Get the grid size for the current difficulty.
+    /// </summary>
+    public int GetCurrentGridSize()
+    {
+        return GetCurrentPreset().gridSize;
+    }
+    
+    /// <summary>
+    /// Get the current difficulty preset.
+    /// </summary>
+    public DifficultyPreset GetCurrentPreset()
+    {
+        return currentDifficulty switch
+        {
+            DifficultyLevel.Easy => easyPreset,
+            DifficultyLevel.Medium => mediumPreset,
+            DifficultyLevel.Hard => hardPreset,
+            _ => mediumPreset
         };
     }
     
@@ -278,13 +319,17 @@ public class GameManager : MonoBehaviour
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
+        // Refresh UI for new difficulty settings
+        if (uiManager != null)
+            uiManager.RefreshTargetScore();
+        
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         if (gridManager != null)
         {
             gridManager.ResetGame();
         }
         
-        Debug.Log($"Game started! Difficulty: {currentDifficulty}");
+        Debug.Log($"Game started! Difficulty: {currentDifficulty}, Target: {WinScore}");
     }
     
     /// <summary>
@@ -319,7 +364,11 @@ public class GameManager : MonoBehaviour
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
-        Debug.Log($"Game activated! Difficulty: {currentDifficulty}");
+        // Refresh UI for new difficulty settings
+        if (uiManager != null)
+            uiManager.RefreshTargetScore();
+        
+        Debug.Log($"Game activated! Difficulty: {currentDifficulty}, Target: {WinScore}");
     }
     
     public void OnCascadeStart()
@@ -510,7 +559,7 @@ public class GameManager : MonoBehaviour
     {
         IsGameActive = false;
         
-        if (Score >= winScore)
+        if (Score >= WinScore)
         {
             Debug.Log("<color=cyan>*** TIME'S UP - YOU WIN! ***</color>");
             SceneFlowManager.Instance?.OnGameEnded(true);
@@ -518,7 +567,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{winScore}");
+            Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{WinScore}");
             SceneFlowManager.Instance?.OnGameEnded(false);
             OnGameLost?.Invoke();
         }
