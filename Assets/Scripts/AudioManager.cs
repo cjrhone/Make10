@@ -30,6 +30,7 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip gameMusic;
     [SerializeField] private AudioClip winMusic;
     [SerializeField] private AudioClip loseMusic;
+    [SerializeField] private AudioClip hotStreakMusic;
     
     [Header("SFX Clips")]
     [SerializeField] private AudioClip buttonClickSFX;
@@ -185,6 +186,7 @@ public class AudioManager : MonoBehaviour
     public void PlayGameMusic() => PlayMusic(gameMusic, loop: true);
     public void PlayWinMusic() => PlayMusic(winMusic, loop: false);
     public void PlayLoseMusic() => PlayMusic(loseMusic, loop: false);
+    public void PlayHotStreakMusic() => PlayMusic(hotStreakMusic, loop: true);
     
     public void StopMusic()
     {

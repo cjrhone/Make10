@@ -49,7 +49,8 @@ public class HotStreakEffect : MonoBehaviour
     [SerializeField] private Color flameMid = new Color(1f, 0.5f, 0.1f);
     [SerializeField] private Color flameEdge = new Color(0.9f, 0.2f, 0.1f);
     [SerializeField] private Color emberColor = new Color(1f, 0.6f, 0.2f);
-    [SerializeField] private Color barPulseColor = new Color(1f, 0.4f, 0.1f);
+    [SerializeField] private Color barPulseCoolColor = new Color(1f, 0.5f, 0.1f);   // Orange
+    [SerializeField] private Color barPulseHotColor = new Color(0.8f, 0.1f, 0.6f);  // Purple/magenta
     [SerializeField] private float colorPulseSpeed = 4f;
     
     // Runtime state
@@ -151,11 +152,18 @@ public class HotStreakEffect : MonoBehaviour
             panelTransform.localEulerAngles = new Vector3(0, 0, rotWobble);
         }
         
-        // Bar color pulse
+        // Bar color pulse - intensity affects how hot the color gets
         if (barFillImage != null)
         {
             float pulse = (Mathf.Sin(time * colorPulseSpeed) + 1f) / 2f;
-            Color pulseColor = Color.Lerp(barOriginalColor, barPulseColor, pulse * 0.5f * currentIntensity);
+            
+            // Base color shifts from cool (orange) to hot (purple) based on intensity
+            Color baseColor = Color.Lerp(barPulseCoolColor, barPulseHotColor, currentIntensity);
+            
+            // Pulse between the base color and a brighter version
+            Color brightColor = Color.Lerp(baseColor, Color.white, 0.3f);
+            Color pulseColor = Color.Lerp(baseColor, brightColor, pulse);
+            
             barFillImage.color = pulseColor;
         }
         

@@ -51,6 +51,12 @@ public class UIManager : MonoBehaviour
     [SerializeField] private HotStreakEffect hotStreakEffect;
     [SerializeField] private bool enableHotStreak = true;
     
+    [Header("Hot Streak Mode UI")]
+    [SerializeField] private GameObject hotStreakBackground;
+    [SerializeField] private Color hotStreakFireColor1 = new Color(1f, 0.3f, 0.1f); // Red-orange
+    [SerializeField] private Color hotStreakFireColor2 = new Color(1f, 0.9f, 0.2f); // Yellow
+    [SerializeField] private float hotStreakPulseSpeed = 8f;
+    
     [Header("Pulse Settings")]
     [SerializeField] private float pulseMinScale = 1.0f;
     [SerializeField] private float pulseMaxScale = 1.3f;
@@ -80,15 +86,22 @@ public class UIManager : MonoBehaviour
     private Coroutine timerPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
     private Coroutine multiplierGlowCoroutine;
+    private Coroutine hotStreakTextPulseCoroutine;
     private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
     private bool hotStreakActive = false;
+    private bool isInHotStreakMode = false;
+    
+    // Hot Streak UI elements (created via code)
+    private GameObject hotStreakTextObject;
+    private TMPro.TMP_Text hotStreakText;
     
     // Multiplier text animation
     private float lastMultiplierValue = 1f;
-    private Color multiplierTextBaseColor = Color.white;
     [Header("Multiplier Text Animation")]
-    [SerializeField] private Color multiplierGlowColor = new Color(1f, 0.9f, 0.3f);
+    [SerializeField] private Color multiplierTextCoolColor = new Color(1f, 0.9f, 0.2f); // Yellow
+    [SerializeField] private Color multiplierTextHotColor = new Color(1f, 0.2f, 0.2f); // Red at max
+    [SerializeField] private Color multiplierGlowColor = new Color(1f, 0.95f, 0.5f); // Bright flash
     [SerializeField] private float multiplierMinScale = 1f;
     [SerializeField] private float multiplierMaxScale = 1.5f;
     [SerializeField] private float multiplierScaleAtMax = 3f; // What multiplier value = max scale
@@ -128,6 +141,8 @@ public class UIManager : MonoBehaviour
         gameManager.OnMultiplierChanged += HandleMultiplierChanged;
         gameManager.OnGameWon += HandleGameWon;
         gameManager.OnGameLost += HandleGameLost;
+        gameManager.OnHotStreakStarted += HandleHotStreakStarted;
+        gameManager.OnHotStreakEnded += HandleHotStreakEnded;
         
         if (gridManager == null)
             gridManager = FindFirstObjectByType<GridManager>();
@@ -147,6 +162,8 @@ public class UIManager : MonoBehaviour
             gameManager.OnMultiplierChanged -= HandleMultiplierChanged;
             gameManager.OnGameWon -= HandleGameWon;
             gameManager.OnGameLost -= HandleGameLost;
+            gameManager.OnHotStreakStarted -= HandleHotStreakStarted;
+            gameManager.OnHotStreakEnded -= HandleHotStreakEnded;
         }
         
         if (gridManager != null)
@@ -194,6 +211,46 @@ public class UIManager : MonoBehaviour
         // Auto-find HotStreakEffect if not assigned
         if (hotStreakEffect == null && multiplierPanel != null)
             hotStreakEffect = multiplierPanel.GetComponent<HotStreakEffect>();
+        
+        // Hide hot streak background initially
+        if (hotStreakBackground != null)
+            hotStreakBackground.SetActive(false);
+        
+        // Create the HOT-STREAK text object (hidden initially)
+        CreateHotStreakText();
+    }
+    
+    private void CreateHotStreakText()
+    {
+        // Create a canvas for the hot streak text that renders on top
+        hotStreakTextObject = new GameObject("HotStreakText");
+        hotStreakTextObject.transform.SetParent(transform, false);
+        
+        // Add RectTransform and position in center of screen
+        RectTransform rt = hotStreakTextObject.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(800f, 0f); // Start off-screen right
+        rt.sizeDelta = new Vector2(600f, 150f);
+        
+        // Add TextMeshPro component
+        hotStreakText = hotStreakTextObject.AddComponent<TMPro.TextMeshProUGUI>();
+        hotStreakText.text = "HOT STREAK!";
+        hotStreakText.fontSize = 72;
+        hotStreakText.fontStyle = TMPro.FontStyles.Bold;
+        hotStreakText.alignment = TMPro.TextAlignmentOptions.Center;
+        hotStreakText.color = hotStreakFireColor1;
+        
+        // Enable gradient for fire effect
+        hotStreakText.enableVertexGradient = true;
+        hotStreakText.colorGradient = new TMPro.VertexGradient(
+            hotStreakFireColor2, // top left - yellow
+            hotStreakFireColor2, // top right - yellow  
+            hotStreakFireColor1, // bottom left - red
+            hotStreakFireColor1  // bottom right - red
+        );
+        
+        hotStreakTextObject.SetActive(false);
     }
     
     #endregion
@@ -221,6 +278,7 @@ public class UIManager : MonoBehaviour
     {
         StopTimeWarningSound();
         DeactivateHotStreak();
+        CleanupHotStreakMode();
         StartCoroutine(ShowFinishThenResult(true));
     }
     
@@ -228,7 +286,18 @@ public class UIManager : MonoBehaviour
     {
         StopTimeWarningSound();
         DeactivateHotStreak();
+        CleanupHotStreakMode();
         StartCoroutine(ShowFinishThenResult(false));
+    }
+    
+    private void HandleHotStreakStarted()
+    {
+        StartCoroutine(HotStreakIntroSequence());
+    }
+    
+    private void HandleHotStreakEnded()
+    {
+        CleanupHotStreakMode();
     }
     
     private void HandleGridUnsolvable()
@@ -319,10 +388,6 @@ public class UIManager : MonoBehaviour
                 
                 // Activate hot streak effect!
                 ActivateHotStreak(multiplier);
-                
-                // Store base color for glow effect
-                if (multiplierValueText != null)
-                    multiplierTextBaseColor = multiplierValueText.color;
             }
             
             if (multiplierSlider != null)
@@ -336,16 +401,20 @@ public class UIManager : MonoBehaviour
                 float scaleT = Mathf.InverseLerp(1f, multiplierScaleAtMax, multiplier);
                 float targetScale = Mathf.Lerp(multiplierMinScale, multiplierMaxScale, scaleT);
                 
+                // Color temperature: white (cool) at low multiplier, red (hot) at high
+                Color temperatureColor = Color.Lerp(multiplierTextCoolColor, multiplierTextHotColor, scaleT);
+                
                 // If multiplier increased, do a glow + punch animation
                 if (multiplier > lastMultiplierValue + 0.01f)
                 {
-                    TriggerMultiplierGlow(targetScale);
+                    TriggerMultiplierGlow(targetScale, temperatureColor);
                     AudioManager.Instance?.PlayMultiplierIncrease();
                 }
                 else
                 {
-                    // Just maintain the scale
+                    // Just maintain the scale and color
                     multiplierValueText.transform.localScale = Vector3.one * targetScale;
+                    multiplierValueText.color = temperatureColor;
                 }
                 
                 lastMultiplierValue = multiplier;
@@ -375,14 +444,14 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    private void TriggerMultiplierGlow(float targetScale)
+    private void TriggerMultiplierGlow(float targetScale, Color targetColor)
     {
         if (multiplierValueText == null) return;
         
         // Stop any existing glow
         StopMultiplierGlow();
         
-        multiplierGlowCoroutine = StartCoroutine(MultiplierGlowAnimation(targetScale));
+        multiplierGlowCoroutine = StartCoroutine(MultiplierGlowAnimation(targetScale, targetColor));
     }
     
     private void StopMultiplierGlow()
@@ -394,15 +463,16 @@ public class UIManager : MonoBehaviour
         }
     }
     
-    private IEnumerator MultiplierGlowAnimation(float targetScale)
+    private IEnumerator MultiplierGlowAnimation(float targetScale, Color targetColor)
     {
         if (multiplierValueText == null) yield break;
         
         Transform textTransform = multiplierValueText.transform;
         float startScale = textTransform.localScale.x;
         float punchScale = targetScale * 1.3f; // Overshoot
+        Color startColor = multiplierValueText.color;
         
-        // Phase 1: Punch up with glow
+        // Phase 1: Punch up with bright glow flash
         float elapsed = 0f;
         float punchDuration = 0.15f;
         
@@ -415,13 +485,13 @@ public class UIManager : MonoBehaviour
             float scale = Mathf.Lerp(startScale, punchScale, t);
             textTransform.localScale = Vector3.one * scale;
             
-            // Color glow (white/gold flash)
-            multiplierValueText.color = Color.Lerp(multiplierTextBaseColor, multiplierGlowColor, t);
+            // Color flash to bright glow
+            multiplierValueText.color = Color.Lerp(startColor, multiplierGlowColor, t);
             
             yield return null;
         }
         
-        // Phase 2: Settle back with glow fade
+        // Phase 2: Settle back to temperature color
         elapsed = 0f;
         float settleDuration = 0.25f;
         
@@ -435,21 +505,144 @@ public class UIManager : MonoBehaviour
             float scale = Mathf.Lerp(punchScale, targetScale, smoothT);
             textTransform.localScale = Vector3.one * scale;
             
-            // Color fade back
-            multiplierValueText.color = Color.Lerp(multiplierGlowColor, multiplierTextBaseColor, smoothT);
+            // Color fade from glow to temperature color
+            multiplierValueText.color = Color.Lerp(multiplierGlowColor, targetColor, smoothT);
             
             yield return null;
         }
         
         // Final state
         textTransform.localScale = Vector3.one * targetScale;
-        multiplierValueText.color = multiplierTextBaseColor;
+        multiplierValueText.color = targetColor;
         multiplierGlowCoroutine = null;
     }
     
     #endregion
     
-    #region Hot Streak
+    #region Hot Streak Mode
+    
+    private IEnumerator HotStreakIntroSequence()
+    {
+        Debug.Log("<color=orange>UIManager: Hot Streak intro starting!</color>");
+        
+        isInHotStreakMode = true;
+        
+        // Stop game music, play hot streak music
+        AudioManager.Instance?.StopMusic();
+        AudioManager.Instance?.PlayHotStreakMusic();
+        
+        // Enable hot streak background
+        if (hotStreakBackground != null)
+            hotStreakBackground.SetActive(true);
+        
+        // Show HOT-STREAK text with slide-in animation
+        if (hotStreakTextObject != null)
+        {
+            hotStreakTextObject.SetActive(true);
+            RectTransform rt = hotStreakTextObject.GetComponent<RectTransform>();
+            
+            // Slide in from right
+            float slideDuration = 0.4f;
+            float elapsed = 0f;
+            Vector2 startPos = new Vector2(800f, 0f);
+            Vector2 endPos = Vector2.zero;
+            
+            while (elapsed < slideDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / slideDuration;
+                float smoothT = 1f - Mathf.Pow(1f - t, 3f); // Ease out
+                rt.anchoredPosition = Vector2.Lerp(startPos, endPos, smoothT);
+                yield return null;
+            }
+            rt.anchoredPosition = endPos;
+            
+            // Punch scale
+            yield return AnimationUtilities.PunchScale(rt, 1.2f, 0.2f);
+            
+            // Hold for a moment
+            yield return new WaitForSeconds(0.8f);
+            
+            // Slide out to left
+            elapsed = 0f;
+            startPos = Vector2.zero;
+            endPos = new Vector2(-800f, 0f);
+            
+            while (elapsed < slideDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / slideDuration;
+                float smoothT = t * t; // Ease in
+                rt.anchoredPosition = Vector2.Lerp(startPos, endPos, smoothT);
+                yield return null;
+            }
+            
+            hotStreakTextObject.SetActive(false);
+            rt.anchoredPosition = new Vector2(800f, 0f); // Reset for next time
+        }
+        
+        // Start fire pulse effect on multiplier text
+        StartHotStreakTextPulse();
+    }
+    
+    private void StartHotStreakTextPulse()
+    {
+        if (hotStreakTextPulseCoroutine != null)
+            StopCoroutine(hotStreakTextPulseCoroutine);
+        
+        hotStreakTextPulseCoroutine = StartCoroutine(HotStreakTextPulseLoop());
+    }
+    
+    private IEnumerator HotStreakTextPulseLoop()
+    {
+        while (isInHotStreakMode && multiplierValueText != null)
+        {
+            float t = (Mathf.Sin(Time.time * hotStreakPulseSpeed) + 1f) / 2f;
+            multiplierValueText.color = Color.Lerp(hotStreakFireColor1, hotStreakFireColor2, t);
+            
+            // Also pulse the scale slightly
+            float scale = Mathf.Lerp(multiplierMaxScale, multiplierMaxScale * 1.1f, t);
+            multiplierValueText.transform.localScale = Vector3.one * scale;
+            
+            yield return null;
+        }
+    }
+    
+    private void CleanupHotStreakMode()
+    {
+        Debug.Log("<color=gray>UIManager: Cleaning up Hot Streak mode</color>");
+        
+        isInHotStreakMode = false;
+        
+        // Stop fire pulse
+        if (hotStreakTextPulseCoroutine != null)
+        {
+            StopCoroutine(hotStreakTextPulseCoroutine);
+            hotStreakTextPulseCoroutine = null;
+        }
+        
+        // Reset multiplier text color
+        if (multiplierValueText != null)
+        {
+            multiplierValueText.color = multiplierTextCoolColor;
+            multiplierValueText.transform.localScale = Vector3.one;
+        }
+        
+        // Hide hot streak background
+        if (hotStreakBackground != null)
+            hotStreakBackground.SetActive(false);
+        
+        // Hide hot streak text (in case it's still showing)
+        if (hotStreakTextObject != null)
+            hotStreakTextObject.SetActive(false);
+        
+        // Resume normal game music
+        AudioManager.Instance?.PlayGameMusic();
+    }
+    
+    #endregion
+    
+    #region Hot Streak Effect (Fire Particles)
     
     private void ActivateHotStreak(float multiplier)
     {
@@ -708,6 +901,7 @@ public class UIManager : MonoBehaviour
         StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
         StopTimeWarningSound();
         DeactivateHotStreak();
+        CleanupHotStreakMode();
         
         // Hide multiplier panel for fresh start
         SetActiveIfNotNull(multiplierPanel, false);

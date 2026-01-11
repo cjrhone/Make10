@@ -97,6 +97,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float maxMultiplier = 3f;
     [SerializeField] private float streakTimeout = 10f;
     
+    [Header("Hot Streak Mode")]
+    [SerializeField] private float hotStreakDuration = 10f;
+    [SerializeField] private float hotStreakMultiplier = 5f;
+    [SerializeField] private float hotStreakIntroDelay = 1.5f; // Time for "HOT-STREAK" text to show
+    
     [Header("References")]
     [SerializeField] private UIManager uiManager;
     
@@ -115,11 +120,18 @@ public class GameManager : MonoBehaviour
     private bool multiplierActive = false;
     private float timeSinceLastSolve = 0f;
     
+    // Hot Streak state
+    private bool hotStreakActive = false;
+    private float hotStreakTimer = 0f;
+    
     // Public accessors for UI
     public bool IsMultiplierActive => multiplierActive;
     public float CurrentMultiplier => currentMultiplier;
     public float MultiplierTimer => multiplierTimer;
     public float MultiplierDuration => multiplierDuration;
+    public bool IsHotStreakActive => hotStreakActive;
+    public float HotStreakTimer => hotStreakTimer;
+    public float HotStreakDuration => hotStreakDuration;
     
     // Events for UI updates
     public event Action<int, int> OnScoreChanged;
@@ -127,6 +139,9 @@ public class GameManager : MonoBehaviour
     public event Action<bool, float, float> OnMultiplierChanged;
     public event Action OnGameWon;
     public event Action OnGameLost;
+    public event Action OnHotStreakStarted;
+    public event Action<float> OnHotStreakTimerChanged; // passes remaining time
+    public event Action OnHotStreakEnded;
     
     private void Awake()
     {
@@ -155,6 +170,19 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         if (IsSolveAnimationPlaying) return;
+        
+        // Hot Streak mode - pause main timer, run hot streak timer
+        if (hotStreakActive)
+        {
+            hotStreakTimer -= Time.deltaTime;
+            OnHotStreakTimerChanged?.Invoke(hotStreakTimer);
+            
+            if (hotStreakTimer <= 0f)
+            {
+                EndHotStreak();
+            }
+            return; // Skip normal timer drain during hot streak
+        }
         
         if (!IsProcessing)
         {
@@ -243,6 +271,8 @@ public class GameManager : MonoBehaviour
         multiplierTimer = 0f;
         multiplierActive = false;
         timeSinceLastSolve = 0f;
+        hotStreakActive = false;
+        hotStreakTimer = 0f;
         
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
@@ -282,6 +312,8 @@ public class GameManager : MonoBehaviour
         multiplierTimer = 0f;
         multiplierActive = false;
         timeSinceLastSolve = 0f;
+        hotStreakActive = false;
+        hotStreakTimer = 0f;
         
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
@@ -318,6 +350,13 @@ public class GameManager : MonoBehaviour
     
     private void ProcessSingleSolve()
     {
+        // During Hot Streak, use special scoring
+        if (hotStreakActive)
+        {
+            ProcessHotStreakSolve();
+            return;
+        }
+        
         solveCount++;
         timeSinceLastSolve = 0f;
         
@@ -344,9 +383,15 @@ public class GameManager : MonoBehaviour
             Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
             
             currentMultiplier += multiplierIncrement;
-            currentMultiplier = Mathf.Min(currentMultiplier, maxMultiplier); // Cap at max
-            multiplierTimer = multiplierDuration;
             
+            // Check if we've exceeded the max - trigger Hot Streak!
+            if (currentMultiplier > maxMultiplier)
+            {
+                StartCoroutine(TriggerHotStreak());
+                return; // Don't process normal scoring, hot streak handles it
+            }
+            
+            multiplierTimer = multiplierDuration;
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         }
         
@@ -387,6 +432,61 @@ public class GameManager : MonoBehaviour
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
         
         Debug.Log("<color=red>Multiplier expired!</color> Streak reset.");
+    }
+    
+    #endregion
+    
+    #region Hot Streak Mode
+    
+    private IEnumerator TriggerHotStreak()
+    {
+        Debug.Log("<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color>");
+        
+        // Set hot streak state
+        hotStreakActive = true;
+        hotStreakTimer = hotStreakDuration;
+        
+        // Set multiplier to hot streak value
+        currentMultiplier = hotStreakMultiplier;
+        multiplierTimer = hotStreakDuration; // Sync with hot streak duration
+        
+        // Fire event for UI to show intro
+        OnHotStreakStarted?.Invoke();
+        
+        // Also update multiplier display
+        OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
+        
+        yield return null; // Hot streak intro handled by UIManager
+    }
+    
+    private void EndHotStreak()
+    {
+        Debug.Log("<color=gray>Hot Streak ended!</color>");
+        
+        hotStreakActive = false;
+        hotStreakTimer = 0f;
+        
+        // Reset multiplier completely
+        DeactivateMultiplierBar();
+        
+        // Fire event for UI cleanup
+        OnHotStreakEnded?.Invoke();
+    }
+    
+    /// <summary>
+    /// Process scoring during Hot Streak (called from ProcessSingleSolve when hot streak is active).
+    /// </summary>
+    private void ProcessHotStreakSolve()
+    {
+        int multipliedScore = Mathf.RoundToInt(baseMatchScore * hotStreakMultiplier);
+        
+        Debug.Log($"<color=orange>🔥 HOT STREAK SOLVE:</color> {baseMatchScore} × {hotStreakMultiplier:F0} = <color=cyan>+{multipliedScore} pts</color>");
+        
+        Score += multipliedScore;
+        OnScoreChanged?.Invoke(Score, multipliedScore);
+        
+        // Multiplier stays fixed at x5 during hot streak
+        OnMultiplierChanged?.Invoke(true, currentMultiplier, hotStreakTimer);
     }
     
     #endregion

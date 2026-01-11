@@ -1189,6 +1189,10 @@ MonoBehaviour:
   multiplierLowThreshold: 3
   hotStreakEffect: {fileID: 2128208163}
   enableHotStreak: 1
+  hotStreakBackground: {fileID: 515369882}
+  hotStreakFireColor1: {r: 1, g: 0.3, b: 0.1, a: 1}
+  hotStreakFireColor2: {r: 1, g: 0.9, b: 0.2, a: 1}
+  hotStreakPulseSpeed: 8
   pulseMinScale: 1
   pulseMaxScale: 1.2
   pulseSpeed: 3
@@ -1204,6 +1208,12 @@ MonoBehaviour:
   unsolvablePopupDuration: 1
   gameManager: {fileID: 1333256939}
   gridManager: {fileID: 901072115}
+  multiplierTextCoolColor: {r: 1, g: 1, b: 1, a: 1}
+  multiplierTextHotColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  multiplierGlowColor: {r: 1, g: 0.9, b: 0.3, a: 1}
+  multiplierMinScale: 1
+  multiplierMaxScale: 1.5
+  multiplierScaleAtMax: 3
 --- !u!224 &178623200
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3615,6 +3625,81 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 512812417}
   m_CullTransparentMesh: 1
+--- !u!1 &515369882
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 515369883}
+  - component: {fileID: 515369885}
+  - component: {fileID: 515369884}
+  m_Layer: 5
+  m_Name: HotStreakBG
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!224 &515369883
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 515369882}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 710881285}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &515369884
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 515369882}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 0, b: 0, a: 0.392}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 1
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &515369885
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 515369882}
+  m_CullTransparentMesh: 1
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -4698,6 +4783,7 @@ RectTransform:
   - {fileID: 68437846}
   - {fileID: 1516882962}
   - {fileID: 1403321186}
+  - {fileID: 515369883}
   - {fileID: 1694822198}
   - {fileID: 1862183837}
   - {fileID: 801159656}
@@ -7782,7 +7868,11 @@ MonoBehaviour:
   multiplierDrainRate: 1
   multiplierIncrement: 0.25
   startingMultiplier: 1.25
+  maxMultiplier: 3
   streakTimeout: 10
+  hotStreakDuration: 10
+  hotStreakMultiplier: 5
+  hotStreakIntroDelay: 1.5
   uiManager: {fileID: 178623199}
 --- !u!4 &1333256940
 Transform:
@@ -11294,9 +11384,9 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 622586887}
-  - {fileID: 1771787567}
   - {fileID: 1970017508}
   - {fileID: 1529845907}
+  - {fileID: 1771787567}
   - {fileID: 1477288766}
   - {fileID: 2128208160}
   - {fileID: 2097410333}
@@ -11604,6 +11694,7 @@ MonoBehaviour:
   gameMusic: {fileID: 8300000, guid: 9e6f5ec7fcca546c8b289c1a22d434f9, type: 3}
   winMusic: {fileID: 8300000, guid: 8cf6ef0ba9a9d4cffb0103bec1327fb4, type: 3}
   loseMusic: {fileID: 8300000, guid: 2c9bea1fd1252477ca3357106aee9e92, type: 3}
+  hotStreakMusic: {fileID: 8300000, guid: 0eeb7fec5995b4a50b7b0f60c46d8100, type: 3}
   buttonClickSFX: {fileID: 8300000, guid: f228806d6553a4d3587500b09a680a41, type: 3}
   convergenceSFX: {fileID: 8300000, guid: 0d226e6996b8f45e0bf556a8fde68d6f, type: 3}
   tenPopSFX: {fileID: 8300000, guid: dac30f359131148a6a292c03141085ef, type: 3}
@@ -11614,6 +11705,7 @@ MonoBehaviour:
   tileSelectSFX: {fileID: 8300000, guid: 2e1e1b8675fb649de96af05730dae98d, type: 3}
   timeWarningSFX: {fileID: 8300000, guid: f27236d39021448998e9ceeeb8c408b5, type: 3}
   finishSFX: {fileID: 8300000, guid: b9e1e7e7b9af348aaa6f8fd2990a349d, type: 3}
+  multiplierIncreaseSFX: {fileID: 8300000, guid: 21f24e4cd71c84089a2cc8132c55a3a0, type: 3}
 --- !u!114 &1720076974
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11971,7 +12063,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -189, y: 207}
+  m_AnchoredPosition: {x: -398.56, y: 309}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1811479575
@@ -12083,8 +12175,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 110, y: -57.829}
-  m_SizeDelta: {x: 294.7167, y: 75.7164}
+  m_AnchoredPosition: {x: 113.621, y: -90.41792}
+  m_SizeDelta: {x: 301.9588, y: 140.8943}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1816239543
 CanvasRenderer:
@@ -12123,8 +12215,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4278190335
-  m_fontColor: {r: 1, g: 0, b: 0, a: 1}
+    rgba: 4278247167
+  m_fontColor: {r: 1, g: 0.86978406, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -14482,7 +14574,8 @@ MonoBehaviour:
   flameMid: {r: 1, g: 0.5, b: 0.1, a: 1}
   flameEdge: {r: 0.9, g: 0.2, b: 0.1, a: 1}
   emberColor: {r: 1, g: 0.6, b: 0.2, a: 1}
-  barPulseColor: {r: 1, g: 0.4, b: 0.1, a: 1}
+  barPulseCoolColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+  barPulseHotColor: {r: 0.8, g: 0.1, b: 0.6, a: 1}
   colorPulseSpeed: 4
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
