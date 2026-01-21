@@ -27,7 +27,8 @@ public class SceneFlowManager : MonoBehaviour
     
     [Header("Loading Settings")]
     [SerializeField] private Slider loadingProgressBar;
-    [SerializeField] private float fakeLoadDuration = 2f;
+    [SerializeField] private float minLoadDuration = 1.5f; // Minimum time to show loading (for VFX)
+    [SerializeField] private float progressSmoothSpeed = 3f; // How fast progress bar catches up
     
     [Header("Countdown Settings")]
     [SerializeField] private TMPro.TMP_Text countdownText;
@@ -281,30 +282,96 @@ public class SceneFlowManager : MonoBehaviour
     
     #region Core Sequences
     
+    // Loading progress state
+    private float loadingDisplayProgress = 0f;
+
     private IEnumerator LoadingSequence()
     {
         CurrentState = GameState.Loading;
-        Debug.Log("LoadingSequence started");
-        
-        // Animate loading bar
-        float elapsed = 0f;
-        while (elapsed < fakeLoadDuration)
+        Debug.Log("LoadingSequence started - tracking actual initialization");
+
+        loadingDisplayProgress = 0f;
+        float startTime = Time.time;
+
+        if (loadingProgressBar != null)
+            loadingProgressBar.value = 0f;
+
+        // Step 1: Initialize core systems (0% - 20%)
+        Debug.Log("Loading: Initializing core systems...");
+        yield return SmoothProgressTo(0.2f);
+
+        // Step 2: Wait for AudioManager (20% - 40%)
+        Debug.Log("Loading: Initializing audio...");
+        while (AudioManager.Instance == null)
         {
-            elapsed += Time.deltaTime;
-            if (loadingProgressBar != null)
-                loadingProgressBar.value = elapsed / fakeLoadDuration;
             yield return null;
         }
-        
+        yield return SmoothProgressTo(0.4f);
+
+        // Step 3: Wait for GameManager (40% - 60%)
+        Debug.Log("Loading: Initializing game manager...");
+        while (GameManager.Instance == null)
+        {
+            yield return null;
+        }
+        yield return SmoothProgressTo(0.6f);
+
+        // Step 4: Warm up prefabs / verify GridManager (60% - 80%)
+        Debug.Log("Loading: Preparing game components...");
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        if (gridManager != null)
+        {
+            Debug.Log("Loading: GridManager ready");
+        }
+        yield return SmoothProgressTo(0.8f);
+
+        // Step 5: Final preparations (80% - 100%)
+        Debug.Log("Loading: Final preparations...");
+        yield return SmoothProgressTo(1f);
+
+        // Ensure minimum load time for VFX to show
+        float elapsed = Time.time - startTime;
+        if (elapsed < minLoadDuration)
+        {
+            yield return new WaitForSeconds(minLoadDuration - elapsed);
+        }
+
+        // Small pause at 100% before transition
+        yield return new WaitForSeconds(0.3f);
+
         Debug.Log("LoadingSequence complete - transitioning to MainMenu");
-        
+
         // Start menu music
         PlayAudio(() => AudioManager.Instance?.PlayMenuMusic());
-        
+
         // Transition to main menu
         yield return SlideTransition(loadingPanel, mainMenuPanel, slideLeft: true);
         CurrentState = GameState.MainMenu;
         Debug.Log($"Now in MainMenu state");
+    }
+
+    /// <summary>
+    /// Smoothly animate progress bar to target value.
+    /// </summary>
+    private IEnumerator SmoothProgressTo(float targetProgress)
+    {
+        while (loadingDisplayProgress < targetProgress - 0.001f)
+        {
+            loadingDisplayProgress = Mathf.Lerp(loadingDisplayProgress, targetProgress, Time.deltaTime * progressSmoothSpeed);
+
+            // Snap if very close
+            if (targetProgress - loadingDisplayProgress < 0.01f)
+                loadingDisplayProgress = targetProgress;
+
+            if (loadingProgressBar != null)
+                loadingProgressBar.value = loadingDisplayProgress;
+
+            yield return null;
+        }
+
+        loadingDisplayProgress = targetProgress;
+        if (loadingProgressBar != null)
+            loadingProgressBar.value = loadingDisplayProgress;
     }
     
     private IEnumerator PlaySequence()
