@@ -12,12 +12,18 @@ public class GridManager : MonoBehaviour
     [Header("Grid Settings")]
     [SerializeField] private int gridWidth = 5;
     [SerializeField] private int gridHeight = 5;
-    [SerializeField] private float baseTileSize = 100f;
-    [SerializeField] private float tileSpacing = 10f;
-    [SerializeField] private float maxGridWidth = 550f; // Max width to fit container
+    [SerializeField] private float baseTileSpacing = 10f; // Base spacing at reference size
+    [SerializeField] private float referenceContainerSize = 550f; // Reference size for proportional scaling
+    [SerializeField] private float baseFontSize = 72f; // Base font size at reference size
+
+    [Header("Editor Preview")]
+    [SerializeField] private Color editorGridLineColor = new Color(1f, 1f, 0f, 0.5f);
+    [SerializeField] private bool showGridLinesInEditor = true;
     
-    // Actual tile size (calculated based on grid size)
+    // Actual tile size and spacing (calculated based on container size)
     private float tileSize;
+    private float tileSpacing;
+    private float scaleFactor = 1f; // Container size / reference size
     
     [Header("References")]
     [SerializeField] private GameObject tilePrefab;
@@ -79,9 +85,97 @@ public class GridManager : MonoBehaviour
     private void Awake()
     {
         weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
-        tileSize = baseTileSize;
         grid = new Tile[gridWidth, gridHeight];
+        CalculateSizesFromContainer();
     }
+
+    /// <summary>
+    /// Calculate tile size, spacing, and scale factor based on container size.
+    /// </summary>
+    private void CalculateSizesFromContainer()
+    {
+        if (gridContainer == null) return;
+
+        float containerWidth = gridContainer.sizeDelta.x;
+        scaleFactor = containerWidth / referenceContainerSize;
+        tileSpacing = baseTileSpacing * scaleFactor;
+
+        float totalSpacing = (gridWidth - 1) * tileSpacing;
+        tileSize = (containerWidth - totalSpacing) / gridWidth;
+    }
+
+    #if UNITY_EDITOR
+    /// <summary>
+    /// Recalculates grid preview when settings change in the editor.
+    /// Resize the gridContainer to change the grid size - tiles will scale to fit.
+    /// </summary>
+    private void OnValidate()
+    {
+        if (gridContainer == null) return;
+
+        // Recalculate sizes based on current container size
+        float containerWidth = gridContainer.sizeDelta.x;
+        float editorScaleFactor = containerWidth / referenceContainerSize;
+        float editorTileSpacing = baseTileSpacing * editorScaleFactor;
+        float editorTotalSpacing = (gridWidth - 1) * editorTileSpacing;
+        float editorTileSize = (containerWidth - editorTotalSpacing) / gridWidth;
+
+        // Update the private fields for gizmo drawing
+        scaleFactor = editorScaleFactor;
+        tileSpacing = editorTileSpacing;
+        tileSize = editorTileSize;
+    }
+
+    /// <summary>
+    /// Draws grid lines in the Scene view for visual preview.
+    /// </summary>
+    private void OnDrawGizmosSelected()
+    {
+        if (!showGridLinesInEditor || gridContainer == null) return;
+
+        // Calculate sizes for preview (in case OnValidate hasn't run)
+        float containerWidth = gridContainer.sizeDelta.x;
+        float previewScaleFactor = containerWidth / referenceContainerSize;
+        float previewTileSpacing = baseTileSpacing * previewScaleFactor;
+        float previewTotalSpacing = (gridWidth - 1) * previewTileSpacing;
+        float previewTileSize = (containerWidth - previewTotalSpacing) / gridWidth;
+
+        float totalWidth = gridWidth * previewTileSize + (gridWidth - 1) * previewTileSpacing;
+        float totalHeight = gridHeight * previewTileSize + (gridHeight - 1) * previewTileSpacing;
+
+        // Get the canvas for proper world-space scaling
+        Canvas canvas = gridContainer.GetComponentInParent<Canvas>();
+        float canvasScale = canvas != null ? canvas.transform.lossyScale.x : 1f;
+
+        // Get world position of the container center
+        Vector3 containerCenter = gridContainer.position;
+
+        Gizmos.color = editorGridLineColor;
+
+        float startX = -totalWidth / 2f;
+        float startY = totalHeight / 2f;
+
+        // Draw tile cells
+        for (int y = 0; y < gridHeight; y++)
+        {
+            for (int x = 0; x < gridWidth; x++)
+            {
+                float posX = startX + x * (previewTileSize + previewTileSpacing) + previewTileSize / 2f;
+                float posY = startY - y * (previewTileSize + previewTileSpacing) - previewTileSize / 2f;
+
+                Vector3 cellCenter = containerCenter + new Vector3(posX * canvasScale, posY * canvasScale, 0);
+                Vector3 cellSize = new Vector3(previewTileSize * canvasScale, previewTileSize * canvasScale, 0);
+
+                Gizmos.DrawWireCube(cellCenter, cellSize);
+            }
+        }
+
+        // Draw outer boundary
+        Gizmos.color = new Color(editorGridLineColor.r, editorGridLineColor.g, editorGridLineColor.b, 1f);
+        Vector3 boundarySize = new Vector3(totalWidth * canvasScale, totalHeight * canvasScale, 0);
+        Gizmos.DrawWireCube(containerCenter, boundarySize);
+    }
+    #endif
     
     private void OnEnable()
     {
@@ -184,24 +278,24 @@ public class GridManager : MonoBehaviour
         activeHintParticles.Add(particle);
         
         RectTransform rt = particle.AddComponent<RectTransform>();
-        
-        // Start slightly behind center, end ahead
-        float startOffset = -20f;
-        float endOffset = 60f;
+
+        // Start slightly behind center, end ahead (scaled)
+        float startOffset = -20f * scaleFactor;
+        float endOffset = 60f * scaleFactor;
         rt.anchoredPosition = startPos + direction * startOffset;
-        rt.sizeDelta = new Vector2(hintParticleSize, hintParticleSize);
+        rt.sizeDelta = new Vector2(hintParticleSize * scaleFactor, hintParticleSize * scaleFactor);
         rt.localEulerAngles = new Vector3(0, 0, 45f); // Diamond shape
-        
+
         Image img = particle.AddComponent<Image>();
         img.color = hintParticleColor;
         img.raycastTarget = false;
-        
+
         // Animate: move in direction, fade out, shrink
         float elapsed = 0f;
-        Vector2 velocity = direction * hintParticleSpeed;
-        
-        // Add slight randomness
-        float wobble = Random.Range(-15f, 15f);
+        Vector2 velocity = direction * hintParticleSpeed * scaleFactor;
+
+        // Add slight randomness (scaled)
+        float wobble = Random.Range(-15f, 15f) * scaleFactor;
         Vector2 perpendicular = new Vector2(-direction.y, direction.x);
         
         while (elapsed < hintParticleLifetime)
@@ -301,31 +395,36 @@ public class GridManager : MonoBehaviour
                 gridWidth = newSize;
                 gridHeight = newSize;
                 grid = new Tile[gridWidth, gridHeight];
-                
-                // Calculate tile size to fit within max grid width
-                float totalSpacing = (gridWidth - 1) * tileSpacing;
-                tileSize = (maxGridWidth - totalSpacing) / gridWidth;
-                
-                Debug.Log($"<color=cyan>Grid size updated to {gridWidth}x{gridHeight}, tile size: {tileSize:F0}</color>");
             }
         }
+
+        // Always recalculate sizes from container (handles both difficulty change and container resize)
+        CalculateSizesFromContainer();
+        Debug.Log($"<color=cyan>Grid size: {gridWidth}x{gridHeight}, tile size: {tileSize:F0}, scale: {scaleFactor:F2}</color>");
     }
     
     private Tile CreateTile(int gridX, int gridY, Vector2 position)
     {
         GameObject tileObj = Instantiate(tilePrefab, gridContainer);
         Tile tile = tileObj.GetComponent<Tile>();
-        
+
         if (tile != null)
         {
             int value = GetWeightedRandomValue();
             tile.Initialize(value, gridX, gridY);
             tile.SetPosition(position);
-            
+
             RectTransform rt = tile.GetRectTransform();
             rt.sizeDelta = new Vector2(tileSize, tileSize);
+
+            // Scale font size proportionally with container
+            TMPro.TMP_Text numberText = tile.GetComponentInChildren<TMPro.TMP_Text>();
+            if (numberText != null)
+            {
+                numberText.fontSize = baseFontSize * scaleFactor;
+            }
         }
-        
+
         return tile;
     }
     
@@ -605,9 +704,9 @@ public class GridManager : MonoBehaviour
                 {
                     RectTransform rt = tile.GetRectTransform();
                     Vector2 originalPos = originalPositions[tile];
-                    float shake = Mathf.Sin(elapsed * 50f) * 5f * (1f - t);
-                    float fallDistance = 800f * t * t;
-                    
+                    float shake = Mathf.Sin(elapsed * 50f) * 5f * scaleFactor * (1f - t);
+                    float fallDistance = 800f * scaleFactor * t * t;
+
                     rt.anchoredPosition = originalPos + new Vector2(shake, -fallDistance);
                     
                     Image img = tile.GetComponent<Image>();
@@ -747,11 +846,11 @@ public class GridManager : MonoBehaviour
         
         RectTransform tenRT = tenObj.AddComponent<RectTransform>();
         tenRT.anchoredPosition = position;
-        tenRT.sizeDelta = new Vector2(200f, 120f);
-        
+        tenRT.sizeDelta = new Vector2(200f * scaleFactor, 120f * scaleFactor);
+
         TMPro.TMP_Text tenText = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
         tenText.text = "10";
-        tenText.fontSize = 82;
+        tenText.fontSize = 82 * scaleFactor;
         tenText.fontStyle = TMPro.FontStyles.Bold;
         tenText.color = tenGlowColor;
         tenText.alignment = TMPro.TextAlignmentOptions.Center;
@@ -770,11 +869,11 @@ public class GridManager : MonoBehaviour
         
         RectTransform glowRT = glowObj.AddComponent<RectTransform>();
         glowRT.anchoredPosition = position;
-        glowRT.sizeDelta = new Vector2(200f, 120f);
-        
+        glowRT.sizeDelta = new Vector2(200f * scaleFactor, 120f * scaleFactor);
+
         TMPro.TMP_Text glowText = glowObj.AddComponent<TMPro.TextMeshProUGUI>();
         glowText.text = "10";
-        glowText.fontSize = 90;
+        glowText.fontSize = 90 * scaleFactor;
         glowText.fontStyle = TMPro.FontStyles.Bold;
         glowText.color = new Color(1f, 0.95f, 0.5f, 0.4f);
         glowText.alignment = TMPro.TextAlignmentOptions.Center;
@@ -790,16 +889,16 @@ public class GridManager : MonoBehaviour
             
             RectTransform sRT = sparkle.AddComponent<RectTransform>();
             sRT.anchoredPosition = position;
-            float size = Random.Range(8f, 16f);
+            float size = Random.Range(8f, 16f) * scaleFactor;
             sRT.sizeDelta = new Vector2(size, size);
             sRT.localEulerAngles = new Vector3(0, 0, 45f);
-            
+
             Image sImg = sparkle.AddComponent<Image>();
             sImg.color = sparkleColor;
             sImg.raycastTarget = false;
-            
+
             float angle = (i / (float)sparkleCount) * Mathf.PI * 2f + Random.Range(-0.3f, 0.3f);
-            float speed = Random.Range(150f, 300f);
+            float speed = Random.Range(150f, 300f) * scaleFactor;
             Vector2 vel = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * speed;
             float rotSpd = Random.Range(-360f, 360f);
             
@@ -818,7 +917,7 @@ public class GridManager : MonoBehaviour
             
             RectTransform rRT = ring.AddComponent<RectTransform>();
             rRT.anchoredPosition = position;
-            rRT.sizeDelta = new Vector2(20f, 20f);
+            rRT.sizeDelta = new Vector2(20f * scaleFactor, 20f * scaleFactor);
             
             Image rImg = ring.AddComponent<Image>();
             rImg.color = new Color(tenGlowColor.r, tenGlowColor.g, tenGlowColor.b, 0.6f);
@@ -860,7 +959,7 @@ public class GridManager : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = elapsed / mainDuration;
             
-            float floatY = Mathf.Sin(t * Mathf.PI) * 40f;
+            float floatY = Mathf.Sin(t * Mathf.PI) * 40f * scaleFactor;
             float pulse = 1f + Mathf.Sin(elapsed * 15f) * 0.08f;
             
             tenRT.anchoredPosition = startPos + new Vector2(0, floatY);
@@ -883,7 +982,7 @@ public class GridManager : MonoBehaviour
                 if (sRT == null) continue;
                 
                 Vector2 currentPos = sRT.anchoredPosition;
-                Vector2 gravity = new Vector2(0, -200f) * Time.deltaTime;
+                Vector2 gravity = new Vector2(0, -200f * scaleFactor) * Time.deltaTime;
                 sRT.anchoredPosition = currentPos + vel * Time.deltaTime + gravity;
                 
                 float currentRot = sRT.localEulerAngles.z;
@@ -902,7 +1001,7 @@ public class GridManager : MonoBehaviour
                 float ringT = Mathf.Clamp01((elapsed - delay) / (mainDuration * 0.6f));
                 if (ringT > 0)
                 {
-                    float ringSize = Mathf.Lerp(20f, 200f, ringT);
+                    float ringSize = Mathf.Lerp(20f * scaleFactor, 200f * scaleFactor, ringT);
                     rRT.sizeDelta = new Vector2(ringSize, ringSize);
                     
                     float ringAlpha = Mathf.Lerp(0.6f, 0f, ringT);
@@ -1028,6 +1127,14 @@ public class GridManager : MonoBehaviour
                         newTile.Initialize(value, x, y);
                         newTile.SetPosition(spawnPos);
                         newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
+
+                        // Scale font size proportionally with container
+                        TMPro.TMP_Text numberText = newTile.GetComponentInChildren<TMPro.TMP_Text>();
+                        if (numberText != null)
+                        {
+                            numberText.fontSize = baseFontSize * scaleFactor;
+                        }
+
                         grid[x, y] = newTile;
                         tilesToDrop.Add((x, y, newTile));
                     }
