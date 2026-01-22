@@ -12,8 +12,8 @@ A fast-paced tile-matching puzzle game where you swap numbered tiles to create r
 
 1. **Swap tiles** by clicking two adjacent tiles or swiping from one tile to a neighbor
 2. **Make 10** - Create a row or column where all numbers sum to exactly 10
-3. **Beat the clock** - Reach the target score before 60 seconds runs out
-4. **Chain matches** - Build your multiplier with consecutive matches for higher scores
+3. **Build streaks** - Chain consecutive matches to increase your multiplier
+4. **Progress through milestones** - Reach score thresholds to unlock upgrades
 
 ### Controls
 
@@ -25,13 +25,38 @@ A fast-paced tile-matching puzzle game where you swap numbered tiles to create r
 
 ---
 
-## Game Modes
+## V2 Redesign (In Progress)
 
-| Difficulty | Grid Size | Target Score | Description |
-|------------|-----------|--------------|-------------|
-| **Easy** | 4×4 | 250 pts | Fewer zeros, balanced tile distribution |
-| **Medium** | 5×5 | 300 pts | Standard challenge |
-| **Hard** | 5×5 | 500 pts | More zeros and high-value tiles |
+Make10 is being redesigned with a **roguelike-style progression system**:
+
+### New Direction
+- **No difficulty select** - Game starts and scales dynamically
+- **Score threshold progression** - Reach milestones to unlock upgrades
+- **Endless gameplay** - Play continues with increasing challenge
+- **Upgrade system** - Choose enhancements as you progress
+- **Dynamic difficulty scaling** - Challenge increases based on your performance
+
+### New Game View Layout
+
+```
+┌─────────────────────────┐
+│                         │
+│    CHARACTER AVATAR     │  ← Top: Character portrait
+│    (scenic background)  │     with reactive animations
+│                         │
+├─────────────────────────┤
+│  SCORE │ TIMER │  x2    │  ← Middle: Stats bar
+│      [████ 250/300]     │     (score, timer, multiplier, XP)
+├─────────────────────────┤
+│                         │
+│   ┌──┬──┬──┬──┐        │
+│   ├──┼──┼──┼──┤        │  ← Bottom: Gameplay grid
+│   ├──┼──┼──┼──┤        │     (thumb-accessible)
+│   ├──┼──┼──┼──┤        │
+│   └──┴──┴──┴──┘        │
+│                         │
+└─────────────────────────┘
+```
 
 ---
 
@@ -58,7 +83,7 @@ When your multiplier exceeds 3.0x, Hot Streak activates:
 ## Features
 
 ### Gameplay
-- Weighted random tile generation based on difficulty
+- Weighted random tile generation
 - Cascading matches - tiles fall after clears, creating chain reactions
 - Automatic grid reset when no valid moves remain
 - Hint system shows valid moves after 10 seconds of inactivity
@@ -98,7 +123,7 @@ When your multiplier exceeds 3.0x, Hot Streak activates:
 ```
 Make10/
 ├── Assets/
-│   ├── Scripts/          # 15 C# gameplay scripts
+│   ├── Scripts/          # C# gameplay scripts
 │   ├── Scenes/           # Make10Scene.unity
 │   ├── Prefabs/          # Tile.prefab, ScorePopup.prefab
 │   ├── Images/           # Avatar sprites
@@ -123,31 +148,25 @@ Make10/
 | `AvatarManager.cs` | Animated character with reactive states |
 | `HotStreakEffect.cs` | Fire particle effects during hot streak |
 | `AudioManager.cs` | Music and SFX management |
-| `MainMenuUI.cs` | Title screen animations |
-| `TutorialDemoWidget.cs` | Tutorial demonstration system |
-| `AnimationUtilities.cs` | Shared animation helpers |
-| `AspectRatioEnforcer.cs` | Responsive layout handling |
-| `CameraLetterbox.cs` | Letterbox for extreme aspect ratios |
-| `ParallaxBackground.cs` | Scrolling background layers |
 
 ---
 
-## Game Flow
+## Game Flow (V2)
 
 ```
 Loading Screen
       ↓
 Main Menu
       ↓
-Difficulty Select (Easy / Medium / Hard)
+Gameplay (Endless with milestones)
       ↓
-Tutorial (Optional)
+    [Milestone reached → Choose upgrade]
       ↓
-Countdown (3... 2... 1... Go!)
+    [Continue playing...]
       ↓
-Gameplay (60 seconds)
+Game Over
       ↓
-Results Screen (Win / Lose)
+Results / Stats
       ↓
 Return to Main Menu
 ```

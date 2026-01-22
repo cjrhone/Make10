@@ -53,9 +53,9 @@ public class LoadingBarVFX : MonoBehaviour
     {
         rectTransform = GetComponent<RectTransform>();
 
-        // Auto-find references if not set
+        // Auto-find references if not set (search in children too)
         if (progressSlider == null)
-            progressSlider = GetComponent<Slider>();
+            progressSlider = GetComponentInChildren<Slider>(true);
         if (fillImage == null && progressSlider != null)
             fillImage = progressSlider.fillRect?.GetComponent<Image>();
         if (fillArea == null && progressSlider != null)
