@@ -63,7 +63,7 @@ public class GameManager : MonoBehaviour
     {
         name = "Medium",
         gridSize = 5,     // 5x5 grid - 5 tiles sum to 10 (avg 2.0)
-        winScore = 300,
+        winScore = 100,
         weight0 = 0.12f,
         weight1 = 0.24f,
         weight2 = 0.26f,
@@ -452,8 +452,9 @@ public class GameManager : MonoBehaviour
         
         Score += pointsAwarded;
         OnScoreChanged?.Invoke(Score, pointsAwarded);
-        
-        // Don't end game early - let player keep playing until time runs out
+
+        // Check for win condition
+        CheckWinCondition();
     }
     
     private void ActivateMultiplierBar()
@@ -483,12 +484,24 @@ public class GameManager : MonoBehaviour
         multiplierTimer = 0f;
         currentMultiplier = 1f;
         solveCount = 0;
-        
+
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
-        
+
         Debug.Log("<color=red>Multiplier expired!</color> Streak reset.");
     }
-    
+
+    /// <summary>
+    /// Check if player has reached the win score and trigger win if so.
+    /// </summary>
+    private void CheckWinCondition()
+    {
+        if (Score >= WinScore && IsGameActive)
+        {
+            Debug.Log($"<color=cyan>*** WIN THRESHOLD REACHED! ***</color> Score: {Score}/{WinScore}");
+            StartCoroutine(WinGameDelayed());
+        }
+    }
+
     #endregion
     
     #region Hot Streak Mode
@@ -545,9 +558,12 @@ public class GameManager : MonoBehaviour
         
         Score += multipliedScore;
         OnScoreChanged?.Invoke(Score, multipliedScore);
-        
+
         // Multiplier stays fixed at x5 during hot streak
         OnMultiplierChanged?.Invoke(true, currentMultiplier, hotStreakTimer);
+
+        // Check for win condition
+        CheckWinCondition();
     }
     
     #endregion

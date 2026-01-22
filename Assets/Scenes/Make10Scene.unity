@@ -11035,14 +11035,14 @@ MonoBehaviour:
   mediumPreset:
     name: Medium
     gridSize: 5
-    winScore: 300
-    weight0: 0.14
+    winScore: 100
+    weight0: 0.12
     weight1: 0.24
-    weight2: 0.24
-    weight3: 0.18
+    weight2: 0.26
+    weight3: 0.2
     weight4: 0.12
-    weight5: 0.08
-    weight6: 0
+    weight5: 0.05
+    weight6: 0.01
   hardPreset:
     name: Hard
     gridSize: 6
@@ -18275,9 +18275,10 @@ MonoBehaviour:
   particleContainer: {fileID: 0}
   explosionDuration: 0.35
   pauseDuration: 0.1
-  collectionDuration: 0.5
-  explosionRadius: 150
+  collectionDuration: 0.35
+  explosionRadius: 500
   explosionDecay: 3
+  forceMultiplierRange: {x: 0.7, y: 1.3}
   smallSizeRange: {x: 20, y: 28}
   smallParticleColor: {r: 1, g: 0.9, b: 0.5, a: 1}
   smallRotationSpeed: 150
@@ -18290,7 +18291,7 @@ MonoBehaviour:
   smallBounceSubtle: 1.04
   smallBounceMedium: 1.06
   smallBounceStrong: 1.08
-  bigBounceScale: 1.15
+  bigBounceScale: 1.9
   bounceDuration: 0.08
 --- !u!21 &1984581564
 Material:
