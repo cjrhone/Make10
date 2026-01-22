@@ -796,10 +796,6 @@ public class GridManager : MonoBehaviour
         
         yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
 
-        // Trigger particle explosion VFX that collects to progress bar
-        float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
-        TenExplosionVFX.Instance?.TriggerExplosion(centerPos, currentMultiplier, gridContainer);
-
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = false;
     }
@@ -835,7 +831,11 @@ public class GridManager : MonoBehaviour
     private IEnumerator ShowTenEffectSpectacular(Vector2 position)
     {
         AudioManager.Instance?.PlayTenPopSound();
-        
+
+        // Trigger particle explosion VFX immediately with the 10 text
+        float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
+        TenExplosionVFX.Instance?.TriggerExplosion(position, currentMultiplier, gridContainer);
+
         List<GameObject> effectObjects = new List<GameObject>();
         
         GameObject tenObj = new GameObject("TenEffect_Main");

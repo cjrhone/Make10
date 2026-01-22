@@ -24,12 +24,12 @@ public class TenExplosionVFX : MonoBehaviour
     [SerializeField] private float explosionDecay = 3f; // Exponential decay rate
 
     [Header("Small Particle Settings")]
-    [SerializeField] private Vector2 smallSizeRange = new Vector2(8f, 12f);
+    [SerializeField] private Vector2 smallSizeRange = new Vector2(20f, 28f);
     [SerializeField] private Color smallParticleColor = new Color(1f, 0.9f, 0.5f); // Gold
     [SerializeField] private float smallRotationSpeed = 150f;
 
     [Header("Big Particle Settings")]
-    [SerializeField] private Vector2 bigSizeRange = new Vector2(18f, 22f);
+    [SerializeField] private Vector2 bigSizeRange = new Vector2(40f, 52f);
     [SerializeField] private Color bigParticleColor = new Color(0.7f, 0.4f, 1f); // Purple
     [SerializeField] private float bigRotationSpeed = 75f;
 
