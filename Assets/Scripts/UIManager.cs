@@ -79,6 +79,20 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject loseScreen;
     [SerializeField] private TMP_Text winScoreText;
     [SerializeField] private TMP_Text loseScoreText;
+
+    [Header("Win Screen Breakdown")]
+    [SerializeField] private TMP_Text scoreLabelText;
+    [SerializeField] private TMP_Text scoreValueText;
+    [SerializeField] private TMP_Text timeBonusLabelText;
+    [SerializeField] private TMP_Text timeBonusValueText;
+    [SerializeField] private TMP_Text hotStreakLabelText;
+    [SerializeField] private TMP_Text hotStreakValueText;
+    [SerializeField] private Image breakdownDivider;
+    [SerializeField] private TMP_Text totalLabelText;
+    [SerializeField] private TMP_Text totalValueText;
+    [SerializeField] private float breakdownLineDelay = 0.3f;
+    [SerializeField] private float countUpDuration = 0.5f;
+    [SerializeField] private float timeBonusPerSecond = 1f;
     
     [Header("Unsolvable Grid Popup")]
     [SerializeField] private GameObject unsolvablePopup;
@@ -248,6 +262,9 @@ public class UIManager : MonoBehaviour
         
         // Create the HOT-STREAK text object (hidden initially)
         CreateHotStreakText();
+
+        // Create breakdown UI elements if not assigned in inspector
+        EnsureBreakdownElementsExist();
     }
     
     private void CreateHotStreakText()
@@ -769,10 +786,8 @@ public class UIManager : MonoBehaviour
         {
             AudioManager.Instance?.PlayWinMusic();
             SetActiveIfNotNull(winScreen, true);
-            if (winScoreText != null && gameManager != null)
-            {
-                winScoreText.text = $"Score: {gameManager.Score}\nTime Left: {gameManager.TimeRemaining:F1}s";
-            }
+            // Start the animated score breakdown
+            StartCoroutine(ShowWinScreenBreakdown());
         }
         else
         {
@@ -789,13 +804,226 @@ public class UIManager : MonoBehaviour
     {
         popup.SetActive(true);
         yield return AnimationUtilities.PopIn(popup.transform, 1.1f, 0.2f, 0.05f);
-        
+
         yield return new WaitForSeconds(duration);
-        
+
         yield return AnimationUtilities.ScaleOut(popup.transform, 0.15f);
         popup.SetActive(false);
     }
-    
+
+    /// <summary>
+    /// Sequential score breakdown on the win screen (Balatro-style).
+    /// Each line appears with a count-up animation for numbers.
+    /// </summary>
+    private IEnumerator ShowWinScreenBreakdown()
+    {
+        if (gameManager == null) yield break;
+
+        // Get values from GameManager
+        int baseScore = gameManager.Score;
+        float timeRemaining = gameManager.TimeRemaining;
+        float maxMultiplier = gameManager.MaxMultiplierReached;
+
+        // Calculate breakdown (1 BP per second remaining)
+        int timeBonus = Mathf.RoundToInt(timeRemaining * timeBonusPerSecond);
+        int subtotal = baseScore + timeBonus;
+        int total = Mathf.RoundToInt(subtotal * maxMultiplier);
+
+        // Hide all breakdown elements initially
+        HideBreakdownElements();
+
+        // Small initial delay after win screen appears
+        yield return new WaitForSeconds(0.3f);
+
+        // Line 1: Score - appears and counts up
+        if (scoreLabelText != null && scoreValueText != null)
+        {
+            // Activate the row (parent of both label and value)
+            scoreLabelText.transform.parent.gameObject.SetActive(true);
+            scoreLabelText.text = "Score";
+            AudioManager.Instance?.PlayButtonClick();
+            yield return StartCoroutine(AnimationUtilities.CountUp(scoreValueText, 0, baseScore, countUpDuration, "{0} BP"));
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+
+        // Line 2: Time Bonus - appears and counts up
+        if (timeBonusLabelText != null && timeBonusValueText != null)
+        {
+            timeBonusLabelText.transform.parent.gameObject.SetActive(true);
+            timeBonusLabelText.text = "Time Bonus";
+            AudioManager.Instance?.PlayButtonClick();
+            yield return StartCoroutine(AnimationUtilities.CountUp(timeBonusValueText, 0, timeBonus, countUpDuration, "+ {0} BP"));
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+
+        // Line 3: Hot Streak multiplier - appears instantly
+        if (hotStreakLabelText != null && hotStreakValueText != null)
+        {
+            hotStreakLabelText.transform.parent.gameObject.SetActive(true);
+            hotStreakLabelText.text = "Hot Streak";
+            hotStreakValueText.text = $"x{maxMultiplier:F1}";
+            AudioManager.Instance?.PlayButtonClick();
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+
+        // Divider line - appears instantly
+        if (breakdownDivider != null)
+        {
+            breakdownDivider.gameObject.SetActive(true);
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+
+        // Line 4: TOTAL - appears and counts up
+        if (totalLabelText != null && totalValueText != null)
+        {
+            totalLabelText.transform.parent.gameObject.SetActive(true);
+            totalLabelText.text = "TOTAL";
+            AudioManager.Instance?.PlayButtonClick();
+            yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, total, countUpDuration * 1.2f, "{0} BP"));
+        }
+
+        // Hide the legacy winScoreText since we're using breakdown
+        if (winScoreText != null)
+        {
+            winScoreText.text = "";
+        }
+    }
+
+    /// <summary>
+    /// Hide all breakdown elements (called before animation starts).
+    /// </summary>
+    private void HideBreakdownElements()
+    {
+        // Hide entire rows (parent of label/value pairs)
+        if (scoreLabelText != null) scoreLabelText.transform.parent.gameObject.SetActive(false);
+        if (timeBonusLabelText != null) timeBonusLabelText.transform.parent.gameObject.SetActive(false);
+        if (hotStreakLabelText != null) hotStreakLabelText.transform.parent.gameObject.SetActive(false);
+        if (breakdownDivider != null) breakdownDivider.gameObject.SetActive(false);
+        if (totalLabelText != null) totalLabelText.transform.parent.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// Create score breakdown UI elements at runtime if not assigned in inspector.
+    /// </summary>
+    private void EnsureBreakdownElementsExist()
+    {
+        if (winScreen == null) return;
+
+        Transform parent = winScreen.transform;
+
+        // Find or create container for breakdown text
+        Transform breakdownContainer = parent.Find("BreakdownContainer");
+        if (breakdownContainer == null)
+        {
+            GameObject containerObj = new GameObject("BreakdownContainer");
+            containerObj.transform.SetParent(parent, false);
+            RectTransform containerRT = containerObj.AddComponent<RectTransform>();
+            containerRT.anchorMin = new Vector2(0.1f, 0.25f);
+            containerRT.anchorMax = new Vector2(0.9f, 0.7f);
+            containerRT.offsetMin = Vector2.zero;
+            containerRT.offsetMax = Vector2.zero;
+
+            // Add vertical layout group
+            var vlg = containerObj.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 12f;
+            vlg.childAlignment = TextAnchor.UpperCenter;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = false;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+
+            breakdownContainer = containerObj.transform;
+        }
+
+        // Create breakdown rows with two-column layout (label left, value right)
+        if (scoreLabelText == null || scoreValueText == null)
+            (scoreLabelText, scoreValueText) = CreateBreakdownRow(breakdownContainer, "ScoreRow", "Score", "0 BP");
+
+        if (timeBonusLabelText == null || timeBonusValueText == null)
+            (timeBonusLabelText, timeBonusValueText) = CreateBreakdownRow(breakdownContainer, "TimeBonusRow", "Time Bonus", "+ 0 BP");
+
+        if (hotStreakLabelText == null || hotStreakValueText == null)
+            (hotStreakLabelText, hotStreakValueText) = CreateBreakdownRow(breakdownContainer, "HotStreakRow", "Hot Streak", "x1.0");
+
+        if (breakdownDivider == null)
+            breakdownDivider = CreateDivider(breakdownContainer, "Divider");
+
+        if (totalLabelText == null || totalValueText == null)
+            (totalLabelText, totalValueText) = CreateBreakdownRow(breakdownContainer, "TotalRow", "TOTAL", "0 BP", true);
+    }
+
+    private (TMP_Text label, TMP_Text value) CreateBreakdownRow(Transform parent, string name, string labelText, string valueText, bool isTotal = false)
+    {
+        // Create row container with horizontal layout
+        GameObject rowObj = new GameObject(name);
+        rowObj.transform.SetParent(parent, false);
+
+        RectTransform rowRT = rowObj.AddComponent<RectTransform>();
+        rowRT.sizeDelta = new Vector2(0, isTotal ? 55f : 40f);
+
+        var hlg = rowObj.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = true;
+        hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = true;
+        hlg.childForceExpandHeight = true;
+        hlg.spacing = 10f;
+
+        // Create label (left-aligned)
+        GameObject labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(rowObj.transform, false);
+        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+
+        TMP_Text label = labelObj.AddComponent<TextMeshProUGUI>();
+        label.text = labelText;
+        label.fontSize = isTotal ? 40f : 32f;
+        label.fontStyle = isTotal ? FontStyles.Bold : FontStyles.Normal;
+        label.alignment = TextAlignmentOptions.Left;
+        label.color = isTotal ? new Color(1f, 0.9f, 0.3f) : Color.white;
+
+        // Create value (right-aligned)
+        GameObject valueObj = new GameObject("Value");
+        valueObj.transform.SetParent(rowObj.transform, false);
+        RectTransform valueRT = valueObj.AddComponent<RectTransform>();
+
+        TMP_Text value = valueObj.AddComponent<TextMeshProUGUI>();
+        value.text = valueText;
+        value.fontSize = isTotal ? 40f : 32f;
+        value.fontStyle = isTotal ? FontStyles.Bold : FontStyles.Normal;
+        value.alignment = TextAlignmentOptions.Right;
+        value.color = isTotal ? new Color(1f, 0.9f, 0.3f) : Color.white;
+
+        // Try to use the same font as winScoreText
+        if (winScoreText != null)
+        {
+            label.font = winScoreText.font;
+            value.font = winScoreText.font;
+        }
+
+        rowObj.SetActive(false);
+        return (label, value);
+    }
+
+    private Image CreateDivider(Transform parent, string name)
+    {
+        GameObject dividerObj = new GameObject(name);
+        dividerObj.transform.SetParent(parent, false);
+
+        RectTransform rt = dividerObj.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(0, 6f);
+
+        Image img = dividerObj.AddComponent<Image>();
+        img.color = new Color(1f, 1f, 1f, 0.8f);
+
+        dividerObj.SetActive(false);
+        return img;
+    }
+
     #endregion
     
     #region Pulse Management
@@ -965,6 +1193,9 @@ public class UIManager : MonoBehaviour
         SetActiveIfNotNull(winScreen, false);
         SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
+
+        // Hide breakdown elements
+        HideBreakdownElements();
 
         // Clean up any active effects
         StopPulse(ref timerPulseCoroutine, timerText?.transform);

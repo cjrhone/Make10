@@ -130,6 +130,7 @@ public class GameManager : MonoBehaviour
     private float multiplierTimer = 0f;
     private bool multiplierActive = false;
     private float timeSinceLastSolve = 0f;
+    private float maxMultiplierReached = 1f;
     
     // Hot Streak state
     private bool hotStreakActive = false;
@@ -143,6 +144,7 @@ public class GameManager : MonoBehaviour
     public bool IsHotStreakActive => hotStreakActive;
     public float HotStreakTimer => hotStreakTimer;
     public float HotStreakDuration => hotStreakDuration;
+    public float MaxMultiplierReached => maxMultiplierReached;
     
     // Events for UI updates
     public event Action<int, int> OnScoreChanged;
@@ -314,15 +316,16 @@ public class GameManager : MonoBehaviour
         timeSinceLastSolve = 0f;
         hotStreakActive = false;
         hotStreakTimer = 0f;
-        
+        maxMultiplierReached = 1f;
+
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
-        
+
         // Refresh UI for new difficulty settings
         if (uiManager != null)
             uiManager.RefreshTargetScore();
-        
+
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         if (gridManager != null)
         {
@@ -362,18 +365,19 @@ public class GameManager : MonoBehaviour
         timeSinceLastSolve = 0f;
         hotStreakActive = false;
         hotStreakTimer = 0f;
-        
+        maxMultiplierReached = 1f;
+
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
         OnMultiplierChanged?.Invoke(false, 1f, 0f);
-        
+
         // Refresh UI for new difficulty settings
         if (uiManager != null)
             uiManager.RefreshTargetScore();
-        
+
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
-        
+
         Debug.Log($"Game activated! Difficulty: {currentDifficulty}, Target: {WinScore}");
     }
     
@@ -436,8 +440,9 @@ public class GameManager : MonoBehaviour
             pointsAwarded = multipliedScore + bonusSeconds;
             
             Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
-            
+
             currentMultiplier += multiplierIncrement;
+            maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
             
             // Check if we've exceeded the max - trigger Hot Streak!
             if (currentMultiplier > maxMultiplier)
@@ -462,7 +467,8 @@ public class GameManager : MonoBehaviour
         multiplierActive = true;
         multiplierTimer = multiplierDuration;
         currentMultiplier = startingMultiplier;
-        
+        maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
+
         OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
     }
     
@@ -517,6 +523,7 @@ public class GameManager : MonoBehaviour
         // Set multiplier to hot streak value
         currentMultiplier = hotStreakMultiplier;
         multiplierTimer = hotStreakDuration; // Sync with hot streak duration
+        maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
         
         // Fire event for UI to show intro
         OnHotStreakStarted?.Invoke();

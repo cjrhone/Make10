@@ -208,26 +208,73 @@ public static class AnimationUtilities
     /// <summary>
     /// Continuous pulse with color shift. Returns the coroutine so caller can stop it.
     /// </summary>
-    public static IEnumerator PulseLoopWithColor(Transform target, Graphic graphic, 
+    public static IEnumerator PulseLoopWithColor(Transform target, Graphic graphic,
         float minScale = 1.0f, float maxScale = 1.3f, float speed = 4f,
         Color? baseColor = null, Color? brightColor = null)
     {
         if (target == null) yield break;
-        
+
         Color base_c = baseColor ?? Color.white;
         Color bright_c = brightColor ?? new Color(1f, 1f, 0.7f);
-        
+
         while (true)
         {
             float t = (Mathf.Sin(Time.time * speed) + 1f) / 2f;
             float scale = Mathf.Lerp(minScale, maxScale, t);
             target.localScale = Vector3.one * scale;
-            
+
             if (graphic != null)
                 graphic.color = Color.Lerp(base_c, bright_c, t);
-            
+
             yield return null;
         }
+    }
+
+    /// <summary>
+    /// Count up animation for numbers in text (Balatro-style score reveal).
+    /// </summary>
+    public static IEnumerator CountUp(TMP_Text text, int startValue, int endValue, float duration, string format = "{0}")
+    {
+        if (text == null) yield break;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            // Ease out for satisfying feel
+            t = 1f - Mathf.Pow(1f - t, 3f);
+            int currentValue = Mathf.RoundToInt(Mathf.Lerp(startValue, endValue, t));
+            text.text = string.Format(format, currentValue);
+            yield return null;
+        }
+        text.text = string.Format(format, endValue);
+    }
+
+    /// <summary>
+    /// Drop in animation - starts above target position, drops down with bounce.
+    /// </summary>
+    public static IEnumerator DropIn(RectTransform target, float dropDistance = 50f, float duration = 0.3f)
+    {
+        if (target == null) yield break;
+
+        Vector2 endPos = target.anchoredPosition;
+        Vector2 startPos = endPos + new Vector2(0, dropDistance);
+
+        target.anchoredPosition = startPos;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / duration;
+            // Elastic ease out for bounce
+            float bounce = Mathf.Sin(t * Mathf.PI * (0.2f + 2.5f * t * t * t)) * Mathf.Pow(1f - t, 2.2f) + t;
+            bounce = (Mathf.Sin(t * Mathf.PI * 0.5f) + t * 0.5f) / 1.5f; // Simpler smooth drop
+            target.anchoredPosition = Vector2.Lerp(startPos, endPos, bounce);
+            yield return null;
+        }
+        target.anchoredPosition = endPos;
     }
 }
 

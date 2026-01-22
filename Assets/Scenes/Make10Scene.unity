@@ -899,7 +899,7 @@ RectTransform:
   - {fileID: 1473722104}
   - {fileID: 288503517}
   - {fileID: 821568621}
-  m_Father: {fileID: 1694822198}
+  m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -919,7 +919,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.5377358, b: 0.46805036, a: 1}
+  m_Color: {r: 0, g: 0.5377358, b: 0.46708432, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -961,7 +961,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &145499434
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1691,6 +1691,13 @@ MonoBehaviour:
   loseScreen: {fileID: 695977311}
   winScoreText: {fileID: 821568619}
   loseScoreText: {fileID: 1916227850}
+  scoreRowText: {fileID: 0}
+  timeBonusRowText: {fileID: 0}
+  hotStreakRowText: {fileID: 0}
+  breakdownDivider: {fileID: 0}
+  totalRowText: {fileID: 0}
+  breakdownLineDelay: 0.3
+  countUpDuration: 0.5
   unsolvablePopup: {fileID: 731897464}
   unsolvablePopupDuration: 1
   gameManager: {fileID: 1333256939}
@@ -6746,6 +6753,7 @@ RectTransform:
   - {fileID: 1694822198}
   - {fileID: 1862183837}
   - {fileID: 801159656}
+  - {fileID: 118860726}
   - {fileID: 158306165}
   - {fileID: 747134862}
   - {fileID: 1546068075}
@@ -15225,7 +15233,6 @@ RectTransform:
   m_Children:
   - {fileID: 1087180759}
   - {fileID: 2097410333}
-  - {fileID: 118860726}
   - {fileID: 695977312}
   - {fileID: 731897465}
   - {fileID: 178623200}

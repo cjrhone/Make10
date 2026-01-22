@@ -8,6 +8,49 @@ Make10 is a number puzzle game where players swap tiles to create rows/columns s
 
 ---
 
+## Brain Points (BP) - Game Currency
+
+**Brain Points (BP)** are the core currency in Make10, used for scoring and purchasing upgrades between runs.
+
+### How BP is Earned
+
+| Source | Formula | Description |
+|--------|---------|-------------|
+| Matches | 10 BP base | Each row/column summing to 10 |
+| Multiplier | Base × multiplier | Streak multiplier increases BP |
+| Time Bonus | 1 BP per second | Remaining time at win |
+
+### BP Economy Flow
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   GAMEPLAY      │────▶│   WIN SCREEN    │────▶│  UPGRADE SHOP   │
+│                 │     │                 │     │   (Future)      │
+│ - Make matches  │     │ - Score: X BP   │     │                 │
+│ - Build streaks │     │ - Time: +Y BP   │     │ - Spend BP on   │
+│ - Beat timer    │     │ - Multi: ×Z     │     │   upgrades      │
+│                 │     │ ─────────────── │     │ - Persist across│
+│                 │     │ TOTAL: N BP     │     │   runs          │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+### Win Screen Breakdown
+
+When player wins, BP is displayed with animated breakdown:
+1. **Score** - Base BP earned from matches (left-aligned label, right-aligned value)
+2. **Time Bonus** - 1 BP × seconds remaining
+3. **Hot Streak** - Max multiplier reached during game
+4. **TOTAL** - (Score + Time Bonus) × Hot Streak Multiplier
+
+### Future: Upgrade Shop (To Be Implemented)
+
+BP will be spent between runs on roguelike upgrades:
+- **Passive abilities** - Extra time, higher base multiplier
+- **Tile modifiers** - Special tiles, wild cards
+- **Scoring bonuses** - Combo multipliers, streak rewards
+
+---
+
 ## Current Architecture
 
 ### Key Files
@@ -318,6 +361,61 @@ Particle spawning pattern from existing code:
 
 ---
 
+## Win Screen Score Breakdown
+
+### Two-Column Layout
+
+The win screen uses a clean two-column layout:
+- **Left column**: Labels (left-aligned)
+- **Right column**: Values (right-aligned)
+
+```
+┌─────────────────────────────────────┐
+│         YOU ARE A GENIUS!           │
+│                                     │
+│   Score                    128 BP   │  ← Row 1: count-up animation
+│   Time Bonus             + 31 BP    │  ← Row 2: count-up animation
+│   Hot Streak               x2.5     │  ← Row 3: instant
+│   ──────────────────────────────    │  ← Divider (6px thick)
+│   TOTAL                    398 BP   │  ← Row 4: count-up animation
+│                                     │
+│      [Restart]    [Main Menu]       │
+└─────────────────────────────────────┘
+```
+
+### UI Structure (Auto-Generated)
+
+```
+WinScreen/
+└── BreakdownContainer (VerticalLayoutGroup)
+    ├── ScoreRow (HorizontalLayoutGroup)
+    │   ├── Label (TMP_Text, left-aligned)
+    │   └── Value (TMP_Text, right-aligned)
+    ├── TimeBonusRow
+    ├── HotStreakRow
+    ├── Divider (Image, 6px height)
+    └── TotalRow
+```
+
+### Tweakable Settings (UIManager Inspector)
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `breakdownLineDelay` | 0.3s | Delay between each line appearing |
+| `countUpDuration` | 0.5s | How long the number count-up animation takes |
+| `timeBonusPerSecond` | 1 | BP awarded per second of remaining time |
+
+### Customizing in Code (UIManager.cs)
+
+| Location | What to Change |
+|----------|----------------|
+| `CreateBreakdownRow()` | Font size, colors, row height |
+| `CreateDivider()` | Divider thickness (default 6px), color |
+| `EnsureBreakdownElementsExist()` | Container position, spacing, padding |
+| `ShowWinScreenBreakdown()` | Text format strings (e.g., "{0} BP") |
+
+---
+
 ## Recent Changes
 
 ### 2026-01-21
@@ -331,3 +429,12 @@ Particle spawning pattern from existing code:
   - Made multiplier display always visible
   - Fixed tile number centering (TextMeshPro alignment + auto-sizing)
   - Character panel with responsive avatar sizing
+- **Win Screen Score Breakdown (Balatro-style):**
+  - Sequential reveal of Score, Time Bonus, Hot Streak multiplier, and Total
+  - Two-column layout: labels left-aligned, values right-aligned
+  - Count-up animations for BP values
+  - Thicker divider line (6px) between breakdown and total
+  - **Brain Points (BP)** introduced as game currency
+  - Time bonus: 1 BP per second remaining
+  - Tracks max multiplier reached (`GameManager.MaxMultiplierReached`)
+  - Auto-generates UI elements at runtime if not assigned in Inspector
