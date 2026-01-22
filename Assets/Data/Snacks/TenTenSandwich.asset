@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c9a136937aa945eb80dc8605c95eea6, type: 3}
+  m_Name: TenTenSandwich
+  m_EditorClassIdentifier: Assembly-CSharp::SnackData
+  id: sandwich
+  displayName: 10/10 Sandwich
+  description: Every 10th Make10 grants +100 BP
+  icon: {fileID: 0}
+  cost: 150
+  snackType: 1
+  isUnique: 1
+  minStageRequired: 1
+  effectValue: 100
+  secondaryValue: 0
+  effectChance: 1
+  maxTriggersPerRound: -1
+  oncePerRound: 0

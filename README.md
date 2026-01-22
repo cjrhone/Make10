@@ -2,7 +2,7 @@
 
 A fast-paced tile-matching puzzle game where you swap numbered tiles to create rows and columns that sum to exactly **10**.
 
-**Created by:** CJ Rhone / [Wizard Bodega](https://wizardbodega.com)
+**Created by:** CJ Rhone / [Wizard Bodega](https://wizardbodega.gg)
 
 **Made for:** Brainless Game Jam 2026
 

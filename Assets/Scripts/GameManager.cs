@@ -1,14 +1,16 @@
 using UnityEngine;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Manages game state: scoring, motivation meter, win/lose conditions, difficulty settings.
+/// Integrates with PlayerInventory for upgrade/snack bonuses.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
-    
+
     #region Game Settings
 
     [System.Serializable]
@@ -39,14 +41,14 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameSettings gameSettings = new GameSettings();
 
     #endregion
-    
+
     public int WinScore => gameSettings.winScore;
     [SerializeField] private float gameDuration = 60f;
     [SerializeField] private float postWinDelay = 0.5f;
-    
+
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
-    
+
     [Header("Multiplier Settings")]
     [SerializeField] private float multiplierDuration = 10f;
     [SerializeField] private float multiplierDrainRate = 1f;
@@ -54,14 +56,18 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float startingMultiplier = 1.25f;
     [SerializeField] private float maxMultiplier = 3f;
     [SerializeField] private float streakTimeout = 10f;
-    
+
     [Header("Hot Streak Mode")]
     [SerializeField] private float hotStreakDuration = 10f;
     [SerializeField] private float hotStreakMultiplier = 5f;
-    
+
+    [Header("Debug Mode")]
+    [SerializeField] private bool debugMode = false;
+    [SerializeField] private int debugStartingBP = 500;
+
     [Header("References")]
     [SerializeField] private UIManager uiManager;
-    
+
     // Current state
     public int Score { get; private set; }
     public float TimeRemaining { get; private set; }
@@ -69,7 +75,7 @@ public class GameManager : MonoBehaviour
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
     public bool IsSolveAnimationPlaying { get; set; }
-    
+
     // Multiplier state
     private int solveCount = 0;
     private float currentMultiplier = 1f;
@@ -77,11 +83,22 @@ public class GameManager : MonoBehaviour
     private bool multiplierActive = false;
     private float timeSinceLastSolve = 0f;
     private float maxMultiplierReached = 1f;
-    
+
     // Hot Streak state
     private bool hotStreakActive = false;
     private float hotStreakTimer = 0f;
-    
+
+    // Tracking for snack triggers
+    private int matchCountThisRound = 0;
+    private bool stopwatchUsedThisRound = false;
+
+    // Cached effective values (from upgrades)
+    private float effectiveMaxMultiplier;
+    private float effectiveHotStreakThreshold;
+    private float effectiveHotStreakMultiplier;
+    private float effectiveHotStreakDuration;
+    private float effectiveMultiplierIncrement;
+
     // Public accessors for UI
     public bool IsMultiplierActive => multiplierActive;
     public float CurrentMultiplier => currentMultiplier;
@@ -91,7 +108,7 @@ public class GameManager : MonoBehaviour
     public float HotStreakTimer => hotStreakTimer;
     public float HotStreakDuration => hotStreakDuration;
     public float MaxMultiplierReached => maxMultiplierReached;
-    
+
     // Events for UI updates
     public event Action<int, int> OnScoreChanged;
     public event Action<float> OnTimeChanged;
@@ -101,6 +118,8 @@ public class GameManager : MonoBehaviour
     public event Action OnHotStreakStarted;
     public event Action<float> OnHotStreakTimerChanged; // passes remaining time
     public event Action OnHotStreakEnded;
+    public event Action<int> OnEnhancedNumberBonus; // bonus BP from enhanced numbers
+    public event Action<float> OnTimeBonus; // time added from snacks/upgrades
     
     private void Awake()
     {
@@ -176,6 +195,44 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public int GetCurrentGridSize() => gameSettings.gridSize;
 
+    /// <summary>
+    /// Cache effective values from PlayerInventory for performance.
+    /// Called at game start to avoid repeated lookups during gameplay.
+    /// </summary>
+    private void CacheEffectiveValues()
+    {
+        if (PlayerInventory.Instance == null)
+        {
+            // Default values when no inventory
+            effectiveMaxMultiplier = maxMultiplier;
+            effectiveHotStreakThreshold = maxMultiplier;
+            effectiveHotStreakMultiplier = hotStreakMultiplier;
+            effectiveHotStreakDuration = hotStreakDuration;
+            effectiveMultiplierIncrement = multiplierIncrement;
+            return;
+        }
+
+        // Night Owl caps multiplier
+        float multiplierCap = PlayerInventory.Instance.GetMultiplierCap();
+        effectiveMaxMultiplier = multiplierCap > 0 ? multiplierCap : maxMultiplier;
+
+        // Cramming lowers hot streak trigger threshold
+        float hotStreakThreshold = PlayerInventory.Instance.GetHotStreakThreshold();
+        effectiveHotStreakThreshold = hotStreakThreshold > 0 ? hotStreakThreshold : maxMultiplier;
+
+        // Red Bull increases hot streak multiplier
+        effectiveHotStreakMultiplier = hotStreakMultiplier + PlayerInventory.Instance.GetHotStreakMultiplierBonus();
+
+        // Study Glasses extends hot streak duration
+        effectiveHotStreakDuration = hotStreakDuration + PlayerInventory.Instance.GetHotStreakDurationBonus();
+
+        // Momentum increases multiplier increment
+        effectiveMultiplierIncrement = multiplierIncrement + PlayerInventory.Instance.GetMultiplierIncrementBonus();
+
+        Debug.Log($"[GameManager] Cached values - MaxMult: {effectiveMaxMultiplier:F2}, HotStreak@{effectiveHotStreakThreshold:F2}x, " +
+                  $"HSMult: {effectiveHotStreakMultiplier:F0}x, HSDur: {effectiveHotStreakDuration}s, MultInc: +{effectiveMultiplierIncrement:F2}");
+    }
+
     #endregion
     
     #region Game Flow
@@ -190,8 +247,10 @@ public class GameManager : MonoBehaviour
         IsGameActive = true;
         IsProcessing = false;
         IsSolveAnimationPlaying = false;
-        
+
         solveCount = 0;
+        matchCountThisRound = 0;
+        stopwatchUsedThisRound = false;
         currentMultiplier = 1f;
         multiplierTimer = 0f;
         multiplierActive = false;
@@ -199,6 +258,9 @@ public class GameManager : MonoBehaviour
         hotStreakActive = false;
         hotStreakTimer = 0f;
         maxMultiplierReached = 1f;
+
+        // Cache effective values from upgrades
+        CacheEffectiveValues();
 
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
@@ -213,10 +275,13 @@ public class GameManager : MonoBehaviour
         {
             gridManager.ResetGame();
         }
-        
+
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
-        
+
+        // Reset round tracking for snacks
+        PlayerInventory.Instance?.ResetRoundTracking();
+
         Debug.Log($"Game started! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}, Target: {WinScore} BP");
     }
     
@@ -235,23 +300,47 @@ public class GameManager : MonoBehaviour
     public void ActivateGame()
     {
         Score = 0;
-        TimeRemaining = gameDuration;
+
+        // Apply time bonuses from inventory
+        float bonusTime = PlayerInventory.Instance?.GetBonusStartingTime() ?? 0f;
+        TimeRemaining = gameDuration + bonusTime;
+
         IsGameActive = true;
         IsProcessing = false;
         IsSolveAnimationPlaying = false;
-        
+
         solveCount = 0;
-        currentMultiplier = 1f;
+        matchCountThisRound = 0;
+        stopwatchUsedThisRound = false;
+
+        // Cache effective values from upgrades for performance
+        CacheEffectiveValues();
+
+        // Apply starting multiplier bonuses from inventory
+        float multiplierBonus = PlayerInventory.Instance?.GetStartingMultiplierBonus() ?? 0f;
+        currentMultiplier = 1f + multiplierBonus;
+
         multiplierTimer = 0f;
-        multiplierActive = false;
+        multiplierActive = multiplierBonus > 0f; // Start with multiplier active if we have bonuses
         timeSinceLastSolve = 0f;
-        hotStreakActive = false;
-        hotStreakTimer = 0f;
-        maxMultiplierReached = 1f;
+
+        // Check for Energy Drink snack (start in Hot Streak)
+        bool startInHotStreak = PlayerInventory.Instance?.HasSnack(SnackType.EnergyDrink) == true;
+        if (startInHotStreak)
+        {
+            StartCoroutine(TriggerHotStreak());
+        }
+        else
+        {
+            hotStreakActive = false;
+            hotStreakTimer = 0f;
+        }
+
+        maxMultiplierReached = currentMultiplier;
 
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
-        OnMultiplierChanged?.Invoke(false, 1f, 0f);
+        OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
 
         // Refresh UI for new difficulty settings
         if (uiManager != null)
@@ -260,7 +349,10 @@ public class GameManager : MonoBehaviour
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
 
-        Debug.Log($"Game activated! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}, Target: {WinScore} BP");
+        // Reset round tracking for snacks
+        PlayerInventory.Instance?.ResetRoundTracking();
+
+        Debug.Log($"Game activated! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}, Target: {WinScore} BP, Bonus Time: +{bonusTime}s, Start Mult: x{currentMultiplier:F2}");
     }
     
     public void OnCascadeStart()
@@ -273,75 +365,187 @@ public class GameManager : MonoBehaviour
         IsProcessing = false;
     }
     
+    /// <summary>
+    /// Called when a match is cleared. Original signature for backward compatibility.
+    /// </summary>
     public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched)
     {
+        // Call the extended version with no tile values (no enhanced number bonuses)
+        OnMatchCleared(tilesCleared, rowsMatched, columnsMatched, null);
+    }
+
+    /// <summary>
+    /// Called when a match is cleared, with tile values for enhanced number bonuses.
+    /// </summary>
+    public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched, List<int> tileValues)
+    {
         if (!IsGameActive) return;
-        
+
         int linesCleared = rowsMatched + columnsMatched;
-        
+
         for (int i = 0; i < linesCleared; i++)
         {
-            ProcessSingleSolve();
+            ProcessSingleSolve(tileValues);
         }
     }
-    
+
     #endregion
-    
+
     #region Scoring
-    
-    private void ProcessSingleSolve()
+
+    /// <summary>
+    /// Process a single solve (Make10), applying all upgrade and snack bonuses.
+    /// </summary>
+    private void ProcessSingleSolve(List<int> tileValues = null)
     {
         // During Hot Streak, use special scoring
         if (hotStreakActive)
         {
-            ProcessHotStreakSolve();
+            ProcessHotStreakSolve(tileValues);
             return;
         }
-        
+
         solveCount++;
+        matchCountThisRound++;
         timeSinceLastSolve = 0f;
-        
+
+        // Calculate base score with Brain Food bonus
+        int effectiveBaseScore = baseMatchScore + (PlayerInventory.Instance?.GetBaseScoreBonus() ?? 0);
+
+        // Calculate enhanced number bonus from matched tiles
+        int enhancedBonus = CalculateEnhancedNumberBonus(tileValues);
+
+        // Calculate time bonus from Enhanced 0
+        float zeroTimeBonus = CalculateZeroTimeBonus(tileValues);
+        if (zeroTimeBonus > 0)
+        {
+            TimeRemaining += zeroTimeBonus;
+            OnTimeBonus?.Invoke(zeroTimeBonus);
+            OnTimeChanged?.Invoke(TimeRemaining);
+            Debug.Log($"<color=yellow>Enhanced 0:</color> +{zeroTimeBonus}s from zeros in match");
+        }
+
         int pointsAwarded = 0;
         int bonusSeconds = 0;
-        
+
         if (solveCount == 1)
         {
-            pointsAwarded = baseMatchScore;
-            Debug.Log($"<color=green>Solve #1:</color> +{pointsAwarded} pts (base)");
+            pointsAwarded = effectiveBaseScore + enhancedBonus;
+            Debug.Log($"<color=green>Solve #1:</color> +{pointsAwarded} pts (base: {effectiveBaseScore}, enhanced: +{enhancedBonus})");
         }
         else if (solveCount == 2)
         {
-            pointsAwarded = baseMatchScore;
+            pointsAwarded = effectiveBaseScore + enhancedBonus;
             ActivateMultiplierBar();
             Debug.Log($"<color=green>Solve #2:</color> +{pointsAwarded} pts | <color=yellow>MULTIPLIER ACTIVATED (x{currentMultiplier:F2} ready)</color>");
         }
         else
         {
             bonusSeconds = Mathf.FloorToInt(multiplierTimer);
-            int multipliedScore = Mathf.RoundToInt(baseMatchScore * currentMultiplier);
-            pointsAwarded = multipliedScore + bonusSeconds;
-            
-            Debug.Log($"<color=green>Solve #{solveCount}:</color> ({baseMatchScore} × {currentMultiplier:F2}) + {bonusSeconds} bonus = <color=cyan>+{pointsAwarded} pts</color>");
+            int multipliedScore = Mathf.RoundToInt(effectiveBaseScore * currentMultiplier);
+            pointsAwarded = multipliedScore + bonusSeconds + enhancedBonus;
 
-            currentMultiplier += multiplierIncrement;
+            Debug.Log($"<color=green>Solve #{solveCount}:</color> ({effectiveBaseScore} × {currentMultiplier:F2}) + {bonusSeconds} time + {enhancedBonus} enhanced = <color=cyan>+{pointsAwarded} pts</color>");
+
+            currentMultiplier += effectiveMultiplierIncrement;
             maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
-            
-            // Check if we've exceeded the max - trigger Hot Streak!
-            if (currentMultiplier > maxMultiplier)
+
+            // Check if we've hit the hot streak threshold
+            if (currentMultiplier > effectiveHotStreakThreshold)
             {
                 StartCoroutine(TriggerHotStreak());
                 return; // Don't process normal scoring, hot streak handles it
             }
-            
+
+            // Cap at max multiplier
+            currentMultiplier = Mathf.Min(currentMultiplier, effectiveMaxMultiplier);
+
             multiplierTimer = multiplierDuration;
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         }
-        
-        Score += pointsAwarded;
-        OnScoreChanged?.Invoke(Score, pointsAwarded);
+
+        // Apply overall BP multiplier (Textbook, Overachiever)
+        float bpMultiplier = PlayerInventory.Instance?.GetOverallBPMultiplier() ?? 1f;
+        int finalPoints = Mathf.RoundToInt(pointsAwarded * bpMultiplier);
+
+        if (bpMultiplier > 1f)
+        {
+            Debug.Log($"<color=magenta>BP Multiplier:</color> {pointsAwarded} × {bpMultiplier:F2} = {finalPoints}");
+        }
+
+        // Check for Calculator snack (5% chance for double points)
+        if (PlayerInventory.Instance?.HasSnack(SnackType.Calculator) == true)
+        {
+            SnackData calculator = PlayerInventory.Instance.GetSnack(SnackType.Calculator);
+            if (calculator != null && UnityEngine.Random.value < calculator.effectChance)
+            {
+                Debug.Log($"<color=cyan>🎲 CALCULATOR TRIGGERED!</color> Double points: {finalPoints} → {finalPoints * 2}");
+                finalPoints *= 2;
+            }
+        }
+
+        // Check for 10/10 Sandwich (bonus every 10th Make10)
+        if (matchCountThisRound % 10 == 0 && PlayerInventory.Instance?.HasSnack(SnackType.TenTenSandwich) == true)
+        {
+            SnackData sandwich = PlayerInventory.Instance.GetSnack(SnackType.TenTenSandwich);
+            int sandwichBonus = Mathf.RoundToInt(sandwich?.effectValue ?? 100);
+            finalPoints += sandwichBonus;
+            Debug.Log($"<color=yellow>🥪 10/10 SANDWICH!</color> Match #{matchCountThisRound} bonus: +{sandwichBonus} BP");
+        }
+
+        // Notify if enhanced bonus was applied
+        if (enhancedBonus > 0)
+        {
+            OnEnhancedNumberBonus?.Invoke(enhancedBonus);
+        }
+
+        Score += finalPoints;
+        OnScoreChanged?.Invoke(Score, finalPoints);
 
         // Check for win condition
         CheckWinCondition();
+    }
+
+    /// <summary>
+    /// Calculate bonus BP from enhanced numbers in the matched tiles.
+    /// </summary>
+    private int CalculateEnhancedNumberBonus(List<int> tileValues)
+    {
+        if (tileValues == null || tileValues.Count == 0 || PlayerInventory.Instance == null)
+            return 0;
+
+        int totalBonus = 0;
+        foreach (int value in tileValues)
+        {
+            int bonus = PlayerInventory.Instance.GetEnhancedNumberBonus(value);
+            if (bonus > 0)
+            {
+                totalBonus += bonus;
+            }
+        }
+        return totalBonus;
+    }
+
+    /// <summary>
+    /// Calculate time bonus from Enhanced 0 (zeros in match give time).
+    /// </summary>
+    private float CalculateZeroTimeBonus(List<int> tileValues)
+    {
+        if (tileValues == null || PlayerInventory.Instance == null)
+            return 0f;
+
+        int zeroCount = 0;
+        foreach (int value in tileValues)
+        {
+            if (value == 0) zeroCount++;
+        }
+
+        if (zeroCount > 0)
+        {
+            float bonusPerZero = PlayerInventory.Instance.GetEnhancedZeroTimeBonus();
+            return zeroCount * bonusPerZero;
+        }
+        return 0f;
     }
     
     private void ActivateMultiplierBar()
@@ -356,10 +560,14 @@ public class GameManager : MonoBehaviour
     
     private void DrainMultiplierTimer(float deltaTime)
     {
-        multiplierTimer -= multiplierDrainRate * deltaTime;
-        
+        // Apply drain rate reduction from upgrades (Sustain, Metronome)
+        float drainReduction = PlayerInventory.Instance?.GetDrainRateReduction() ?? 0f;
+        float effectiveDrainRate = multiplierDrainRate * (1f - drainReduction);
+
+        multiplierTimer -= effectiveDrainRate * deltaTime;
+
         OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
-        
+
         if (multiplierTimer <= 0f)
         {
             DeactivateMultiplierBar();
@@ -396,59 +604,106 @@ public class GameManager : MonoBehaviour
     
     private IEnumerator TriggerHotStreak()
     {
-        Debug.Log("<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color>");
-        
-        // Set hot streak state
+        Debug.Log($"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{effectiveHotStreakMultiplier} for {effectiveHotStreakDuration}s)");
+
+        // Set hot streak state using cached effective values
         hotStreakActive = true;
-        hotStreakTimer = hotStreakDuration;
-        
-        // Set multiplier to hot streak value
-        currentMultiplier = hotStreakMultiplier;
-        multiplierTimer = hotStreakDuration; // Sync with hot streak duration
+        hotStreakTimer = effectiveHotStreakDuration;
+
+        // Set multiplier to hot streak value (with Red Bull bonus)
+        currentMultiplier = effectiveHotStreakMultiplier;
+        multiplierTimer = effectiveHotStreakDuration; // Sync with hot streak duration
         maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
-        
+
         // Fire event for UI to show intro
         OnHotStreakStarted?.Invoke();
-        
+
         // Trigger avatar hot streak mode
         AvatarManager.Instance?.OnHotStreakStart();
-        
+
         // Also update multiplier display
         OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
-        
+
         yield return null; // Hot streak intro handled by UIManager
     }
-    
+
     private void EndHotStreak()
     {
         Debug.Log("<color=gray>Hot Streak ended!</color>");
-        
+
         hotStreakActive = false;
         hotStreakTimer = 0f;
-        
+
         // Reset multiplier completely
         DeactivateMultiplierBar();
-        
+
         // Fire event for UI cleanup
         OnHotStreakEnded?.Invoke();
-        
+
         // Return avatar to default struggling state
         AvatarManager.Instance?.OnHotStreakEnd();
     }
-    
+
     /// <summary>
     /// Process scoring during Hot Streak (called from ProcessSingleSolve when hot streak is active).
     /// </summary>
-    private void ProcessHotStreakSolve()
+    private void ProcessHotStreakSolve(List<int> tileValues = null)
     {
-        int multipliedScore = Mathf.RoundToInt(baseMatchScore * hotStreakMultiplier);
-        
-        Debug.Log($"<color=orange>🔥 HOT STREAK SOLVE:</color> {baseMatchScore} × {hotStreakMultiplier:F0} = <color=cyan>+{multipliedScore} pts</color>");
-        
-        Score += multipliedScore;
-        OnScoreChanged?.Invoke(Score, multipliedScore);
+        matchCountThisRound++;
 
-        // Multiplier stays fixed at x5 during hot streak
+        // Calculate base score with Brain Food bonus
+        int effectiveBaseScore = baseMatchScore + (PlayerInventory.Instance?.GetBaseScoreBonus() ?? 0);
+
+        // Calculate enhanced number bonus
+        int enhancedBonus = CalculateEnhancedNumberBonus(tileValues);
+
+        // Calculate time bonus from Enhanced 0
+        float zeroTimeBonus = CalculateZeroTimeBonus(tileValues);
+        if (zeroTimeBonus > 0)
+        {
+            TimeRemaining += zeroTimeBonus;
+            OnTimeBonus?.Invoke(zeroTimeBonus);
+            OnTimeChanged?.Invoke(TimeRemaining);
+        }
+
+        int multipliedScore = Mathf.RoundToInt(effectiveBaseScore * effectiveHotStreakMultiplier);
+        int pointsAwarded = multipliedScore + enhancedBonus;
+
+        // Apply overall BP multiplier
+        float bpMultiplier = PlayerInventory.Instance?.GetOverallBPMultiplier() ?? 1f;
+        int finalPoints = Mathf.RoundToInt(pointsAwarded * bpMultiplier);
+
+        // Check for Calculator snack
+        if (PlayerInventory.Instance?.HasSnack(SnackType.Calculator) == true)
+        {
+            SnackData calculator = PlayerInventory.Instance.GetSnack(SnackType.Calculator);
+            if (calculator != null && UnityEngine.Random.value < calculator.effectChance)
+            {
+                Debug.Log($"<color=cyan>🎲 CALCULATOR TRIGGERED!</color> Double points!");
+                finalPoints *= 2;
+            }
+        }
+
+        // Check for 10/10 Sandwich
+        if (matchCountThisRound % 10 == 0 && PlayerInventory.Instance?.HasSnack(SnackType.TenTenSandwich) == true)
+        {
+            SnackData sandwich = PlayerInventory.Instance.GetSnack(SnackType.TenTenSandwich);
+            int sandwichBonus = Mathf.RoundToInt(sandwich?.effectValue ?? 100);
+            finalPoints += sandwichBonus;
+            Debug.Log($"<color=yellow>🥪 10/10 SANDWICH!</color> Match #{matchCountThisRound} bonus: +{sandwichBonus} BP");
+        }
+
+        Debug.Log($"<color=orange>🔥 HOT STREAK SOLVE:</color> ({effectiveBaseScore} × {effectiveHotStreakMultiplier:F0}) + {enhancedBonus} enhanced = <color=cyan>+{finalPoints} pts</color>");
+
+        if (enhancedBonus > 0)
+        {
+            OnEnhancedNumberBonus?.Invoke(enhancedBonus);
+        }
+
+        Score += finalPoints;
+        OnScoreChanged?.Invoke(Score, finalPoints);
+
+        // Multiplier stays fixed during hot streak
         OnMultiplierChanged?.Invoke(true, currentMultiplier, hotStreakTimer);
 
         // Check for win condition
@@ -474,8 +729,26 @@ public class GameManager : MonoBehaviour
     
     private void TimeUp()
     {
+        // Check for Stopwatch snack (emergency time when timer hits 0)
+        if (!stopwatchUsedThisRound && PlayerInventory.Instance != null)
+        {
+            if (PlayerInventory.Instance.TryTriggerSnack(SnackType.Stopwatch))
+            {
+                SnackData stopwatch = PlayerInventory.Instance.GetSnack(SnackType.Stopwatch);
+                float bonusTime = stopwatch?.effectValue ?? 10f;
+
+                TimeRemaining = bonusTime;
+                stopwatchUsedThisRound = true;
+
+                Debug.Log($"<color=yellow>⏱️ STOPWATCH TRIGGERED!</color> +{bonusTime} seconds!");
+                OnTimeBonus?.Invoke(bonusTime);
+                OnTimeChanged?.Invoke(TimeRemaining);
+                return; // Don't end game
+            }
+        }
+
         IsGameActive = false;
-        
+
         if (Score >= WinScore)
         {
             Debug.Log("<color=cyan>*** TIME'S UP - YOU WIN! ***</color>");

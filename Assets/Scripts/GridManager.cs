@@ -618,15 +618,24 @@ public class GridManager : MonoBehaviour
             Debug.Log($"<color=yellow>MATCH {cascadeCount}!</color> " +
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
                     $"{result.TotalMatchedTiles} tiles");
-            
+
+            // Collect tile values before clearing for enhanced number bonuses
+            System.Collections.Generic.List<int> tileValues = new System.Collections.Generic.List<int>();
+            foreach (Tile tile in result.allMatchedTiles)
+            {
+                if (tile != null)
+                    tileValues.Add(tile.Value);
+            }
+
             yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));
-            
+
             ClearMatchedTiles(result.allMatchedTiles);
-            
+
             GameManager.Instance?.OnMatchCleared(
                 result.TotalMatchedTiles,
                 result.matchedRows.Count,
-                result.matchedColumns.Count
+                result.matchedColumns.Count,
+                tileValues
             );
             
             yield return new WaitForSeconds(postClearDelay);

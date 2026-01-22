@@ -3,7 +3,7 @@ using System;
 
 /// <summary>
 /// Manages persistent state across rounds within a single run.
-/// Tracks BP (Brain Points) currency and round progression.
+/// Tracks BP (Brain Points) currency, round progression, and Gold Stars.
 /// </summary>
 public class RunManager : MonoBehaviour
 {
@@ -12,16 +12,24 @@ public class RunManager : MonoBehaviour
     [Header("Run State")]
     [SerializeField] private int startingBP = 0;
 
+    [Header("Permanent Currency (Saved)")]
+    [SerializeField] private int goldStars = 0;
+    private const string GOLD_STARS_KEY = "Make10_GoldStars";
+
     // Current run state
     public int CurrentBP { get; private set; }
     public int RoundNumber { get; private set; }
     public bool IsRunActive { get; private set; }
+
+    // Permanent currency
+    public int GoldStars => goldStars;
 
     // Events for UI updates
     public event Action<int> OnBPChanged;
     public event Action<int> OnRoundChanged;
     public event Action OnRunStarted;
     public event Action OnRunEnded;
+    public event Action<int> OnGoldStarsChanged;
 
     private void Awake()
     {
@@ -31,6 +39,27 @@ public class RunManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Load permanent currency
+        LoadGoldStars();
+    }
+
+    /// <summary>
+    /// Load Gold Stars from PlayerPrefs.
+    /// </summary>
+    private void LoadGoldStars()
+    {
+        goldStars = PlayerPrefs.GetInt(GOLD_STARS_KEY, 0);
+        Debug.Log($"<color=yellow>[RunManager] Loaded {goldStars} Gold Stars</color>");
+    }
+
+    /// <summary>
+    /// Save Gold Stars to PlayerPrefs.
+    /// </summary>
+    private void SaveGoldStars()
+    {
+        PlayerPrefs.SetInt(GOLD_STARS_KEY, goldStars);
+        PlayerPrefs.Save();
     }
 
     /// <summary>
@@ -116,4 +145,73 @@ public class RunManager : MonoBehaviour
     {
         return CurrentBP >= cost;
     }
+
+    #region Gold Stars
+
+    /// <summary>
+    /// Add Gold Stars (permanent currency from boss defeats).
+    /// </summary>
+    public void AddGoldStars(int amount)
+    {
+        if (amount <= 0) return;
+
+        int previousStars = goldStars;
+        goldStars += amount;
+        SaveGoldStars();
+
+        Debug.Log($"<color=yellow>[RunManager] +{amount} Gold Stars ({previousStars} → {goldStars})</color>");
+
+        OnGoldStarsChanged?.Invoke(goldStars);
+    }
+
+    /// <summary>
+    /// Spend Gold Stars on cosmetics.
+    /// </summary>
+    public bool SpendGoldStars(int amount)
+    {
+        if (amount <= 0) return false;
+        if (goldStars < amount)
+        {
+            Debug.Log($"<color=yellow>[RunManager] Cannot spend {amount} Gold Stars - only have {goldStars}</color>");
+            return false;
+        }
+
+        int previousStars = goldStars;
+        goldStars -= amount;
+        SaveGoldStars();
+
+        Debug.Log($"<color=yellow>[RunManager] -{amount} Gold Stars ({previousStars} → {goldStars})</color>");
+
+        OnGoldStarsChanged?.Invoke(goldStars);
+        return true;
+    }
+
+    /// <summary>
+    /// Check if player can afford Gold Stars cost.
+    /// </summary>
+    public bool CanAffordGoldStars(int cost)
+    {
+        return goldStars >= cost;
+    }
+
+    /// <summary>
+    /// Debug: Add Gold Stars for testing.
+    /// </summary>
+    public void DebugAddGoldStars(int amount)
+    {
+        AddGoldStars(amount);
+    }
+
+    /// <summary>
+    /// Debug: Reset Gold Stars to 0.
+    /// </summary>
+    public void DebugResetGoldStars()
+    {
+        goldStars = 0;
+        SaveGoldStars();
+        OnGoldStarsChanged?.Invoke(goldStars);
+        Debug.Log("<color=yellow>[RunManager] DEBUG: Gold Stars reset to 0</color>");
+    }
+
+    #endregion
 }

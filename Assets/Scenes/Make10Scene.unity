@@ -945,6 +945,84 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 118860725}
   m_CullTransparentMesh: 1
+--- !u!1 &123786408
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 123786409}
+  - component: {fileID: 123786410}
+  m_Layer: 0
+  m_Name: DebugUpgradePanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &123786409
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 123786408}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1720076972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &123786410
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 123786408}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f665f450cf604ffa9c9183e83e6971e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DebugUpgradePanel
+  panelRoot: {fileID: 0}
+  contentParent: {fileID: 0}
+  closeButton: {fileID: 0}
+  availableUpgrades:
+  - {fileID: 11400000, guid: 3b826d91e2b87406381bdfeb0e12804f, type: 2}
+  - {fileID: 11400000, guid: dac18f49ab3d442459cd2b058dbde06e, type: 2}
+  - {fileID: 11400000, guid: a2e4a74b46f1b45e39c6eaa4299f4f4e, type: 2}
+  - {fileID: 11400000, guid: 8dc4c16f2296248f5aafc19fe2491c36, type: 2}
+  - {fileID: 11400000, guid: 5b3127cbf2af8416680aae370801abea, type: 2}
+  - {fileID: 11400000, guid: 1f5de8dd125f54e6f918c7435da31980, type: 2}
+  - {fileID: 11400000, guid: 3774b50533de54b85a6db55497547962, type: 2}
+  - {fileID: 11400000, guid: e00d507638a114c5791b2e7c03ec6a58, type: 2}
+  - {fileID: 11400000, guid: b2c695ae796234c6792440e8241d8fa8, type: 2}
+  - {fileID: 11400000, guid: 8f21353c49e2d4d4f9f388b57398a01b, type: 2}
+  - {fileID: 11400000, guid: 37872c69960944fc4a3a053290fa8aa9, type: 2}
+  - {fileID: 11400000, guid: 0382963a0d7cb44d78e81d6e2058a70e, type: 2}
+  availableSnacks:
+  - {fileID: 11400000, guid: a32cd2eb94f614b189026607be542133, type: 2}
+  - {fileID: 11400000, guid: 94b24cfc2b1a64327988cd6d6ed0ea1f, type: 2}
+  - {fileID: 11400000, guid: 0765ceb88bf76485f959bdba5a86e8ff, type: 2}
+  - {fileID: 11400000, guid: 508e22e74e9644068a1e040c6bd50f0e, type: 2}
+  - {fileID: 11400000, guid: 0b32484d146254bd58424989c863032a, type: 2}
+  - {fileID: 11400000, guid: 9450ac5760f614886828ec748feba3d9, type: 2}
+  - {fileID: 11400000, guid: 0183e8cc1f693434398c346f39476048, type: 2}
+  - {fileID: 11400000, guid: ff47a4ba656434d43a05764e327afcfc, type: 2}
+  - {fileID: 11400000, guid: 3abac44246c634dcc9d9395fd80c8bf8, type: 2}
+  - {fileID: 11400000, guid: 880636c8e0faa4343bf600e11085a24b, type: 2}
+  - {fileID: 11400000, guid: 71e21f15597f64a77ba7d927bc3fcb46, type: 2}
+  availableArtifacts:
+  - {fileID: 11400000, guid: 2bc918918ade1423cba4b932af19ac6c, type: 2}
+  - {fileID: 11400000, guid: 9435b3901f73244e6ab65b331fa74045, type: 2}
+  - {fileID: 11400000, guid: f5b1fe49086954d38be5f95d40b51bf1, type: 2}
+  - {fileID: 11400000, guid: 3ecf06b352bae4037a51b3fe0ececb71, type: 2}
+  - {fileID: 11400000, guid: 9628be155839a45d4b97ebcdd12e3042, type: 2}
 --- !u!1 &145499433
 GameObject:
   m_ObjectHideFlags: 0
@@ -4954,6 +5032,57 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 495253536}
   m_CullTransparentMesh: 1
+--- !u!1 &502914117
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 502914118}
+  - component: {fileID: 502914119}
+  m_Layer: 0
+  m_Name: CampaignManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &502914118
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 502914117}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1720076972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &502914119
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 502914117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2612b97e0627947e58441fe3731e2a68, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CampaignManager
+  stages: []
+  currentStageIndex: 0
+  currentRoundIndex: 0
+  isInBossFight: 0
+  isInChillZone: 0
+  currentBossHP: 0
+  maxBossHP: 0
 --- !u!1 &511060759
 GameObject:
   m_ObjectHideFlags: 0
@@ -9388,7 +9517,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: -827.50793}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1008238838
 MonoBehaviour:
@@ -10997,13 +11126,14 @@ MonoBehaviour:
   buttonColor: {r: 0.2, g: 0.6, b: 0.9, a: 1}
   titleFontSize: 72
   bpFontSize: 48
-  cardSize: {x: 180, y: 280}
+  cardSize: {x: 280, y: 380}
   cardBackgroundColor: {r: 0.15, g: 0.15, b: 0.2, a: 1}
   cardBorderColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
   cardCount: 3
   bpCountUpDuration: 0.8
   bpCountUpDelay: 0.3
   cardSpawnDelay: 0.15
+  shopMusic: {fileID: 8300000, guid: ca9dc88cde06b472993c0ef7d394a529, type: 3}
 --- !u!21 &1230899398
 Material:
   serializedVersion: 8
@@ -11472,6 +11602,8 @@ MonoBehaviour:
   streakTimeout: 10
   hotStreakDuration: 15
   hotStreakMultiplier: 5
+  debugMode: 0
+  debugStartingBP: 500
   uiManager: {fileID: 178623199}
 --- !u!4 &1333256940
 Transform:
@@ -13001,6 +13133,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RunManager
   startingBP: 0
+  goldStars: 0
 --- !u!1 &1454138009
 GameObject:
   m_ObjectHideFlags: 0
@@ -16021,6 +16154,9 @@ RectTransform:
   - {fileID: 1217288414}
   - {fileID: 1440789706}
   - {fileID: 1333256940}
+  - {fileID: 1895653353}
+  - {fileID: 502914118}
+  - {fileID: 123786409}
   m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -17556,6 +17692,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1880873838}
   m_CullTransparentMesh: 1
+--- !u!1 &1895653352
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1895653353}
+  - component: {fileID: 1895653354}
+  m_Layer: 0
+  m_Name: PlayerInventory
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1895653353
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1895653352}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1720076972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1895653354
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1895653352}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c53edd9f2848248f1a0dbe66fec22f65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  debugMode: 1
+  debugStartingBP: 500
 --- !u!21 &1909107906
 Material:
   serializedVersion: 8

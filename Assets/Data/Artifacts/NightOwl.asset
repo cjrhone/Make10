@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 511a41554ce2d4660aa2c9cddeae6d5a, type: 3}
+  m_Name: NightOwl
+  m_EditorClassIdentifier: Assembly-CSharp::ArtifactData
+  id: night_owl
+  displayName: Night Owl
+  description: +15 seconds base time, but multiplier caps at x2.5
+  icon: {fileID: 0}
+  artifactType: 4
+  minBossRequired: 1
+  rarityWeight: 5
+  effectValue: 15
+  secondaryValue: 0
+  hasDownside: 1
+  downsideDescription: Multiplier caps at x2.5
+  downsideValue: 2.5

@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7d4af8bb8afb9441591fc3b054db7f99, type: 3}
+  m_Name: Enhanced2
+  m_EditorClassIdentifier: Assembly-CSharp::UpgradeData
+  id: enhanced_2
+  displayName: Enhanced 2
+  description: +2 BP for each '2' in a Make10 match
+  icon: {fileID: 0}
+  baseCost: 40
+  upgradeType: 0
+  isStackable: 1
+  maxStacks: 5
+  minStageRequired: 1
+  targetNumber: 2
+  bonusBPPerInstance: 2
+  bonusSecondsPerInstance: 0
+  startingMultiplierBonus: 0
+  multiplierIncrementBonus: 0
+  drainRateReduction: 0
+  bonusStartingSeconds: 0
+  timeBonusMultiplier: 1
+  weightTargetNumber: -1
+  weightMultiplier: 1
+  cascadeBonusBP: 0
+  cascadeMultiplier: 1
+  doubleChance: 0
+  halfChance: 0
+  overallBPMultiplier: 1
+  spawnsFreeSpace: 0
+  freeSpaceCount: 0
+  bossDamageMultiplier: 1
+  bossAttackReduction: 0
