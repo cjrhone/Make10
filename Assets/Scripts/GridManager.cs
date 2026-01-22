@@ -48,6 +48,14 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float burstRingCount = 2;
     [SerializeField] private Color tenGlowColor = new Color(1f, 0.9f, 0.3f);
     [SerializeField] private Color sparkleColor = new Color(1f, 0.95f, 0.6f);
+
+    [Header("Consecutive 10s Scaling")]
+    [SerializeField] private float baseTenScale = 1f;
+    [SerializeField] private float tenScaleIncrement = 0.15f; // Scale increase per consecutive 10
+    [SerializeField] private float maxTenScale = 2f;
+    [SerializeField] private float consecutiveResetTime = 2f; // Reset if no 10 in this time
+    private int consecutive10Count = 0;
+    private float lastTenTime = 0f;
     
     [Header("Tile Value Weights (fallback if no GameManager)")]
     [SerializeField] private float weight0 = 0.15f;
@@ -832,23 +840,35 @@ public class GridManager : MonoBehaviour
     {
         AudioManager.Instance?.PlayTenPopSound();
 
+        // Track consecutive 10s for scaling
+        if (Time.time - lastTenTime > consecutiveResetTime)
+        {
+            consecutive10Count = 0; // Reset if too much time passed
+        }
+        consecutive10Count++;
+        lastTenTime = Time.time;
+
+        // Calculate scale based on consecutive 10s
+        float tenScale = Mathf.Min(baseTenScale + (consecutive10Count - 1) * tenScaleIncrement, maxTenScale);
+        Debug.Log($"<color=yellow>Consecutive 10s: {consecutive10Count}, Scale: {tenScale:F2}</color>");
+
         // Trigger particle explosion VFX immediately with the 10 text
         float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
         TenExplosionVFX.Instance?.TriggerExplosion(position, currentMultiplier, gridContainer);
 
         List<GameObject> effectObjects = new List<GameObject>();
-        
+
         GameObject tenObj = new GameObject("TenEffect_Main");
         tenObj.transform.SetParent(gridContainer, false);
         effectObjects.Add(tenObj);
-        
+
         RectTransform tenRT = tenObj.AddComponent<RectTransform>();
         tenRT.anchoredPosition = position;
-        tenRT.sizeDelta = new Vector2(200f * scaleFactor, 120f * scaleFactor);
+        tenRT.sizeDelta = new Vector2(200f * scaleFactor * tenScale, 120f * scaleFactor * tenScale);
 
         TMPro.TMP_Text tenText = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
         tenText.text = "10";
-        tenText.fontSize = 82 * scaleFactor;
+        tenText.fontSize = 82 * scaleFactor * tenScale;
         tenText.fontStyle = TMPro.FontStyles.Bold;
         tenText.color = tenGlowColor;
         tenText.alignment = TMPro.TextAlignmentOptions.Center;
@@ -859,19 +879,19 @@ public class GridManager : MonoBehaviour
             new Color(1f, 0.8f, 0.2f),
             new Color(1f, 0.8f, 0.2f)
         );
-        
+
         GameObject glowObj = new GameObject("TenEffect_Glow");
         glowObj.transform.SetParent(gridContainer, false);
         glowObj.transform.SetSiblingIndex(tenObj.transform.GetSiblingIndex());
         effectObjects.Add(glowObj);
-        
+
         RectTransform glowRT = glowObj.AddComponent<RectTransform>();
         glowRT.anchoredPosition = position;
-        glowRT.sizeDelta = new Vector2(200f * scaleFactor, 120f * scaleFactor);
+        glowRT.sizeDelta = new Vector2(200f * scaleFactor * tenScale, 120f * scaleFactor * tenScale);
 
         TMPro.TMP_Text glowText = glowObj.AddComponent<TMPro.TextMeshProUGUI>();
         glowText.text = "10";
-        glowText.fontSize = 90 * scaleFactor;
+        glowText.fontSize = 90 * scaleFactor * tenScale;
         glowText.fontStyle = TMPro.FontStyles.Bold;
         glowText.color = new Color(1f, 0.95f, 0.5f, 0.4f);
         glowText.alignment = TMPro.TextAlignmentOptions.Center;
@@ -1236,13 +1256,17 @@ public class GridManager : MonoBehaviour
     public void ResetGame()
     {
         Debug.Log("GridManager.ResetGame() called - full reset with match processing");
-        
+
         if (gridContainer == null)
         {
             Debug.LogError("GridManager: gridContainer is not assigned!");
             return;
         }
-        
+
+        // Reset consecutive 10s tracking
+        consecutive10Count = 0;
+        lastTenTime = 0f;
+
         ClearGrid();
         SpawnGrid();
         StartCoroutine(ProcessMatchesCoroutine());
@@ -1251,13 +1275,17 @@ public class GridManager : MonoBehaviour
     public void SpawnGridOnly()
     {
         Debug.Log("GridManager.SpawnGridOnly() called - grid visible, no match processing yet");
-        
+
         if (gridContainer == null)
         {
             Debug.LogError("GridManager: gridContainer is not assigned!");
             return;
         }
-        
+
+        // Reset consecutive 10s tracking
+        consecutive10Count = 0;
+        lastTenTime = 0f;
+
         ClearGrid();
         SpawnGrid();
     }

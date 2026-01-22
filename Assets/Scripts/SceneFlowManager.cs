@@ -15,6 +15,7 @@ public class SceneFlowManager : MonoBehaviour
     [SerializeField] private RectTransform mainMenuPanel;
     [SerializeField] private RectTransform optionsPanel;
     [SerializeField] private RectTransform gamePanel;
+    [SerializeField] private RectTransform shopPanel;
     [SerializeField] private RectTransform tutorialPanel1;
     [SerializeField] private RectTransform tutorialPanel2;
     [SerializeField] private RectTransform countdownPanel;
@@ -40,7 +41,7 @@ public class SceneFlowManager : MonoBehaviour
     private float screenWidth;
     
     // Current state
-    public enum GameState { Loading, MainMenu, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, Options, Game, Win, Shop, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
     
     #region Initialization
@@ -72,18 +73,19 @@ public class SceneFlowManager : MonoBehaviour
     private void InitializePanels()
     {
         // Position all panels off-screen except loading
-        RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, optionsPanel,
+        RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, shopPanel, optionsPanel,
             tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
-        
+
         foreach (var panel in offScreenPanels)
             SetPanelPosition(panel, screenWidth);
-        
+
         SetPanelPosition(loadingPanel, 0);
-        
+
         // Set active states
         SetPanelActive(loadingPanel, true);
         SetPanelActive(mainMenuPanel, true);
         SetPanelActive(gamePanel, true);
+        SetPanelActive(shopPanel, true);
         SetPanelActive(optionsPanel, false); // Options is overlay
         SetPanelActive(tutorialPanel1, true);
         SetPanelActive(tutorialPanel2, true);
@@ -162,30 +164,36 @@ public class SceneFlowManager : MonoBehaviour
     {
         Debug.Log($"GoBack() called from state: {CurrentState}");
         AudioManager.Instance?.PlayButtonClick();
-        
+
         switch (CurrentState)
         {
             // Overlay panels → fade out to MainMenu
             case GameState.Options:
                 StartCoroutine(CloseOverlayToMainMenu(optionsPanel));
                 break;
-            
+
             // Slide panels → slide back to MainMenu
             case GameState.Quit:
                 StartCoroutine(SlideBackToMainMenu(quitPanel));
                 break;
-            
+
             // Game state → full cleanup and return to main menu
             case GameState.Game:
+            case GameState.Win:
                 StartCoroutine(ReturnToMainMenuFromGame());
                 break;
-            
+
+            // Shop state → end run and return to main menu
+            case GameState.Shop:
+                StartCoroutine(ReturnToMainMenuFromShop());
+                break;
+
             // Tutorial states → could go back to difficulty or cancel entirely
             case GameState.Tutorial1:
             case GameState.Tutorial2:
                 StartCoroutine(CancelTutorialToMainMenu());
                 break;
-                
+
             default:
                 Debug.LogWarning($"GoBack() not handled for state: {CurrentState}");
                 break;
@@ -219,32 +227,62 @@ public class SceneFlowManager : MonoBehaviour
     private IEnumerator ReturnToMainMenuFromGame()
     {
         Debug.Log("ReturnToMainMenuFromGame - cleaning up...");
-        
+
         // Stop any music (game music, win/lose music)
         AudioManager.Instance?.StopMusic();
-        
+
+        // End the run
+        RunManager.Instance?.EndRun();
+
         // Deactivate the game
         GameManager.Instance?.DeactivateGame();
-        
+
         // Clear the grid
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         gridManager?.ClearGrid();
-        
+
         // Notify UIManager to hide any win/lose screens
         UIManager uiManager = FindFirstObjectByType<UIManager>();
         uiManager?.HideAllGameOverScreens();
-        
+
         // Slide back to main menu
         yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
         CurrentState = GameState.MainMenu;
         SetPanelPosition(gamePanel, screenWidth);
-        
+
         // Start menu music
         AudioManager.Instance?.PlayMenuMusic();
-        
+
         Debug.Log("Returned to MainMenu from Game");
     }
     
+    /// <summary>
+    /// Return to main menu from shop (ends the run).
+    /// </summary>
+    private IEnumerator ReturnToMainMenuFromShop()
+    {
+        Debug.Log("ReturnToMainMenuFromShop - ending run...");
+
+        // Stop any music
+        AudioManager.Instance?.StopMusic();
+
+        // End the run
+        RunManager.Instance?.EndRun();
+
+        // Hide shop UI
+        ShopManager.Instance?.HideShop();
+
+        // Slide back to main menu
+        yield return SlideTransition(shopPanel, mainMenuPanel, slideLeft: false);
+        CurrentState = GameState.MainMenu;
+        SetPanelPosition(shopPanel, screenWidth);
+
+        // Start menu music
+        AudioManager.Instance?.PlayMenuMusic();
+
+        Debug.Log("Returned to MainMenu from Shop");
+    }
+
     /// <summary>
     /// Cancel from tutorials and return to main menu.
     /// </summary>
@@ -371,15 +409,18 @@ public class SceneFlowManager : MonoBehaviour
     {
         // Stop menu music
         AudioManager.Instance?.StopMusic();
-        
+
+        // Start a new run
+        RunManager.Instance?.StartNewRun();
+
         // Transition to game panel
         yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
-        
+
         // Spawn grid (visible behind tutorials) but DON'T process matches yet!
         FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
-        
+
         yield return new WaitForSeconds(0.1f);
-        
+
         // Show tutorials
         CurrentState = GameState.Tutorial1;
         yield return ShowPanel(tutorialPanel1);
@@ -612,6 +653,86 @@ public class SceneFlowManager : MonoBehaviour
     public void OnGameEnded(bool won)
     {
         Debug.Log($"SceneFlowManager: Game ended - {(won ? "WIN" : "LOSE")}");
+        if (won)
+        {
+            CurrentState = GameState.Win;
+        }
+    }
+
+    /// <summary>
+    /// Transition from win screen to shop (called by UIManager on Continue press).
+    /// </summary>
+    public void TransitionToShop()
+    {
+        if (CurrentState != GameState.Win && CurrentState != GameState.Game)
+        {
+            Debug.LogWarning($"TransitionToShop called from invalid state: {CurrentState}");
+            return;
+        }
+
+        StartCoroutine(TransitionToShopSequence());
+    }
+
+    private IEnumerator TransitionToShopSequence()
+    {
+        Debug.Log("TransitionToShopSequence - sliding grid out, shop in");
+
+        // Stop any win music
+        AudioManager.Instance?.StopMusic();
+
+        // Slide game panel out (left), shop panel in (from right)
+        yield return SlideTransition(gamePanel, shopPanel, slideLeft: true);
+
+        CurrentState = GameState.Shop;
+
+        // Reset game panel position for later
+        SetPanelPosition(gamePanel, screenWidth);
+
+        // Notify ShopManager to show (if it exists)
+        ShopManager.Instance?.ShowShop();
+
+        Debug.Log("Now in Shop state");
+    }
+
+    /// <summary>
+    /// Transition from shop back to game for next round (called by ShopManager).
+    /// </summary>
+    public void TransitionFromShopToGame()
+    {
+        if (CurrentState != GameState.Shop)
+        {
+            Debug.LogWarning($"TransitionFromShopToGame called from invalid state: {CurrentState}");
+            return;
+        }
+
+        StartCoroutine(TransitionFromShopToGameSequence());
+    }
+
+    private IEnumerator TransitionFromShopToGameSequence()
+    {
+        Debug.Log("TransitionFromShopToGameSequence - sliding shop out, grid in");
+
+        // Hide shop UI first
+        ShopManager.Instance?.HideShop();
+
+        // Advance to next round
+        RunManager.Instance?.AdvanceRound();
+
+        // Spawn new grid (visible during transition)
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.SpawnGridOnly();
+
+        // Slide shop panel out (left), game panel in (from right)
+        yield return SlideTransition(shopPanel, gamePanel, slideLeft: true);
+
+        // Reset shop panel position for later
+        SetPanelPosition(shopPanel, screenWidth);
+
+        // Run countdown sequence
+        CurrentState = GameState.Countdown;
+        yield return CountdownSequence();
+
+        Debug.Log("Next round started");
     }
     
     public bool IsInGameplay() => CurrentState == GameState.Game;

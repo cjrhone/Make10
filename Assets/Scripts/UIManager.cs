@@ -11,6 +11,9 @@ public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
 
+    [Header("Round Display")]
+    [SerializeField] private TMP_Text roundText;
+
     [Header("Score Display")]
     [SerializeField] private TMP_Text scoreText;
     [SerializeField] private TMP_Text targetScoreText;
@@ -177,7 +180,14 @@ public class UIManager : MonoBehaviour
         
         if (gridManager != null)
             gridManager.OnGridUnsolvable += HandleGridUnsolvable;
-        
+
+        // Subscribe to RunManager events
+        if (RunManager.Instance != null)
+        {
+            RunManager.Instance.OnRoundChanged += HandleRoundChanged;
+            RunManager.Instance.OnRunStarted += HandleRunStarted;
+        }
+
         isSubscribed = true;
     }
     
@@ -196,6 +206,12 @@ public class UIManager : MonoBehaviour
         
         if (gridManager != null)
             gridManager.OnGridUnsolvable -= HandleGridUnsolvable;
+
+        if (RunManager.Instance != null)
+        {
+            RunManager.Instance.OnRoundChanged -= HandleRoundChanged;
+            RunManager.Instance.OnRunStarted -= HandleRunStarted;
+        }
     }
     
     private void InitializeUI()
@@ -251,6 +267,13 @@ public class UIManager : MonoBehaviour
         
         UpdateScoreDisplay(0);
         UpdateTimerDisplay(gameManager?.GameDuration ?? 60f);
+
+        // Initialize round display
+        if (roundText != null)
+        {
+            int round = RunManager.Instance?.RoundNumber ?? 1;
+            roundText.text = $"Round {round}";
+        }
         
         // Auto-find HotStreakEffect if not assigned
         if (hotStreakEffect == null && multiplierPanel != null)
@@ -362,11 +385,32 @@ public class UIManager : MonoBehaviour
         if (unsolvablePopup != null)
             StartCoroutine(ShowPopupBriefly(unsolvablePopup, unsolvablePopupDuration));
     }
-    
+
+    private void HandleRoundChanged(int roundNumber)
+    {
+        UpdateRoundDisplay(roundNumber);
+    }
+
+    private void HandleRunStarted()
+    {
+        // Reset round display when new run starts
+        if (RunManager.Instance != null)
+            UpdateRoundDisplay(RunManager.Instance.RoundNumber);
+    }
+
     #endregion
     
     #region Display Updates
-    
+
+    private void UpdateRoundDisplay(int roundNumber)
+    {
+        if (roundText != null)
+        {
+            roundText.text = $"Round {roundNumber}";
+            StartCoroutine(AnimationUtilities.PunchScale(roundText.transform, 1.15f, 0.15f));
+        }
+    }
+
     private void UpdateScoreDisplay(int score)
     {
         if (scoreText != null)
@@ -1111,15 +1155,47 @@ public class UIManager : MonoBehaviour
     #region Public Methods
     
     /// <summary>
-    /// Restart button clicked on win/lose screen.
+    /// Continue button clicked on win screen - proceeds to shop.
+    /// </summary>
+    public void OnContinueButtonClicked()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+
+        // Calculate total BP earned (same formula as breakdown)
+        if (gameManager != null)
+        {
+            int baseScore = gameManager.Score;
+            float timeRemaining = gameManager.TimeRemaining;
+            float maxMultiplier = gameManager.MaxMultiplierReached;
+
+            int timeBonus = Mathf.RoundToInt(timeRemaining * timeBonusPerSecond);
+            int subtotal = baseScore + timeBonus;
+            int totalBP = Mathf.RoundToInt(subtotal * maxMultiplier);
+
+            // Add BP to RunManager
+            RunManager.Instance?.AddBP(totalBP);
+
+            Debug.Log($"<color=green>[UIManager] Continue pressed - Added {totalBP} BP to run total</color>");
+        }
+
+        // Hide win screen immediately
+        SetActiveIfNotNull(winScreen, false);
+        HideBreakdownElements();
+
+        // Notify SceneFlowManager to transition to shop
+        SceneFlowManager.Instance?.TransitionToShop();
+    }
+
+    /// <summary>
+    /// Restart button clicked on lose screen.
     /// </summary>
     public void OnRestartButtonClicked()
     {
         AudioManager.Instance?.PlayButtonClick();
-        
+
         // Clean up and restart
         CleanupGameOverState();
-        
+
         // Use SceneFlowManager to restart with countdown
         if (SceneFlowManager.Instance != null)
         {
@@ -1134,17 +1210,20 @@ public class UIManager : MonoBehaviour
             grid?.ResetGame();
         }
     }
-    
+
     /// <summary>
-    /// Main Menu button clicked on win/lose screen.
+    /// Main Menu button clicked on lose screen.
     /// </summary>
     public void OnMainMenuButtonClicked()
     {
         AudioManager.Instance?.PlayButtonClick();
-        
+
+        // End the current run
+        RunManager.Instance?.EndRun();
+
         // Clean up game over state
         CleanupGameOverState();
-        
+
         // Use SceneFlowManager's universal GoBack()
         SceneFlowManager.Instance?.GoBack();
     }
@@ -1220,6 +1299,8 @@ public class UIManager : MonoBehaviour
     #region Score Progress Bar VFX
 
     private Coroutine progressBarBounceCoroutine;
+    private float currentBounceScale = 1f;
+    private float targetBounceScale = 1f;
 
     /// <summary>
     /// Get the RectTransform of the score progress slider for VFX targeting.
@@ -1230,56 +1311,50 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Trigger a bounce animation on the progress bar.
+    /// Add to the progress bar's scale. Each particle impact adds a small bump.
     /// </summary>
-    /// <param name="bounceScale">Target scale at peak of bounce</param>
-    /// <param name="duration">Duration of the bounce animation</param>
+    /// <param name="bounceScale">Scale to add (e.g., 1.02 adds 2% size)</param>
+    /// <param name="duration">Not used - kept for compatibility</param>
     public void BounceProgressBar(float bounceScale, float duration)
     {
         if (scoreProgressSlider == null) return;
 
-        // If already bouncing, interrupt and start new bounce
-        if (progressBarBounceCoroutine != null)
-        {
-            StopCoroutine(progressBarBounceCoroutine);
-        }
+        // Accumulate scale instead of interrupting
+        float scaleAdd = (bounceScale - 1f) * 0.5f; // Subtler effect
+        targetBounceScale = Mathf.Min(targetBounceScale + scaleAdd, 1.25f); // Cap at 25% increase
 
-        progressBarBounceCoroutine = StartCoroutine(BounceProgressBarCoroutine(bounceScale, duration));
+        // Start the smooth bounce coroutine if not running
+        if (progressBarBounceCoroutine == null)
+        {
+            progressBarBounceCoroutine = StartCoroutine(SmoothBounceCoroutine());
+        }
     }
 
-    private IEnumerator BounceProgressBarCoroutine(float bounceScale, float duration)
+    private IEnumerator SmoothBounceCoroutine()
     {
         Transform sliderTransform = scoreProgressSlider.transform;
 
-        float elapsed = 0f;
-        float halfDuration = duration * 0.4f; // Quick up, slower down
-
-        // Scale up
-        while (elapsed < halfDuration)
+        while (true)
         {
-            elapsed += Time.deltaTime;
-            float t = elapsed / halfDuration;
-            float scale = Mathf.Lerp(1f, bounceScale, t);
-            sliderTransform.localScale = Vector3.one * scale;
+            // Smoothly approach target scale
+            currentBounceScale = Mathf.Lerp(currentBounceScale, targetBounceScale, Time.deltaTime * 12f);
+            sliderTransform.localScale = Vector3.one * currentBounceScale;
+
+            // Decay target back toward 1
+            targetBounceScale = Mathf.Lerp(targetBounceScale, 1f, Time.deltaTime * 4f);
+
+            // Exit when settled back to normal
+            if (Mathf.Abs(currentBounceScale - 1f) < 0.001f && Mathf.Abs(targetBounceScale - 1f) < 0.001f)
+            {
+                sliderTransform.localScale = Vector3.one;
+                currentBounceScale = 1f;
+                targetBounceScale = 1f;
+                progressBarBounceCoroutine = null;
+                yield break;
+            }
+
             yield return null;
         }
-
-        // Scale down
-        elapsed = 0f;
-        float downDuration = duration - halfDuration;
-        while (elapsed < downDuration)
-        {
-            elapsed += Time.deltaTime;
-            float t = elapsed / downDuration;
-            // Ease out for snappy feel
-            t = 1f - (1f - t) * (1f - t);
-            float scale = Mathf.Lerp(bounceScale, 1f, t);
-            sliderTransform.localScale = Vector3.one * scale;
-            yield return null;
-        }
-
-        sliderTransform.localScale = Vector3.one;
-        progressBarBounceCoroutine = null;
     }
 
     /// <summary>

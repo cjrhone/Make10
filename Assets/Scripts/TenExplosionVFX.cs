@@ -37,6 +37,7 @@ public class TenExplosionVFX : MonoBehaviour
     [Header("Collection Settings")]
     [SerializeField] private float collectionStaggerSmall = 0.03f;
     [SerializeField] private float collectionStaggerBig = 0.08f;
+    [SerializeField] private float arrivalRandomness = 0.15f; // Random variation in arrival time (0-1)
     [SerializeField] private float shrinkOnApproach = 0.6f; // Final scale when hitting target
 
     [Header("Bounce Settings")]
@@ -46,11 +47,23 @@ public class TenExplosionVFX : MonoBehaviour
     [SerializeField] private float bigBounceScale = 1.15f;
     [SerializeField] private float bounceDuration = 0.08f;
 
+    [Header("Glow Settings")]
+    [SerializeField] private float glowSizeMultiplier = 1.8f;
+    [SerializeField] private float glowAlpha = 0.35f;
+
+    [Header("Impact Flash Settings")]
+    [SerializeField] private float flashSize = 40f;
+    [SerializeField] private float flashDuration = 0.15f;
+    [SerializeField] private Color smallFlashColor = new Color(1f, 0.95f, 0.7f, 0.8f);
+    [SerializeField] private Color bigFlashColor = new Color(0.85f, 0.6f, 1f, 0.9f);
+
     // Particle data
     private class ExplosionParticle
     {
         public RectTransform transform;
         public Image image;
+        public RectTransform glowTransform;
+        public Image glowImage;
         public bool isBig;
         public Vector2 velocity;
         public Vector2 startPosition;
@@ -137,7 +150,7 @@ public class TenExplosionVFX : MonoBehaviour
         // Phase 1: Explosion
         yield return StartCoroutine(ExplosionPhase());
 
-        // Store peak positions
+        // Store peak positions (glow follows main particle, so just store once)
         foreach (var particle in activeParticles)
         {
             if (particle.transform != null)
@@ -197,51 +210,69 @@ public class TenExplosionVFX : MonoBehaviour
             SpawnParticle(origin, true, smallCount + i);
         }
 
-        // Assign arrival times (staggered)
-        float arrivalTime = 0f;
+        // Assign arrival times with randomness
+        float baseArrivalTime = 0f;
         int arrivalOrder = 0;
 
-        // Small particles arrive first
+        // Small particles - staggered with random variation
         foreach (var particle in activeParticles)
         {
             if (!particle.isBig)
             {
-                particle.arrivalTime = arrivalTime;
+                // Add random offset to arrival time
+                float randomOffset = Random.Range(-arrivalRandomness, arrivalRandomness) * collectionDuration;
+                particle.arrivalTime = Mathf.Max(0f, baseArrivalTime + randomOffset);
                 particle.arrivalOrder = arrivalOrder++;
-                arrivalTime += collectionStaggerSmall;
+                baseArrivalTime += collectionStaggerSmall;
             }
         }
 
-        // Big particles arrive after
+        // Big particles arrive after small ones, also with randomness
+        baseArrivalTime += 0.1f; // Small gap before big particles start
         foreach (var particle in activeParticles)
         {
             if (particle.isBig)
             {
-                particle.arrivalTime = arrivalTime;
+                float randomOffset = Random.Range(-arrivalRandomness * 0.5f, arrivalRandomness) * collectionDuration;
+                particle.arrivalTime = Mathf.Max(0f, baseArrivalTime + randomOffset);
                 particle.arrivalOrder = arrivalOrder++;
-                arrivalTime += collectionStaggerBig;
+                baseArrivalTime += collectionStaggerBig;
             }
         }
     }
 
     private void SpawnParticle(Vector2 origin, bool isBig, int index)
     {
+        Color particleColor = isBig ? bigParticleColor : smallParticleColor;
+
+        // Create glow first (behind particle)
+        GameObject glowObj = new GameObject(isBig ? "BigGlow" : "SmallGlow");
+        glowObj.transform.SetParent(particleContainer, false);
+
+        RectTransform glowRT = glowObj.AddComponent<RectTransform>();
+        glowRT.anchoredPosition = origin;
+
+        Vector2 sizeRange = isBig ? bigSizeRange : smallSizeRange;
+        float size = Random.Range(sizeRange.x, sizeRange.y);
+        float glowSize = size * glowSizeMultiplier;
+        glowRT.sizeDelta = new Vector2(glowSize, glowSize);
+        glowRT.localEulerAngles = new Vector3(0, 0, 45f);
+
+        Image glowImg = glowObj.AddComponent<Image>();
+        glowImg.color = new Color(particleColor.r, particleColor.g, particleColor.b, glowAlpha);
+        glowImg.raycastTarget = false;
+
+        // Create main particle (on top of glow)
         GameObject particleObj = new GameObject(isBig ? "BigParticle" : "SmallParticle");
         particleObj.transform.SetParent(particleContainer, false);
 
         RectTransform rt = particleObj.AddComponent<RectTransform>();
         rt.anchoredPosition = origin;
-
-        // Random size within range
-        Vector2 sizeRange = isBig ? bigSizeRange : smallSizeRange;
-        float size = Random.Range(sizeRange.x, sizeRange.y);
         rt.sizeDelta = new Vector2(size, size);
-
-        // Diamond rotation (45 degrees)
         rt.localEulerAngles = new Vector3(0, 0, 45f);
 
         Image img = particleObj.AddComponent<Image>();
-        img.color = isBig ? bigParticleColor : smallParticleColor;
+        img.color = particleColor;
         img.raycastTarget = false;
 
         // Random explosion direction using golden angle for even distribution
@@ -258,6 +289,8 @@ public class TenExplosionVFX : MonoBehaviour
         {
             transform = rt,
             image = img,
+            glowTransform = glowRT,
+            glowImage = glowImg,
             isBig = isBig,
             velocity = direction * force / explosionDuration,
             startPosition = origin,
@@ -287,9 +320,22 @@ public class TenExplosionVFX : MonoBehaviour
                 Vector2 movement = particle.velocity * decayFactor * Time.deltaTime;
                 particle.transform.anchoredPosition += movement;
 
+                // Move glow with particle
+                if (particle.glowTransform != null)
+                {
+                    particle.glowTransform.anchoredPosition = particle.transform.anchoredPosition;
+                }
+
                 // Rotate
                 float rot = particle.transform.localEulerAngles.z;
                 particle.transform.localEulerAngles = new Vector3(0, 0, rot + particle.rotationSpeed * Time.deltaTime);
+
+                // Rotate glow slightly slower for a "trailing" effect
+                if (particle.glowTransform != null)
+                {
+                    float glowRot = particle.glowTransform.localEulerAngles.z;
+                    particle.glowTransform.localEulerAngles = new Vector3(0, 0, glowRot + particle.rotationSpeed * 0.7f * Time.deltaTime);
+                }
             }
 
             yield return null;
@@ -338,9 +384,21 @@ public class TenExplosionVFX : MonoBehaviour
 
                 particle.transform.anchoredPosition = currentPos;
 
+                // Move glow with particle
+                if (particle.glowTransform != null)
+                {
+                    particle.glowTransform.anchoredPosition = currentPos;
+                }
+
                 // Shrink as approaching
                 float scale = Mathf.Lerp(1f, shrinkOnApproach, easedT);
                 particle.transform.localScale = Vector3.one * scale;
+
+                // Shrink glow as well
+                if (particle.glowTransform != null)
+                {
+                    particle.glowTransform.localScale = Vector3.one * scale;
+                }
 
                 // Fade slightly
                 float alpha = Mathf.Lerp(1f, 0.8f, easedT);
@@ -351,10 +409,28 @@ public class TenExplosionVFX : MonoBehaviour
                     alpha
                 );
 
+                // Fade glow as well
+                if (particle.glowImage != null)
+                {
+                    particle.glowImage.color = new Color(
+                        particle.glowImage.color.r,
+                        particle.glowImage.color.g,
+                        particle.glowImage.color.b,
+                        glowAlpha * alpha
+                    );
+                }
+
                 // Rotate (slower as approaching)
                 float rotSpeed = particle.rotationSpeed * (1f - easedT * 0.5f);
                 float rot = particle.transform.localEulerAngles.z;
                 particle.transform.localEulerAngles = new Vector3(0, 0, rot + rotSpeed * Time.deltaTime);
+
+                // Rotate glow
+                if (particle.glowTransform != null)
+                {
+                    float glowRot = particle.glowTransform.localEulerAngles.z;
+                    particle.glowTransform.localEulerAngles = new Vector3(0, 0, glowRot + rotSpeed * 0.7f * Time.deltaTime);
+                }
 
                 // Check if arrived
                 if (t >= 1f)
@@ -370,11 +446,19 @@ public class TenExplosionVFX : MonoBehaviour
 
     private void OnParticleArrived(ExplosionParticle particle, RectTransform targetSlider)
     {
-        // Hide particle
+        // Hide particle and glow
         if (particle.transform != null)
         {
             particle.transform.gameObject.SetActive(false);
         }
+        if (particle.glowTransform != null)
+        {
+            particle.glowTransform.gameObject.SetActive(false);
+        }
+
+        // Spawn impact flash at the target position
+        Vector2 flashPos = ConvertPosition(Vector2.zero, targetSlider, particleContainer);
+        StartCoroutine(SpawnImpactFlash(flashPos, particle.isBig));
 
         // Calculate bounce intensity and points
         float bounceScale;
@@ -408,6 +492,44 @@ public class TenExplosionVFX : MonoBehaviour
         UIManager.Instance?.OnParticleScoreArrived(pointsValue);
     }
 
+    private IEnumerator SpawnImpactFlash(Vector2 position, bool isBig)
+    {
+        GameObject flashObj = new GameObject("ImpactFlash");
+        flashObj.transform.SetParent(particleContainer, false);
+
+        RectTransform rt = flashObj.AddComponent<RectTransform>();
+        rt.anchoredPosition = position;
+
+        float size = isBig ? flashSize * 1.5f : flashSize;
+        rt.sizeDelta = new Vector2(size, size);
+        rt.localEulerAngles = new Vector3(0, 0, 45f);
+
+        Image img = flashObj.AddComponent<Image>();
+        Color flashColor = isBig ? bigFlashColor : smallFlashColor;
+        img.color = flashColor;
+        img.raycastTarget = false;
+
+        // Animate flash: quick scale up, then fade out
+        float elapsed = 0f;
+        while (elapsed < flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / flashDuration;
+
+            // Scale: pop up quickly, then hold
+            float scale = t < 0.3f ? Mathf.Lerp(0.5f, 1.2f, t / 0.3f) : Mathf.Lerp(1.2f, 0.8f, (t - 0.3f) / 0.7f);
+            rt.localScale = Vector3.one * scale;
+
+            // Fade out
+            float alpha = Mathf.Lerp(flashColor.a, 0f, t);
+            img.color = new Color(flashColor.r, flashColor.g, flashColor.b, alpha);
+
+            yield return null;
+        }
+
+        Destroy(flashObj);
+    }
+
     private Vector2 ConvertPosition(Vector2 localPosition, RectTransform sourceRect, RectTransform targetRect)
     {
         // Convert from source's local space to world space, then to target's local space
@@ -423,6 +545,10 @@ public class TenExplosionVFX : MonoBehaviour
             if (particle.transform != null)
             {
                 Destroy(particle.transform.gameObject);
+            }
+            if (particle.glowTransform != null)
+            {
+                Destroy(particle.glowTransform.gameObject);
             }
         }
         activeParticles.Clear();
