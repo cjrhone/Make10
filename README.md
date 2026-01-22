@@ -92,6 +92,7 @@ When your multiplier exceeds 3.0x, Hot Streak activates:
 - Color-coded tiles (each number 0-6 has a unique color)
 - Smooth swap and fall animations
 - "10" effect with glow, sparkles, and expanding rings
+- Particle explosion → collection to progress bar (multiplier scales particle count)
 - Convergence animation - matched tiles spiral to center
 - Score popups floating upward
 - Hot Streak fire particles and color pulse effects

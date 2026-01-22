@@ -115,6 +115,137 @@ The main menu will have a different layout (to be designed). The above layout is
 
 ---
 
+## Ten Explosion VFX System
+
+### Overview
+When a "10" match is made, diamond particles explode outward then collect into the ScoreProgressSlider, creating satisfying visual and audio feedback.
+
+### Visual Flow
+
+```
+PHASE 1: EXPLOSION (0.3-0.4s)
+┌─────────────────────────────┐
+│                             │
+│        ◇    ◇    ◇         │
+│     ◇               ◇      │
+│        ◇   10   ◇          │  Particles burst outward
+│     ◇               ◇      │  from match center
+│        ◇    ◇    ◇         │  (fast → slow, exponential decay)
+│                             │
+├─────────────────────────────┤
+│   [░░░░░░░░░░░░░░░░░░░░]   │  Progress bar (idle)
+└─────────────────────────────┘
+
+PHASE 2: PAUSE (0.1s)
+┌─────────────────────────────┐
+│                             │
+│     ◇                 ◇    │
+│          ◇       ◇         │
+│                             │  Particles hold at peak
+│          ◇       ◇         │  (brief moment of anticipation)
+│     ◇                 ◇    │
+│                             │
+├─────────────────────────────┤
+│   [░░░░░░░░░░░░░░░░░░░░]   │  Progress bar (idle)
+└─────────────────────────────┘
+
+PHASE 3: COLLECTION (0.5-0.6s)
+┌─────────────────────────────┐
+│                             │
+│       ◇ ↘           ↙ ◇    │
+│            ↘     ↙         │
+│              ↘ ↙           │  Particles curve toward
+│           ◇→ ↓ ←◇          │  progress bar
+│              ↓             │  (slow → fast, ease-in)
+│            ↙   ↘           │
+├─────────────────────────────┤
+│   [████████░░░░░░░░░░░░]   │  Bar bounces on each impact!
+└─────────────────────────────┘
+```
+
+### Particle Behavior
+
+| Phase | Duration | Motion | Easing |
+|-------|----------|--------|--------|
+| Explosion | ~0.35s | Radial outward from center | Fast→Slow (exponential decay) |
+| Pause | ~0.1s | Hold at peak position | None |
+| Collection | ~0.5s | Curved path to slider | Slow→Fast (ease-in quadratic) |
+
+### Particle Count Formula
+
+```
+baseCount = 8
+multiplierBonus = floor((multiplier - 1) * 6)
+totalParticles = clamp(baseCount + multiplierBonus, 8, 30)
+
+Examples:
+┌────────────┬──────────┬─────────────────┐
+│ Multiplier │ Bonus    │ Total Particles │
+├────────────┼──────────┼─────────────────┤
+│ x1.00      │ +0       │ 8               │
+│ x1.50      │ +3       │ 11              │
+│ x2.00      │ +6       │ 14              │
+│ x2.50      │ +9       │ 17              │
+│ x3.00      │ +12      │ 20              │
+│ x5.00 (HS) │ +24      │ 30 (capped)     │
+└────────────┴──────────┴─────────────────┘
+```
+
+### Progress Bar Bounce Feedback
+
+Bounce intensity escalates with consecutive particle impacts:
+
+```
+Particle #1-3:   scale 1.0 → 1.05 → 1.0  (subtle)
+Particle #4-8:   scale 1.0 → 1.08 → 1.0  (medium)
+Particle #9-15:  scale 1.0 → 1.10 → 1.0  (strong)
+Particle #16+:   scale 1.0 → 1.12 → 1.0  (max)
+
+Bounce duration: 0.08s (snappy)
+Particles staggered ~0.03-0.05s apart for "machine gun" effect
+```
+
+### Audio
+
+- Each particle impact plays a subtle "tick" sound
+- Tick pitch can vary slightly for variety (±5-10%)
+- Volume scaled with SFX settings via AudioManager
+
+### Particle Visual Style
+
+- **Shape**: Diamond (45° rotated square) - reuse existing particle pattern
+- **Color**: Gold glow (`#FFE680` / `rgb(1.0, 0.9, 0.5)`) matching "10" text
+- **Size**: 8-14px, slight random variation
+- **Rotation**: Gentle spin during flight (90-180°/sec)
+- **Alpha**: Full opacity during explosion, slight fade during collection
+- **Scale**: Shrink slightly as approaching target (1.0 → 0.6)
+
+### Implementation Files
+
+| File | Changes |
+|------|---------|
+| `TenExplosionVFX.cs` | **NEW** - Main particle system controller |
+| `GridManager.cs` | Call VFX on match, pass origin position + multiplier |
+| `UIManager.cs` | Expose ScoreProgressSlider reference, add BounceProgressBar() method |
+| `AudioManager.cs` | Add PlayScoreTick() method for particle impact sound |
+
+### Code Reuse
+
+Particle spawning pattern from existing code:
+- `AvatarManager.cs` → `SpawnParticle()`, `UpdateParticles()` pattern
+- `LoadingBarVFX.cs` → Diamond shape, rotation, color fade
+- `GridManager.cs` → `TenEffect()` sparkle spawning
+
+### Mobile Performance Considerations
+
+- Max 30 particles (capped)
+- Simple UI Images (no complex shaders)
+- Object pooling optional (particles are short-lived)
+- Single coroutine manages all particles
+- No physics simulation (pure math-based movement)
+
+---
+
 ## Technical Notes
 
 ### Canvas Reference Resolution
