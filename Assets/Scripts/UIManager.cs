@@ -21,7 +21,16 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Color scoreProgressStartColor = new Color(0.3f, 0.5f, 0.9f);
     [SerializeField] private Color scoreProgressMidColor = new Color(0.9f, 0.7f, 0.2f);
     [SerializeField] private Color scoreProgressFullColor = new Color(0.3f, 0.9f, 0.3f);
-    
+
+    [Header("Score Progress Glow")]
+    [SerializeField] private Image scoreProgressGlow;
+    [SerializeField] private Color scoreGlowColor = new Color(1f, 0.9f, 0.5f, 0.6f);
+    [SerializeField] private float glowFadeDuration = 0.15f;
+
+    // Pending score for particle-based increment
+    private int displayedScore = 0;
+    private int pendingScoreToAdd = 0;
+
     [Header("Timer Display")]
     [SerializeField] private TMP_Text timerText;
     [SerializeField] private TMP_Text timerShadowText;
@@ -204,6 +213,14 @@ public class UIManager : MonoBehaviour
                 scoreProgressSlider.maxValue = gameManager.WinScore;
                 scoreProgressSlider.value = 0;
             }
+
+            // Initialize score tracking
+            displayedScore = 0;
+            pendingScoreToAdd = 0;
+
+            // Hide glow initially
+            if (scoreProgressGlow != null)
+                scoreProgressGlow.gameObject.SetActive(false);
             
             if (timerSlider != null)
             {
@@ -272,9 +289,19 @@ public class UIManager : MonoBehaviour
     
     private void HandleScoreChanged(int newScore, int delta)
     {
-        UpdateScoreDisplay(newScore);
         if (delta > 0)
+        {
+            // Store pending score for particle-based animation
+            pendingScoreToAdd += delta;
             SpawnScorePopup(delta);
+        }
+        else
+        {
+            // Direct update for non-positive changes (reset, etc.)
+            displayedScore = newScore;
+            pendingScoreToAdd = 0;
+            UpdateScoreDisplay(newScore);
+        }
     }
     
     private void HandleTimeChanged(float timeRemaining)
@@ -1022,6 +1049,103 @@ public class UIManager : MonoBehaviour
 
         sliderTransform.localScale = Vector3.one;
         progressBarBounceCoroutine = null;
+    }
+
+    /// <summary>
+    /// Get the amount of pending score available for particle distribution.
+    /// </summary>
+    public int GetPendingScore()
+    {
+        return pendingScoreToAdd;
+    }
+
+    /// <summary>
+    /// Called by TenExplosionVFX when a particle arrives.
+    /// Adds a portion of pending score to the displayed score.
+    /// </summary>
+    /// <param name="pointsPerParticle">How many points this particle represents</param>
+    public void OnParticleScoreArrived(int pointsPerParticle)
+    {
+        if (pendingScoreToAdd <= 0) return;
+
+        // Claim points from pending
+        int pointsToAdd = Mathf.Min(pointsPerParticle, pendingScoreToAdd);
+        pendingScoreToAdd -= pointsToAdd;
+        displayedScore += pointsToAdd;
+
+        // Update the score text with punch animation
+        if (scoreText != null)
+        {
+            scoreText.text = displayedScore.ToString();
+            StartCoroutine(AnimationUtilities.PunchScale(scoreText.transform, 1.15f, 0.08f));
+        }
+
+        // Update progress bar
+        if (scoreProgressSlider != null)
+            scoreProgressSlider.value = displayedScore;
+
+        // Update progress bar color
+        if (scoreProgressFillImage != null && gameManager != null)
+        {
+            float progress = (float)displayedScore / gameManager.WinScore;
+            scoreProgressFillImage.color = GetGradientColor(progress,
+                scoreProgressStartColor, scoreProgressMidColor, scoreProgressFullColor);
+        }
+
+        // Flash the glow
+        FlashProgressGlow();
+    }
+
+    /// <summary>
+    /// Flash the progress bar glow effect.
+    /// </summary>
+    public void FlashProgressGlow()
+    {
+        if (scoreProgressGlow == null) return;
+        StartCoroutine(FlashGlowCoroutine());
+    }
+
+    private Coroutine glowCoroutine;
+
+    private IEnumerator FlashGlowCoroutine()
+    {
+        // If already glowing, just restart from full
+        if (glowCoroutine != null)
+        {
+            StopCoroutine(glowCoroutine);
+        }
+
+        scoreProgressGlow.gameObject.SetActive(true);
+        scoreProgressGlow.color = scoreGlowColor;
+
+        float elapsed = 0f;
+        Color startColor = scoreGlowColor;
+        Color endColor = new Color(scoreGlowColor.r, scoreGlowColor.g, scoreGlowColor.b, 0f);
+
+        while (elapsed < glowFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / glowFadeDuration;
+            scoreProgressGlow.color = Color.Lerp(startColor, endColor, t);
+            yield return null;
+        }
+
+        scoreProgressGlow.color = endColor;
+        scoreProgressGlow.gameObject.SetActive(false);
+        glowCoroutine = null;
+    }
+
+    /// <summary>
+    /// Flush any remaining pending score immediately (fallback).
+    /// </summary>
+    public void FlushPendingScore()
+    {
+        if (pendingScoreToAdd > 0)
+        {
+            displayedScore += pendingScoreToAdd;
+            pendingScoreToAdd = 0;
+            UpdateScoreDisplay(displayedScore);
+        }
     }
 
     #endregion

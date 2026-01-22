@@ -151,6 +151,9 @@ public class TenExplosionVFX : MonoBehaviour
         // Phase 3: Collection
         yield return StartCoroutine(CollectionPhase(targetPosition, targetSlider));
 
+        // Flush any remaining pending score (safety net)
+        UIManager.Instance?.FlushPendingScore();
+
         // Cleanup
         CleanupParticles();
         currentVFXCoroutine = null;
@@ -372,16 +375,21 @@ public class TenExplosionVFX : MonoBehaviour
             particle.transform.gameObject.SetActive(false);
         }
 
-        // Calculate bounce intensity
+        // Calculate bounce intensity and points
         float bounceScale;
+        int pointsValue;
+
         if (particle.isBig)
         {
             bounceScale = bigBounceScale;
+            pointsValue = 5; // Big particle = 5 points
             AudioManager.Instance?.PlayScoreTickBig();
         }
         else
         {
             totalSmallArrived++;
+            pointsValue = 1; // Small particle = 1 point
+
             if (totalSmallArrived <= 5)
                 bounceScale = smallBounceSubtle;
             else if (totalSmallArrived <= 15)
@@ -394,6 +402,9 @@ public class TenExplosionVFX : MonoBehaviour
 
         // Trigger bounce on progress bar
         UIManager.Instance?.BounceProgressBar(bounceScale, bounceDuration);
+
+        // Update score display incrementally
+        UIManager.Instance?.OnParticleScoreArrived(pointsValue);
     }
 
     private Vector2 ConvertPosition(Vector2 localPosition, RectTransform sourceRect, RectTransform targetRect)
