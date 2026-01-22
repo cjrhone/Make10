@@ -22,6 +22,7 @@ public class TenExplosionVFX : MonoBehaviour
     [Header("Explosion Settings")]
     [SerializeField] private float explosionRadius = 150f;
     [SerializeField] private float explosionDecay = 3f; // Exponential decay rate
+    [SerializeField] private Vector2 forceMultiplierRange = new Vector2(0.7f, 1.3f); // Min/max force variation
 
     [Header("Small Particle Settings")]
     [SerializeField] private Vector2 smallSizeRange = new Vector2(20f, 28f);
@@ -248,7 +249,7 @@ public class TenExplosionVFX : MonoBehaviour
         float angle = index * goldenAngle + Random.Range(-0.2f, 0.2f);
 
         // Vary the explosion force
-        float force = explosionRadius * Random.Range(0.7f, 1.3f);
+        float force = explosionRadius * Random.Range(forceMultiplierRange.x, forceMultiplierRange.y);
         if (isBig) force *= 0.8f; // Big particles don't go as far
 
         Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));

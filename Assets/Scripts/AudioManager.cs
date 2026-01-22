@@ -223,15 +223,15 @@ public class AudioManager : MonoBehaviour
 
     /// <summary>
     /// Play SFX with random pitch variation for variety.
+    /// Note: Pitch stays modified until next call - this is intentional since
+    /// PlayOneShot is async and resetting immediately would affect the playing sound.
     /// </summary>
     private void PlaySFXWithPitchVariation(AudioClip clip, float minPitch, float maxPitch)
     {
         if (sfxSource != null && clip != null)
         {
-            float originalPitch = sfxSource.pitch;
             sfxSource.pitch = Random.Range(minPitch, maxPitch);
             sfxSource.PlayOneShot(clip, sfxVolume);
-            sfxSource.pitch = originalPitch;
         }
     }
 

@@ -1102,19 +1102,20 @@ public class UIManager : MonoBehaviour
     public void FlashProgressGlow()
     {
         if (scoreProgressGlow == null) return;
-        StartCoroutine(FlashGlowCoroutine());
+
+        // Stop any existing glow animation
+        if (glowCoroutine != null)
+        {
+            StopCoroutine(glowCoroutine);
+        }
+
+        glowCoroutine = StartCoroutine(FlashGlowCoroutine());
     }
 
     private Coroutine glowCoroutine;
 
     private IEnumerator FlashGlowCoroutine()
     {
-        // If already glowing, just restart from full
-        if (glowCoroutine != null)
-        {
-            StopCoroutine(glowCoroutine);
-        }
-
         scoreProgressGlow.gameObject.SetActive(true);
         scoreProgressGlow.color = scoreGlowColor;
 
