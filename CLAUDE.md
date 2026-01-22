@@ -86,28 +86,27 @@ The main menu will have a different layout (to be designed). The above layout is
 
 ## Implementation Phases
 
-### Phase 1: UI Layout Restructuring
-- Reorganize GamePanel into 3 vertical sections
-- Top: CharacterPanel (new)
-- Middle: StatsPanel (horizontal bar)
-- Bottom: GridPanel (existing, resized)
+### Phase 1: UI Layout Restructuring ✓
+- [x] Reorganize GamePanel into 3 vertical sections
+- [x] Top: CharacterPanel (40% - anchors 0.6 to 1.0)
+- [x] Middle: StatsPanel (horizontal bar)
+- [x] Bottom: GridPanelContainer (50% - anchors 0 to 0.5)
 
-### Phase 2: Stats Bar Implementation
-- Create horizontal stats display
-- Wire existing score/timer to new positions
-- Add multiplier display
-- Add XP progress bar
+### Phase 2: Stats Bar Implementation ✓
+- [x] Create horizontal stats display
+- [x] Score, timer, multiplier positioned in stats bar
+- [x] Multiplier always visible (shows "x1.00" when inactive)
 
-### Phase 3: Game Mechanics
-- Remove difficulty select flow
-- Implement score threshold progression
-- Add multiplier system enhancements
-- Design upgrade system (future)
+### Phase 3: Game Flow Changes ✓
+- [x] Remove difficulty select screen
+- [x] Play button goes directly to game (default Medium difficulty)
+- [ ] Score threshold progression (future)
+- [ ] Upgrade system (future)
 
-### Phase 4: Character Panel
-- Add character portrait display
-- Background scene with decorations
-- Character animation states
+### Phase 4: Character Panel ✓
+- [x] CharacterPanel with AvatarImage
+- [x] AvatarManager handles reactive states (Struggling, Solve, Scribbling, HotStreak)
+- [x] Avatar preserves aspect ratio and scales responsively
 
 ### Phase 5: Difficulty Scaling (Future)
 - Dynamic difficulty increase during gameplay
@@ -139,3 +138,9 @@ The main menu will have a different layout (to be designed). The above layout is
 - Made loading progress responsive to actual initialization
 - Added dynamic grid scaling based on container size
 - Fixed LoadingBarVFX auto-find to search children for Slider component
+- **V2 Redesign Implementation:**
+  - Restructured UI into 3 vertical sections (Character/Stats/Grid)
+  - Removed difficulty select - game starts directly with default difficulty
+  - Made multiplier display always visible
+  - Fixed tile number centering (TextMeshPro alignment + auto-sizing)
+  - Character panel with responsive avatar sizing

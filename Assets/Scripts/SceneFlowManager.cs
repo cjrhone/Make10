@@ -533,15 +533,16 @@ public class SceneFlowManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Play button pressed - show difficulty selection.
+    /// Play button pressed - starts game directly (V2: no difficulty select).
     /// </summary>
     public void OnPlayPressed()
     {
         Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
         HandleButton(GameState.MainMenu, () =>
         {
-            StartCoroutine(FadeTransition(difficultyPanel, fadeIn: true));
-            CurrentState = GameState.DifficultySelect;
+            // V2: Skip difficulty select, use default difficulty and go straight to game
+            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Medium);
+            StartCoroutine(PlaySequence());
         });
     }
     

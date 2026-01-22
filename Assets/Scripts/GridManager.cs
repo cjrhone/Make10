@@ -416,13 +416,7 @@ public class GridManager : MonoBehaviour
 
             RectTransform rt = tile.GetRectTransform();
             rt.sizeDelta = new Vector2(tileSize, tileSize);
-
-            // Scale font size proportionally with container
-            TMPro.TMP_Text numberText = tile.GetComponentInChildren<TMPro.TMP_Text>();
-            if (numberText != null)
-            {
-                numberText.fontSize = baseFontSize * scaleFactor;
-            }
+            // Font size handled by TextMeshPro auto-sizing in prefab
         }
 
         return tile;
@@ -1127,13 +1121,7 @@ public class GridManager : MonoBehaviour
                         newTile.Initialize(value, x, y);
                         newTile.SetPosition(spawnPos);
                         newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
-
-                        // Scale font size proportionally with container
-                        TMPro.TMP_Text numberText = newTile.GetComponentInChildren<TMPro.TMP_Text>();
-                        if (numberText != null)
-                        {
-                            numberText.fontSize = baseFontSize * scaleFactor;
-                        }
+                        // Font size handled by TextMeshPro auto-sizing in prefab
 
                         grid[x, y] = newTile;
                         tilesToDrop.Add((x, y, newTile));

@@ -172,8 +172,16 @@ public class UIManager : MonoBehaviour
         SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
         SetActiveIfNotNull(unsolvablePopup, false);
-        SetActiveIfNotNull(multiplierPanel, false);
-        
+        SetActiveIfNotNull(multiplierPanel, true);
+
+        // Initialize multiplier display to x1.00
+        if (multiplierValueText != null)
+        {
+            multiplierValueText.text = "x1.00";
+            multiplierValueText.transform.localScale = Vector3.one;
+            multiplierValueText.color = multiplierTextCoolColor;
+        }
+
         // Initialize from GameManager
         if (gameManager != null)
         {
@@ -429,12 +437,20 @@ public class UIManager : MonoBehaviour
             // Update hot streak intensity as multiplier grows
             UpdateHotStreakIntensity(multiplier);
         }
-        else if (multiplierPanel.activeSelf)
+        else
         {
+            // Multiplier inactive - reset display to x1.00 but keep panel visible
             StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
             StopMultiplierGlow();
             DeactivateHotStreak();
-            multiplierPanel.SetActive(false);
+
+            if (multiplierValueText != null)
+            {
+                multiplierValueText.text = "x1.00";
+                multiplierValueText.transform.localScale = Vector3.one;
+                multiplierValueText.color = multiplierTextCoolColor;
+            }
+
             lastMultiplierValue = 1f;
         }
     }
@@ -920,8 +936,15 @@ public class UIManager : MonoBehaviour
         DeactivateHotStreak();
         CleanupHotStreakMode();
         
-        // Hide multiplier panel for fresh start
-        SetActiveIfNotNull(multiplierPanel, false);
+        // Reset multiplier display to x1.00 (keep panel visible)
+        SetActiveIfNotNull(multiplierPanel, true);
+        if (multiplierValueText != null)
+        {
+            multiplierValueText.text = "x1.00";
+            multiplierValueText.transform.localScale = Vector3.one;
+            multiplierValueText.color = multiplierTextCoolColor;
+        }
+        lastMultiplierValue = 1f;
     }
     
     #endregion
