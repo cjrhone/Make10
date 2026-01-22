@@ -44,7 +44,9 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip timeWarningSFX;
     [SerializeField] private AudioClip finishSFX;
     [SerializeField] private AudioClip multiplierIncreaseSFX; // Multiplier goes up
-    
+    [SerializeField] private AudioClip scoreTickSmallSFX;     // Small particle hits progress bar
+    [SerializeField] private AudioClip scoreTickBigSFX;       // Big particle hits progress bar
+
     // Volume state
     private float musicVolume;
     private float sfxVolume;
@@ -216,7 +218,23 @@ public class AudioManager : MonoBehaviour
     public void PlayTileSelect() => PlaySFX(tileSelectSFX);
     public void PlayFinishSound() => PlaySFX(finishSFX);
     public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
-    
+    public void PlayScoreTickSmall() => PlaySFXWithPitchVariation(scoreTickSmallSFX, 0.95f, 1.05f);
+    public void PlayScoreTickBig() => PlaySFXWithPitchVariation(scoreTickBigSFX, 0.9f, 1.0f);
+
+    /// <summary>
+    /// Play SFX with random pitch variation for variety.
+    /// </summary>
+    private void PlaySFXWithPitchVariation(AudioClip clip, float minPitch, float maxPitch)
+    {
+        if (sfxSource != null && clip != null)
+        {
+            float originalPitch = sfxSource.pitch;
+            sfxSource.pitch = Random.Range(minPitch, maxPitch);
+            sfxSource.PlayOneShot(clip, sfxVolume);
+            sfxSource.pitch = originalPitch;
+        }
+    }
+
     #endregion
     
     #region Looping SFX (Time Warning)

@@ -795,7 +795,11 @@ public class GridManager : MonoBehaviour
         }
         
         yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
-        
+
+        // Trigger particle explosion VFX that collects to progress bar
+        float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
+        TenExplosionVFX.Instance?.TriggerExplosion(centerPos, currentMultiplier, gridContainer);
+
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = false;
     }

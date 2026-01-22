@@ -9,6 +9,8 @@ using System.Collections;
 /// </summary>
 public class UIManager : MonoBehaviour
 {
+    public static UIManager Instance { get; private set; }
+
     [Header("Score Display")]
     [SerializeField] private TMP_Text scoreText;
     [SerializeField] private TMP_Text targetScoreText;
@@ -102,9 +104,17 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float multiplierScaleAtMax = 3f; // What multiplier value = max scale
     
     #region Initialization
-    
+
     private void Awake()
     {
+        // Singleton pattern
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+
         TrySubscribeToEvents();
     }
     
@@ -928,14 +938,14 @@ public class UIManager : MonoBehaviour
         SetActiveIfNotNull(winScreen, false);
         SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
-        
+
         // Clean up any active effects
         StopPulse(ref timerPulseCoroutine, timerText?.transform);
         StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
         StopTimeWarningSound();
         DeactivateHotStreak();
         CleanupHotStreakMode();
-        
+
         // Reset multiplier display to x1.00 (keep panel visible)
         SetActiveIfNotNull(multiplierPanel, true);
         if (multiplierValueText != null)
@@ -946,6 +956,73 @@ public class UIManager : MonoBehaviour
         }
         lastMultiplierValue = 1f;
     }
-    
+
+    #endregion
+
+    #region Score Progress Bar VFX
+
+    private Coroutine progressBarBounceCoroutine;
+
+    /// <summary>
+    /// Get the RectTransform of the score progress slider for VFX targeting.
+    /// </summary>
+    public RectTransform GetScoreProgressSlider()
+    {
+        return scoreProgressSlider?.GetComponent<RectTransform>();
+    }
+
+    /// <summary>
+    /// Trigger a bounce animation on the progress bar.
+    /// </summary>
+    /// <param name="bounceScale">Target scale at peak of bounce</param>
+    /// <param name="duration">Duration of the bounce animation</param>
+    public void BounceProgressBar(float bounceScale, float duration)
+    {
+        if (scoreProgressSlider == null) return;
+
+        // If already bouncing, interrupt and start new bounce
+        if (progressBarBounceCoroutine != null)
+        {
+            StopCoroutine(progressBarBounceCoroutine);
+        }
+
+        progressBarBounceCoroutine = StartCoroutine(BounceProgressBarCoroutine(bounceScale, duration));
+    }
+
+    private IEnumerator BounceProgressBarCoroutine(float bounceScale, float duration)
+    {
+        Transform sliderTransform = scoreProgressSlider.transform;
+
+        float elapsed = 0f;
+        float halfDuration = duration * 0.4f; // Quick up, slower down
+
+        // Scale up
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / halfDuration;
+            float scale = Mathf.Lerp(1f, bounceScale, t);
+            sliderTransform.localScale = Vector3.one * scale;
+            yield return null;
+        }
+
+        // Scale down
+        elapsed = 0f;
+        float downDuration = duration - halfDuration;
+        while (elapsed < downDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / downDuration;
+            // Ease out for snappy feel
+            t = 1f - (1f - t) * (1f - t);
+            float scale = Mathf.Lerp(bounceScale, 1f, t);
+            sliderTransform.localScale = Vector3.one * scale;
+            yield return null;
+        }
+
+        sliderTransform.localScale = Vector3.one;
+        progressBarBounceCoroutine = null;
+    }
+
     #endregion
 }
