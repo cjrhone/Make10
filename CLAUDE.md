@@ -55,10 +55,10 @@ BP will be spent between runs on roguelike upgrades:
 
 ### Key Files
 - `GridManager.cs` - Grid spawning, tile management, dynamic scaling based on container size
-- `GameManager.cs` - Game state, scoring, multiplier system
+- `GameManager.cs` - Game state, scoring, multiplier system, BP tracking
 - `Tile.cs` - Individual tile behavior, click/swipe input handling
 - `SceneFlowManager.cs` - Panel transitions, loading sequence
-- `UIManager.cs` - Score display, timer, UI updates
+- `UIManager.cs` - Score display, timer, UI updates, win screen breakdown
 
 ### Dynamic Grid Scaling
 The grid now scales dynamically based on `gridContainer.sizeDelta`. Key settings:
@@ -72,15 +72,16 @@ The grid now scales dynamically based on `gridContainer.sizeDelta`. Key settings
 
 ### Game Direction Changes
 
-**Removed:**
-- Difficulty select screen (Easy/Medium/Hard)
-- Fixed time limit (60 seconds)
+**Completed:**
+- Removed difficulty select screen - single configurable GameSettings
+- Brain Points (BP) currency system
+- Win screen score breakdown with sequential animations
 
-**New Direction:**
+**Planned:**
 - **Roguelike-style progression** - Score threshold milestones unlock upgrades
 - **Endless gameplay** - Play continues until failure condition (TBD)
-- **Upgrade system** - Player choices between runs/milestones
-- **Dynamic difficulty scaling** - Difficulty increases as player progresses (to be implemented)
+- **Upgrade system** - Player spends BP on upgrades between runs
+- **Dynamic difficulty scaling** - Difficulty increases as player progresses
 
 ### New Game View Layout (Portrait Mode)
 
