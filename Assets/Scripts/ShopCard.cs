@@ -20,8 +20,8 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     [SerializeField] private Image cardBorder;
 
     [Header("Float Animation")]
-    [SerializeField] private float floatSpeed = 2f;
-    [SerializeField] private float floatAmount = 8f;
+    [SerializeField] private float floatSpeed = 1.2f;
+    [SerializeField] private float floatAmount = 4f;
 
     [Header("Hover Effect")]
     [SerializeField] private float hoverScale = 1.05f;
@@ -40,8 +40,9 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     private bool isHovered = false;
     private Coroutine hoverCoroutine;
 
-    // Card data (for future use)
+    // Card data
     public string CardId { get; private set; }
+    public string CardTitle { get; private set; }
     public int Cost { get; private set; }
 
     private void Awake()
@@ -51,7 +52,27 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
     private void Start()
     {
+        // Wait for layout system to position the card before capturing base position
+        StartCoroutine(CaptureBasePositionAfterLayout());
+    }
+
+    private IEnumerator CaptureBasePositionAfterLayout()
+    {
+        // Disable floating until we have the correct position
+        isFloating = false;
+
+        // Wait for end of frame to let layout system run
+        yield return new WaitForEndOfFrame();
+
+        // Force layout rebuild and wait another frame to be safe
+        Canvas.ForceUpdateCanvases();
+        yield return null;
+
+        // Now capture the position set by the layout group
         basePosition = rectTransform.anchoredPosition;
+
+        // Enable floating animation
+        isFloating = true;
     }
 
     private void Update()
@@ -69,6 +90,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     public void Initialize(string id, string title, string description, int cost, float floatPhaseOffset)
     {
         CardId = id;
+        CardTitle = title;
         Cost = cost;
         floatOffset = floatPhaseOffset;
 
@@ -76,7 +98,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
             titleText.text = title;
 
         if (descriptionText != null)
-            descriptionText.text = description;
+            descriptionText.text = $"{description}\n\n<color=#FFD700>Cost: {cost} BP</color>";
 
         // Icon stays empty/transparent as requested
         if (iconImage != null)
@@ -100,14 +122,15 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         card.cardBorder = cardObj.AddComponent<Image>();
         card.cardBorder.color = borderColor;
 
-        // Inner background
+        // Inner background - border thickness proportional to card size
         GameObject innerBg = new GameObject("Background");
         innerBg.transform.SetParent(cardObj.transform, false);
         RectTransform innerRT = innerBg.AddComponent<RectTransform>();
         innerRT.anchorMin = Vector2.zero;
         innerRT.anchorMax = Vector2.one;
-        innerRT.offsetMin = new Vector2(4, 4);
-        innerRT.offsetMax = new Vector2(-4, -4);
+        float border = Mathf.Max(3f, size.x * 0.02f); // 2% border, min 3px
+        innerRT.offsetMin = new Vector2(border, border);
+        innerRT.offsetMax = new Vector2(-border, -border);
 
         card.cardBackground = innerBg.AddComponent<Image>();
         card.cardBackground.color = bgColor;
@@ -118,57 +141,69 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         RectTransform contentRT = content.AddComponent<RectTransform>();
         contentRT.anchorMin = Vector2.zero;
         contentRT.anchorMax = Vector2.one;
-        contentRT.offsetMin = new Vector2(12, 12);
-        contentRT.offsetMax = new Vector2(-12, -12);
+        float contentPad = size.x * 0.04f; // 4% content padding
+        contentRT.offsetMin = new Vector2(contentPad, contentPad);
+        contentRT.offsetMax = new Vector2(-contentPad, -contentPad);
 
         VerticalLayoutGroup vlg = content.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = 8f;
+        vlg.spacing = size.y * 0.02f; // 2% of card height
         vlg.childAlignment = TextAnchor.UpperCenter;
         vlg.childControlWidth = true;
-        vlg.childControlHeight = false;
+        vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
-        vlg.padding = new RectOffset(8, 8, 12, 12);
+        int padding = Mathf.RoundToInt(size.x * 0.05f); // 5% padding
+        vlg.padding = new RectOffset(padding, padding, padding, padding);
 
-        // Title
+        // Title - uses auto-sizing to fit card width
         GameObject titleObj = new GameObject("Title");
         titleObj.transform.SetParent(content.transform, false);
         RectTransform titleRT = titleObj.AddComponent<RectTransform>();
-        titleRT.sizeDelta = new Vector2(0, 36);
+
+        LayoutElement titleLE = titleObj.AddComponent<LayoutElement>();
+        titleLE.preferredHeight = size.y * 0.12f; // 12% of card height
+        titleLE.flexibleWidth = 1;
 
         card.titleText = titleObj.AddComponent<TextMeshProUGUI>();
         card.titleText.text = "Card Title";
-        card.titleText.fontSize = 24;
         card.titleText.fontStyle = FontStyles.Bold;
         card.titleText.color = Color.white;
         card.titleText.alignment = TextAlignmentOptions.Center;
+        card.titleText.enableAutoSizing = true;
+        card.titleText.fontSizeMin = 18;
+        card.titleText.fontSizeMax = 72;
 
-        // Icon area (empty/transparent)
+        // Icon area (empty/transparent) - flexible middle section
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(content.transform, false);
         RectTransform iconRT = iconObj.AddComponent<RectTransform>();
-        iconRT.sizeDelta = new Vector2(0, 120);
 
         LayoutElement iconLE = iconObj.AddComponent<LayoutElement>();
-        iconLE.minHeight = 120;
+        iconLE.preferredHeight = size.y * 0.45f; // 45% of card height
         iconLE.flexibleHeight = 1;
+        iconLE.flexibleWidth = 1;
 
         card.iconImage = iconObj.AddComponent<Image>();
         card.iconImage.color = new Color(1, 1, 1, 0.1f); // Faint placeholder
 
-        // Description
+        // Description - uses auto-sizing to fit card width
         GameObject descObj = new GameObject("Description");
         descObj.transform.SetParent(content.transform, false);
         RectTransform descRT = descObj.AddComponent<RectTransform>();
-        descRT.sizeDelta = new Vector2(0, 60);
+
+        LayoutElement descLE = descObj.AddComponent<LayoutElement>();
+        descLE.preferredHeight = size.y * 0.25f; // 25% of card height
+        descLE.flexibleWidth = 1;
 
         card.descriptionText = descObj.AddComponent<TextMeshProUGUI>();
         card.descriptionText.text = "Card description goes here";
-        card.descriptionText.fontSize = 16;
         card.descriptionText.fontStyle = FontStyles.Normal;
         card.descriptionText.color = new Color(0.8f, 0.8f, 0.8f);
         card.descriptionText.alignment = TextAlignmentOptions.Center;
-        card.descriptionText.enableWordWrapping = true;
+        card.descriptionText.enableAutoSizing = true;
+        card.descriptionText.fontSizeMin = 14;
+        card.descriptionText.fontSizeMax = 48;
+        card.descriptionText.textWrappingMode = TextWrappingModes.Normal;
 
         return card;
     }
@@ -201,13 +236,20 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
     private void SelectCard()
     {
-        isSelected = true;
-        isFloating = false;
-
+        // Don't mark as selected yet - wait for confirmation
         AudioManager.Instance?.PlayButtonClick();
 
-        // Notify ShopManager
+        // Notify ShopManager to show confirmation popup
         ShopManager.Instance?.OnCardSelected(this);
+    }
+
+    /// <summary>
+    /// Called by ShopManager when purchase is confirmed.
+    /// </summary>
+    public void ConfirmPurchase()
+    {
+        isSelected = true;
+        isFloating = false;
 
         // Play select animation then destroy
         StartCoroutine(SelectAnimation());

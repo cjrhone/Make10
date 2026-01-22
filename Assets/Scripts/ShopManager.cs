@@ -31,7 +31,7 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private float bpFontSize = 36f;
 
     [Header("Card Settings")]
-    [SerializeField] private Vector2 cardSize = new Vector2(180f, 280f);
+    [SerializeField] private Vector2 cardSize = new Vector2(520f, 760f);
     [SerializeField] private Color cardBackgroundColor = new Color(0.15f, 0.15f, 0.2f);
     [SerializeField] private Color cardBorderColor = new Color(0.4f, 0.4f, 0.5f);
     [SerializeField] private int cardCount = 3;
@@ -41,6 +41,9 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private float bpCountUpDelay = 0.3f;
     [SerializeField] private float cardSpawnDelay = 0.15f;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip shopMusic; // Assign in inspector, falls back to menu music if null
+
     // Placeholder card data
     private readonly string[] placeholderTitles = { "Power Up", "Time Boost", "Multiplier" };
     private readonly string[] placeholderDescriptions = {
@@ -48,11 +51,19 @@ public class ShopManager : MonoBehaviour
         "Add extra seconds to the clock",
         "Start with a higher multiplier"
     };
+    private readonly int[] placeholderCosts = { 50, 75, 100 };
 
     // Runtime state
     private bool isInitialized = false;
     private Coroutine countUpCoroutine;
     private List<ShopCard> activeCards = new List<ShopCard>();
+    private HorizontalLayoutGroup cardsLayoutGroup;
+
+    // Confirmation popup
+    private GameObject confirmationPopup;
+    private TMP_Text confirmTitleText;
+    private TMP_Text confirmCostText;
+    private ShopCard pendingCard;
 
     private void Awake()
     {
@@ -108,6 +119,9 @@ public class ShopManager : MonoBehaviour
         // Create Next Round button at bottom
         CreateNextRoundButton();
 
+        // Create confirmation popup (hidden by default)
+        CreateConfirmationPopup();
+
         isInitialized = true;
         Debug.Log("[ShopManager] UI auto-generated successfully");
     }
@@ -152,29 +166,29 @@ public class ShopManager : MonoBehaviour
         csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        // Horizontal layout for cards - centered
-        HorizontalLayoutGroup hlg = cardsObj.AddComponent<HorizontalLayoutGroup>();
-        hlg.spacing = 30f;
-        hlg.childAlignment = TextAnchor.MiddleCenter;
-        hlg.childControlWidth = false;
-        hlg.childControlHeight = false;
-        hlg.childForceExpandWidth = false;
-        hlg.childForceExpandHeight = false;
-        hlg.padding = new RectOffset(20, 20, 20, 20);
+        // Horizontal layout for cards - centered (will be disabled after spawn)
+        cardsLayoutGroup = cardsObj.AddComponent<HorizontalLayoutGroup>();
+        cardsLayoutGroup.spacing = 30f;
+        cardsLayoutGroup.childAlignment = TextAnchor.MiddleCenter;
+        cardsLayoutGroup.childControlWidth = false;
+        cardsLayoutGroup.childControlHeight = false;
+        cardsLayoutGroup.childForceExpandWidth = false;
+        cardsLayoutGroup.childForceExpandHeight = false;
+        cardsLayoutGroup.padding = new RectOffset(20, 20, 20, 20);
     }
 
     private void CreateBPDisplay()
     {
-        // Container for BP (top-right corner)
+        // Container for BP (bottom-left corner)
         GameObject bpContainer = new GameObject("BPContainer");
         bpContainer.transform.SetParent(shopPanel, false);
 
         RectTransform bpContainerRT = bpContainer.AddComponent<RectTransform>();
-        bpContainerRT.anchorMin = new Vector2(1f, 1f); // Top-right
-        bpContainerRT.anchorMax = new Vector2(1f, 1f);
-        bpContainerRT.pivot = new Vector2(1f, 1f);
-        bpContainerRT.anchoredPosition = new Vector2(-20f, -20f);
-        bpContainerRT.sizeDelta = new Vector2(280f, 70f);
+        bpContainerRT.anchorMin = new Vector2(0f, 0f); // Bottom-left
+        bpContainerRT.anchorMax = new Vector2(0f, 0f);
+        bpContainerRT.pivot = new Vector2(0f, 0f);
+        bpContainerRT.anchoredPosition = new Vector2(20f, 140f); // Above the Next Round button
+        bpContainerRT.sizeDelta = new Vector2(300f, 80f);
 
         // Black backdrop with higher opacity
         bpBackdrop = bpContainer.AddComponent<Image>();
@@ -187,20 +201,20 @@ public class ShopManager : MonoBehaviour
         RectTransform bpTextRT = bpTextObj.AddComponent<RectTransform>();
         bpTextRT.anchorMin = Vector2.zero;
         bpTextRT.anchorMax = Vector2.one;
-        bpTextRT.offsetMin = new Vector2(10f, 5f);
-        bpTextRT.offsetMax = new Vector2(-10f, -5f);
+        bpTextRT.offsetMin = new Vector2(15f, 10f);
+        bpTextRT.offsetMax = new Vector2(-15f, -10f);
 
         bpAmountText = bpTextObj.AddComponent<TextMeshProUGUI>();
         bpAmountText.text = "BP: 0";
-        bpAmountText.fontSize = 42f; // Larger font
+        bpAmountText.fontSize = 48f; // Larger font
         bpAmountText.fontStyle = FontStyles.Bold;
-        bpAmountText.color = new Color(1f, 0.95f, 0.4f); // Bright gold/yellow for better visibility
+        bpAmountText.color = new Color(1f, 0.85f, 0.2f); // Bright gold for visibility
         bpAmountText.alignment = TextAlignmentOptions.Center;
         bpAmountText.enableAutoSizing = false;
 
         // Add outline for better readability
-        bpAmountText.outlineWidth = 0.2f;
-        bpAmountText.outlineColor = new Color32(0, 0, 0, 200);
+        bpAmountText.outlineWidth = 0.25f;
+        bpAmountText.outlineColor = new Color32(0, 0, 0, 220);
     }
 
     private void CreateNextRoundButton()
@@ -249,6 +263,118 @@ public class ShopManager : MonoBehaviour
         buttonText.alignment = TextAlignmentOptions.Center;
     }
 
+    private void CreateConfirmationPopup()
+    {
+        // Fullscreen overlay
+        confirmationPopup = new GameObject("ConfirmationPopup");
+        confirmationPopup.transform.SetParent(shopPanel, false);
+
+        RectTransform popupRT = confirmationPopup.AddComponent<RectTransform>();
+        popupRT.anchorMin = Vector2.zero;
+        popupRT.anchorMax = Vector2.one;
+        popupRT.offsetMin = Vector2.zero;
+        popupRT.offsetMax = Vector2.zero;
+
+        // Semi-transparent background
+        Image popupBg = confirmationPopup.AddComponent<Image>();
+        popupBg.color = new Color(0f, 0f, 0f, 0.7f);
+        popupBg.raycastTarget = true;
+
+        // Dialog box
+        GameObject dialog = new GameObject("Dialog");
+        dialog.transform.SetParent(confirmationPopup.transform, false);
+
+        RectTransform dialogRT = dialog.AddComponent<RectTransform>();
+        dialogRT.anchorMin = new Vector2(0.5f, 0.5f);
+        dialogRT.anchorMax = new Vector2(0.5f, 0.5f);
+        dialogRT.pivot = new Vector2(0.5f, 0.5f);
+        dialogRT.sizeDelta = new Vector2(600f, 400f);
+
+        Image dialogBg = dialog.AddComponent<Image>();
+        dialogBg.color = new Color(0.15f, 0.15f, 0.2f);
+
+        // Title text
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(dialog.transform, false);
+
+        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
+        titleRT.anchorMin = new Vector2(0f, 0.7f);
+        titleRT.anchorMax = new Vector2(1f, 0.95f);
+        titleRT.offsetMin = new Vector2(20f, 0f);
+        titleRT.offsetMax = new Vector2(-20f, 0f);
+
+        confirmTitleText = titleObj.AddComponent<TextMeshProUGUI>();
+        confirmTitleText.text = "Purchase Card?";
+        confirmTitleText.fontSize = 42;
+        confirmTitleText.fontStyle = FontStyles.Bold;
+        confirmTitleText.color = titleColor;
+        confirmTitleText.alignment = TextAlignmentOptions.Center;
+
+        // Cost text
+        GameObject costObj = new GameObject("Cost");
+        costObj.transform.SetParent(dialog.transform, false);
+
+        RectTransform costRT = costObj.AddComponent<RectTransform>();
+        costRT.anchorMin = new Vector2(0f, 0.4f);
+        costRT.anchorMax = new Vector2(1f, 0.65f);
+        costRT.offsetMin = new Vector2(20f, 0f);
+        costRT.offsetMax = new Vector2(-20f, 0f);
+
+        confirmCostText = costObj.AddComponent<TextMeshProUGUI>();
+        confirmCostText.text = "Cost: 50 BP";
+        confirmCostText.fontSize = 36;
+        confirmCostText.fontStyle = FontStyles.Normal;
+        confirmCostText.color = new Color(1f, 0.85f, 0.2f);
+        confirmCostText.alignment = TextAlignmentOptions.Center;
+
+        // Confirm button
+        CreatePopupButton(dialog.transform, "ConfirmBtn", "CONFIRM", new Vector2(-100f, -130f),
+            new Color(0.2f, 0.7f, 0.3f), OnConfirmPurchase);
+
+        // Cancel button
+        CreatePopupButton(dialog.transform, "CancelBtn", "CANCEL", new Vector2(100f, -130f),
+            new Color(0.7f, 0.3f, 0.3f), OnCancelPurchase);
+
+        // Hide by default
+        confirmationPopup.SetActive(false);
+    }
+
+    private void CreatePopupButton(Transform parent, string name, string text, Vector2 position, Color color, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject btnObj = new GameObject(name);
+        btnObj.transform.SetParent(parent, false);
+
+        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
+        btnRT.anchorMin = new Vector2(0.5f, 0.5f);
+        btnRT.anchorMax = new Vector2(0.5f, 0.5f);
+        btnRT.pivot = new Vector2(0.5f, 0.5f);
+        btnRT.anchoredPosition = position;
+        btnRT.sizeDelta = new Vector2(180f, 60f);
+
+        Image btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = color;
+
+        Button btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = btnImage;
+        btn.onClick.AddListener(onClick);
+
+        // Button text
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        TMP_Text btnText = textObj.AddComponent<TextMeshProUGUI>();
+        btnText.text = text;
+        btnText.fontSize = 28;
+        btnText.fontStyle = FontStyles.Bold;
+        btnText.color = Color.white;
+        btnText.alignment = TextAlignmentOptions.Center;
+    }
 
     /// <summary>
     /// Show the shop UI and populate with cards.
@@ -258,6 +384,13 @@ public class ShopManager : MonoBehaviour
         Debug.Log("[ShopManager] ShowShop called");
 
         EnsureUIExists();
+
+        // Play shop music (or fallback to menu music)
+        PlayShopMusic();
+
+        // Re-enable layout group for fresh card positioning
+        if (cardsLayoutGroup != null)
+            cardsLayoutGroup.enabled = true;
 
         // Reset BP text before counting up
         if (bpAmountText != null)
@@ -273,6 +406,20 @@ public class ShopManager : MonoBehaviour
 
         // Spawn cards
         SpawnCards();
+    }
+
+    private void PlayShopMusic()
+    {
+        if (shopMusic != null)
+        {
+            // Use custom shop music
+            AudioManager.Instance?.PlayMusic(shopMusic);
+        }
+        else
+        {
+            // Fallback to menu music
+            AudioManager.Instance?.PlayMenuMusic();
+        }
     }
 
     /// <summary>
@@ -297,21 +444,82 @@ public class ShopManager : MonoBehaviour
     public void OnNextRoundPressed()
     {
         AudioManager.Instance?.PlayButtonClick();
+        AudioManager.Instance?.StopMusic(); // Stop shop music before transitioning
         SceneFlowManager.Instance?.TransitionFromShopToGame();
     }
 
     /// <summary>
-    /// Called when a card is selected/clicked.
+    /// Called when a card is clicked - shows confirmation popup.
     /// </summary>
     public void OnCardSelected(ShopCard card)
     {
-        Debug.Log($"[ShopManager] Card selected: {card.CardId}");
+        Debug.Log($"[ShopManager] Card clicked: {card.CardId}, Cost: {card.Cost} BP");
 
-        // Remove from active list
-        activeCards.Remove(card);
+        // Store pending card and show confirmation
+        pendingCard = card;
+        ShowConfirmationPopup(card);
+    }
 
-        // TODO: Apply card effect when we have real upgrades
-        // For now, just log it
+    private void ShowConfirmationPopup(ShopCard card)
+    {
+        if (confirmationPopup == null) return;
+
+        // Update popup text
+        if (confirmTitleText != null)
+            confirmTitleText.text = $"Purchase {card.CardTitle}?";
+
+        if (confirmCostText != null)
+            confirmCostText.text = $"Cost: {card.Cost} BP";
+
+        confirmationPopup.SetActive(true);
+        AudioManager.Instance?.PlayButtonClick();
+    }
+
+    private void OnConfirmPurchase()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+
+        if (pendingCard == null)
+        {
+            HideConfirmationPopup();
+            return;
+        }
+
+        // Check if player can afford
+        if (RunManager.Instance != null && RunManager.Instance.SpendBP(pendingCard.Cost))
+        {
+            Debug.Log($"[ShopManager] Purchased {pendingCard.CardTitle} for {pendingCard.Cost} BP");
+
+            // Remove from active list
+            activeCards.Remove(pendingCard);
+
+            // Trigger card's disappear animation
+            pendingCard.ConfirmPurchase();
+
+            // Update BP display
+            RefreshBPDisplay();
+        }
+        else
+        {
+            Debug.Log($"[ShopManager] Cannot afford {pendingCard.CardTitle} - need {pendingCard.Cost} BP");
+            // Could show "insufficient funds" feedback here
+        }
+
+        pendingCard = null;
+        HideConfirmationPopup();
+    }
+
+    private void OnCancelPurchase()
+    {
+        AudioManager.Instance?.PlayButtonClick();
+        pendingCard = null;
+        HideConfirmationPopup();
+    }
+
+    private void HideConfirmationPopup()
+    {
+        if (confirmationPopup != null)
+            confirmationPopup.SetActive(false);
     }
 
     private IEnumerator CountUpBPWithDelay(int targetBP)
@@ -372,9 +580,10 @@ public class ShopManager : MonoBehaviour
             // Initialize with placeholder data
             string title = placeholderTitles[i % placeholderTitles.Length];
             string desc = placeholderDescriptions[i % placeholderDescriptions.Length];
+            int cost = placeholderCosts[i % placeholderCosts.Length];
             float floatOffset = i * 2.1f; // Different phase for each card
 
-            card.Initialize($"card_{i}", title, desc, 0, floatOffset);
+            card.Initialize($"card_{i}", title, desc, cost, floatOffset);
 
             activeCards.Add(card);
 
@@ -385,7 +594,15 @@ public class ShopManager : MonoBehaviour
             }
         }
 
-        Debug.Log($"[ShopManager] Spawned {cardCount} cards");
+        // Wait a frame for layout to finalize positions
+        yield return null;
+        yield return new WaitForEndOfFrame();
+
+        // Disable layout group so cards hold their positions when one is removed
+        if (cardsLayoutGroup != null)
+            cardsLayoutGroup.enabled = false;
+
+        Debug.Log($"[ShopManager] Spawned {cardCount} cards, layout frozen");
     }
 
     private void ClearCards()

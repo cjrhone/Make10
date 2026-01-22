@@ -169,26 +169,29 @@ public class AudioManager : MonoBehaviour
     
     #region Music Playback
     
-    private void PlayMusic(AudioClip clip, bool loop = true)
+    public void PlayMenuMusic() => PlayMusic(menuMusic, loop: true);
+    public void PlayGameMusic() => PlayMusic(gameMusic, loop: true);
+    public void PlayWinMusic() => PlayMusic(winMusic, loop: false);
+    public void PlayLoseMusic() => PlayMusic(loseMusic, loop: false);
+    public void PlayHotStreakMusic() => PlayMusic(hotStreakMusic, loop: true);
+
+    /// <summary>
+    /// Play a custom music clip.
+    /// </summary>
+    public void PlayMusic(AudioClip clip, bool loop = true)
     {
         if (musicSource == null || clip == null)
         {
             Debug.LogWarning($"PlayMusic failed: source={musicSource != null}, clip={clip != null}");
             return;
         }
-        
+
         musicSource.clip = clip;
         musicSource.volume = musicVolume;
         musicSource.loop = loop;
         musicSource.Play();
         Debug.Log($"Playing music: {clip.name} at volume {musicVolume} (loop={loop})");
     }
-    
-    public void PlayMenuMusic() => PlayMusic(menuMusic, loop: true);
-    public void PlayGameMusic() => PlayMusic(gameMusic, loop: true);
-    public void PlayWinMusic() => PlayMusic(winMusic, loop: false);
-    public void PlayLoseMusic() => PlayMusic(loseMusic, loop: false);
-    public void PlayHotStreakMusic() => PlayMusic(hotStreakMusic, loop: true);
     
     public void StopMusic()
     {

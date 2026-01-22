@@ -688,7 +688,7 @@ public class SceneFlowManager : MonoBehaviour
         // Reset game panel position for later
         SetPanelPosition(gamePanel, screenWidth);
 
-        // Notify ShopManager to show (if it exists)
+        // Notify ShopManager to show (if it exists) - it handles its own music
         ShopManager.Instance?.ShowShop();
 
         Debug.Log("Now in Shop state");
