@@ -18199,10 +18199,10 @@ MonoBehaviour:
   collectionDuration: 0.5
   explosionRadius: 150
   explosionDecay: 3
-  smallSizeRange: {x: 8, y: 12}
+  smallSizeRange: {x: 20, y: 28}
   smallParticleColor: {r: 1, g: 0.9, b: 0.5, a: 1}
   smallRotationSpeed: 150
-  bigSizeRange: {x: 18, y: 22}
+  bigSizeRange: {x: 40, y: 52}
   bigParticleColor: {r: 0.7, g: 0.4, b: 1, a: 1}
   bigRotationSpeed: 75
   collectionStaggerSmall: 0.03
