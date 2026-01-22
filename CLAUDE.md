@@ -171,54 +171,110 @@ PHASE 3: COLLECTION (0.5-0.6s)
 | Pause | ~0.1s | Hold at peak position | None |
 | Collection | ~0.5s | Curved path to slider | Slow→Fast (ease-in quadratic) |
 
-### Particle Count Formula
+### Particle Points Formula
+
+Points are calculated from the multiplier, then converted to particles:
 
 ```
-baseCount = 8
-multiplierBonus = floor((multiplier - 1) * 6)
-totalParticles = clamp(baseCount + multiplierBonus, 8, 30)
+basePoints = 10
+multiplierBonus = floor((multiplier - 1) * 8)
+totalPoints = clamp(basePoints + multiplierBonus, 10, 50)
 
 Examples:
-┌────────────┬──────────┬─────────────────┐
-│ Multiplier │ Bonus    │ Total Particles │
-├────────────┼──────────┼─────────────────┤
-│ x1.00      │ +0       │ 8               │
-│ x1.50      │ +3       │ 11              │
-│ x2.00      │ +6       │ 14              │
-│ x2.50      │ +9       │ 17              │
-│ x3.00      │ +12      │ 20              │
-│ x5.00 (HS) │ +24      │ 30 (capped)     │
-└────────────┴──────────┴─────────────────┘
+┌────────────┬──────────┬──────────────┐
+│ Multiplier │ Bonus    │ Total Points │
+├────────────┼──────────┼──────────────┤
+│ x1.00      │ +0       │ 10           │
+│ x1.50      │ +4       │ 14           │
+│ x2.00      │ +8       │ 18           │
+│ x2.50      │ +12      │ 22           │
+│ x3.00      │ +16      │ 26           │
+│ x5.00 (HS) │ +32      │ 42           │
+│ x6.00+     │ +40      │ 50 (capped)  │
+└────────────┴──────────┴──────────────┘
+```
+
+### Two-Size Particle System
+
+Particles come in two sizes representing point values:
+
+| Type | Points | Color | Size |
+|------|--------|-------|------|
+| Small ◇ | 1 point | Gold | 8-12px |
+| Big ◆ | 5 points | Purple | 18-22px |
+
+**Conversion Rules:**
+- **≤14 points**: All small particles (no big)
+- **≥15 points**: Convert excess to big particles
+
+```
+if (totalPoints <= 14):
+    smallCount = totalPoints
+    bigCount = 0
+else:
+    bigCount = min(floor((totalPoints - 10) / 5), 5)  # max 5 big
+    smallCount = totalPoints - (bigCount * 5)
+```
+
+**Conversion Examples:**
+
+```
+┌──────────┬───────┬───────┬─────────────────┬────────────────┐
+│ Points   │ Small │ Big   │ Visual Total    │ Visual Layout  │
+├──────────┼───────┼───────┼─────────────────┼────────────────┤
+│ 10       │ 10    │ 0     │ 10 particles    │ ◇◇◇◇◇◇◇◇◇◇     │
+│ 14       │ 14    │ 0     │ 14 particles    │ ◇◇◇◇◇◇◇◇◇◇◇◇◇◇ │
+│ 15       │ 10    │ 1     │ 11 particles    │ ◇◇◇◇◇◇◇◇◇◇ ◆   │
+│ 20       │ 10    │ 2     │ 12 particles    │ ◇◇◇◇◇◇◇◇◇◇ ◆◆  │
+│ 25       │ 10    │ 3     │ 13 particles    │ ◇◇◇◇◇◇◇◇◇◇ ◆◆◆ │
+│ 30       │ 10    │ 4     │ 14 particles    │ ◇◇◇◇◇◇◇◇◇◇ ◆◆◆◆│
+│ 35       │ 10    │ 5     │ 15 particles    │ ◇◇◇◇◇◇◇◇◇◇ ◆◆◆◆◆│
+│ 50 (max) │ 25    │ 5     │ 30 particles    │ ◇×25 ◆◆◆◆◆     │
+└──────────┴───────┴───────┴─────────────────┴────────────────┘
 ```
 
 ### Progress Bar Bounce Feedback
 
-Bounce intensity escalates with consecutive particle impacts:
+Bounce intensity based on particle type and count:
 
 ```
-Particle #1-3:   scale 1.0 → 1.05 → 1.0  (subtle)
-Particle #4-8:   scale 1.0 → 1.08 → 1.0  (medium)
-Particle #9-15:  scale 1.0 → 1.10 → 1.0  (strong)
-Particle #16+:   scale 1.0 → 1.12 → 1.0  (max)
+Small particle (◇):
+  #1-5:    scale 1.0 → 1.04 → 1.0  (subtle)
+  #6-15:   scale 1.0 → 1.06 → 1.0  (medium)
+  #16+:    scale 1.0 → 1.08 → 1.0  (strong)
+
+Big particle (◆):
+  Always:  scale 1.0 → 1.15 → 1.0  (impactful!)
 
 Bounce duration: 0.08s (snappy)
-Particles staggered ~0.03-0.05s apart for "machine gun" effect
+Small particles staggered ~0.03s apart
+Big particles staggered ~0.08s apart (more dramatic)
 ```
 
 ### Audio
 
-- Each particle impact plays a subtle "tick" sound
-- Tick pitch can vary slightly for variety (±5-10%)
+- **Small particle impact**: Subtle "tick" sound
+- **Big particle impact**: Slightly louder/deeper "thunk" sound
+- Pitch varies slightly for variety (±5-10%)
 - Volume scaled with SFX settings via AudioManager
 
 ### Particle Visual Style
 
-- **Shape**: Diamond (45° rotated square) - reuse existing particle pattern
-- **Color**: Gold glow (`#FFE680` / `rgb(1.0, 0.9, 0.5)`) matching "10" text
-- **Size**: 8-14px, slight random variation
-- **Rotation**: Gentle spin during flight (90-180°/sec)
+**Small Particles (◇)**
+- **Shape**: Diamond (45° rotated square)
+- **Color**: Gold glow (`#FFE680` / `rgb(1.0, 0.9, 0.5)`)
+- **Size**: 8-12px
+- **Rotation**: Spin 120-180°/sec
+
+**Big Particles (◆)**
+- **Shape**: Diamond (45° rotated square)
+- **Color**: Purple (`#B366FF` / `rgb(0.7, 0.4, 1.0)`)
+- **Size**: 18-22px
+- **Rotation**: Spin 60-90°/sec (slower, more weighty)
+
+**Both Types:**
 - **Alpha**: Full opacity during explosion, slight fade during collection
-- **Scale**: Shrink slightly as approaching target (1.0 → 0.6)
+- **Scale**: Shrink as approaching target (1.0 → 0.6)
 
 ### Implementation Files
 
