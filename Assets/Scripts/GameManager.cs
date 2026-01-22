@@ -9,92 +9,38 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
     
-    #region Difficulty Settings
-    
-    public enum DifficultyLevel { Easy, Medium, Hard }
-    
+    #region Game Settings
+
     [System.Serializable]
-    public class DifficultyPreset
+    public class GameSettings
     {
-        public string name;
-        
         [Header("Grid Settings")]
         public int gridSize = 5;
-        
+
         [Header("Win Condition")]
-        public int winScore = 250;
-        
+        public int winScore = 100;
+
         [Header("Tile Weights (must sum to 1.0)")]
-        [Range(0, 1)] public float weight0 = 0.15f;
-        [Range(0, 1)] public float weight1 = 0.22f;
-        [Range(0, 1)] public float weight2 = 0.22f;
-        [Range(0, 1)] public float weight3 = 0.17f;
+        [Range(0, 1)] public float weight0 = 0.12f;
+        [Range(0, 1)] public float weight1 = 0.24f;
+        [Range(0, 1)] public float weight2 = 0.26f;
+        [Range(0, 1)] public float weight3 = 0.20f;
         [Range(0, 1)] public float weight4 = 0.12f;
-        [Range(0, 1)] public float weight5 = 0.06f;
-        [Range(0, 1)] public float weight6 = 0.06f;
-        
+        [Range(0, 1)] public float weight5 = 0.05f;
+        [Range(0, 1)] public float weight6 = 0.01f;
+
         public float[] GetWeights()
         {
             return new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
         }
-        
-        public float TotalWeight()
-        {
-            return weight0 + weight1 + weight2 + weight3 + weight4 + weight5 + weight6;
-        }
     }
-    
-    [Header("Difficulty Presets")]
-    [SerializeField] private DifficultyPreset easyPreset = new DifficultyPreset
-    {
-        name = "Easy",
-        gridSize = 4,     // 4x4 grid - 4 tiles sum to 10 (avg 2.5)
-        winScore = 250,
-        weight0 = 0.05f,  // Low - too many zeros = unsolvable
-        weight1 = 0.15f,  // Moderate
-        weight2 = 0.30f,  // High - very versatile
-        weight3 = 0.25f,  // High - key for 4-tile sums
-        weight4 = 0.20f,  // High - important for reaching 10
-        weight5 = 0.04f,  // Rare
-        weight6 = 0.01f   // Very rare
-    };
-    
-    [SerializeField] private DifficultyPreset mediumPreset = new DifficultyPreset
-    {
-        name = "Medium",
-        gridSize = 5,     // 5x5 grid - 5 tiles sum to 10 (avg 2.0)
-        winScore = 100,
-        weight0 = 0.12f,
-        weight1 = 0.24f,
-        weight2 = 0.26f,
-        weight3 = 0.20f,
-        weight4 = 0.12f,
-        weight5 = 0.05f,
-        weight6 = 0.01f
-    };
-    
-    [SerializeField] private DifficultyPreset hardPreset = new DifficultyPreset
-    {
-        name = "Hard",
-        gridSize = 5,     // 5x5 grid - same as medium, but harder weights
-        winScore = 500,
-        weight0 = 0.15f,  // More zeros = trickier
-        weight1 = 0.22f,
-        weight2 = 0.22f,
-        weight3 = 0.17f,
-        weight4 = 0.12f,
-        weight5 = 0.07f,  // 5s present
-        weight6 = 0.05f   // 6s present - challenging!
-    };
-    
-    [SerializeField] private DifficultyLevel currentDifficulty = DifficultyLevel.Medium;
-    
-    public DifficultyLevel CurrentDifficulty => currentDifficulty;
-    
+
+    [Header("Game Settings")]
+    [SerializeField] private GameSettings gameSettings = new GameSettings();
+
     #endregion
     
-    [Header("Game Settings")]
-    public int WinScore => GetCurrentPreset().winScore;
+    public int WinScore => gameSettings.winScore;
     [SerializeField] private float gameDuration = 60f;
     [SerializeField] private float postWinDelay = 0.5f;
     
@@ -168,13 +114,6 @@ public class GameManager : MonoBehaviour
     
     private void Start()
     {
-        // Ensure hard mode uses 5x5 (in case old serialized value of 6 persists)
-        if (hardPreset.gridSize != 5)
-        {
-            hardPreset.gridSize = 5;
-            Debug.Log("<color=yellow>Hard preset grid size corrected to 5x5</color>");
-        }
-        
         if (SceneFlowManager.Instance == null)
         {
             Debug.Log("GameManager: No SceneFlowManager found - auto-starting for testing");
@@ -225,75 +164,18 @@ public class GameManager : MonoBehaviour
         }
     }
     
-    #region Difficulty Methods
-    
+    #region Settings Accessors
+
     /// <summary>
-    /// Set the difficulty level. Call this before starting a game.
+    /// Get the tile spawn weights.
     /// </summary>
-    public void SetDifficulty(DifficultyLevel level)
-    {
-        currentDifficulty = level;
-        var preset = GetPreset(level);
-        Debug.Log($"<color=yellow>Difficulty set to: {level}</color> (Grid: {preset.gridSize}x{preset.gridSize}, Target: {preset.winScore})");
-        
-        // Log the weights for debugging
-        float[] weights = GetCurrentWeights();
-        string weightStr = $"Weights: ";
-        for (int i = 0; i < weights.Length; i++)
-            weightStr += $"[{i}]={weights[i]:F2} ";
-        Debug.Log(weightStr);
-    }
-    
+    public float[] GetCurrentWeights() => gameSettings.GetWeights();
+
     /// <summary>
-    /// Get the tile spawn weights for the current difficulty.
+    /// Get the grid size.
     /// </summary>
-    public float[] GetCurrentWeights()
-    {
-        return currentDifficulty switch
-        {
-            DifficultyLevel.Easy => easyPreset.GetWeights(),
-            DifficultyLevel.Medium => mediumPreset.GetWeights(),
-            DifficultyLevel.Hard => hardPreset.GetWeights(),
-            _ => mediumPreset.GetWeights()
-        };
-    }
-    
-    /// <summary>
-    /// Get the grid size for the current difficulty.
-    /// </summary>
-    public int GetCurrentGridSize()
-    {
-        return GetCurrentPreset().gridSize;
-    }
-    
-    /// <summary>
-    /// Get the current difficulty preset.
-    /// </summary>
-    public DifficultyPreset GetCurrentPreset()
-    {
-        return currentDifficulty switch
-        {
-            DifficultyLevel.Easy => easyPreset,
-            DifficultyLevel.Medium => mediumPreset,
-            DifficultyLevel.Hard => hardPreset,
-            _ => mediumPreset
-        };
-    }
-    
-    /// <summary>
-    /// Get a specific difficulty preset (for UI display, etc.)
-    /// </summary>
-    public DifficultyPreset GetPreset(DifficultyLevel level)
-    {
-        return level switch
-        {
-            DifficultyLevel.Easy => easyPreset,
-            DifficultyLevel.Medium => mediumPreset,
-            DifficultyLevel.Hard => hardPreset,
-            _ => mediumPreset
-        };
-    }
-    
+    public int GetCurrentGridSize() => gameSettings.gridSize;
+
     #endregion
     
     #region Game Flow
@@ -335,7 +217,7 @@ public class GameManager : MonoBehaviour
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
         
-        Debug.Log($"Game started! Difficulty: {currentDifficulty}, Target: {WinScore}");
+        Debug.Log($"Game started! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}, Target: {WinScore} BP");
     }
     
     /// <summary>
@@ -378,7 +260,7 @@ public class GameManager : MonoBehaviour
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
 
-        Debug.Log($"Game activated! Difficulty: {currentDifficulty}, Target: {WinScore}");
+        Debug.Log($"Game activated! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}, Target: {WinScore} BP");
     }
     
     public void OnCascadeStart()
@@ -624,9 +506,4 @@ public class GameManager : MonoBehaviour
     }
     
     #endregion
-    
-    public void OnPlayerSwap()
-    {
-        // Could add small motivation boost for activity
-    }
 }

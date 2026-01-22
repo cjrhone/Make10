@@ -13,7 +13,6 @@ public class SceneFlowManager : MonoBehaviour
     [Header("Panels")]
     [SerializeField] private RectTransform loadingPanel;
     [SerializeField] private RectTransform mainMenuPanel;
-    [SerializeField] private RectTransform difficultyPanel;
     [SerializeField] private RectTransform optionsPanel;
     [SerializeField] private RectTransform gamePanel;
     [SerializeField] private RectTransform tutorialPanel1;
@@ -41,7 +40,7 @@ public class SceneFlowManager : MonoBehaviour
     private float screenWidth;
     
     // Current state
-    public enum GameState { Loading, MainMenu, DifficultySelect, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, Options, Game, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
     
     #region Initialization
@@ -73,7 +72,7 @@ public class SceneFlowManager : MonoBehaviour
     private void InitializePanels()
     {
         // Position all panels off-screen except loading
-        RectTransform[] offScreenPanels = { mainMenuPanel, difficultyPanel, gamePanel, optionsPanel, 
+        RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, optionsPanel,
             tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
         
         foreach (var panel in offScreenPanels)
@@ -84,7 +83,6 @@ public class SceneFlowManager : MonoBehaviour
         // Set active states
         SetPanelActive(loadingPanel, true);
         SetPanelActive(mainMenuPanel, true);
-        SetPanelActive(difficultyPanel, false); // Difficulty is overlay popup
         SetPanelActive(gamePanel, true);
         SetPanelActive(optionsPanel, false); // Options is overlay
         SetPanelActive(tutorialPanel1, true);
@@ -118,7 +116,6 @@ public class SceneFlowManager : MonoBehaviour
     {
         return CurrentState switch
         {
-            GameState.DifficultySelect => difficultyPanel,
             GameState.Options => optionsPanel,
             _ => null
         };
@@ -142,7 +139,7 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private bool IsOverlayState(GameState state)
     {
-        return state == GameState.DifficultySelect || state == GameState.Options;
+        return state == GameState.Options;
     }
     
     /// <summary>
@@ -169,10 +166,6 @@ public class SceneFlowManager : MonoBehaviour
         switch (CurrentState)
         {
             // Overlay panels → fade out to MainMenu
-            case GameState.DifficultySelect:
-                StartCoroutine(CloseOverlayToMainMenu(difficultyPanel));
-                break;
-                
             case GameState.Options:
                 StartCoroutine(CloseOverlayToMainMenu(optionsPanel));
                 break;
@@ -533,70 +526,17 @@ public class SceneFlowManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Play button pressed - starts game directly (V2: no difficulty select).
+    /// Play button pressed - starts game directly.
     /// </summary>
     public void OnPlayPressed()
     {
         Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
         HandleButton(GameState.MainMenu, () =>
         {
-            // V2: Skip difficulty select, use default difficulty and go straight to game
-            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Medium);
             StartCoroutine(PlaySequence());
         });
     }
-    
-    // Legacy method - now calls GoBack()
-    public void OnDifficultyBackPressed() => GoBack();
-    
-    /// <summary>
-    /// Easy difficulty selected.
-    /// </summary>
-    public void OnEasyPressed()
-    {
-        HandleButton(GameState.DifficultySelect, () =>
-        {
-            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Easy);
-            StartCoroutine(StartGameFromDifficulty());
-        });
-    }
-    
-    /// <summary>
-    /// Medium difficulty selected.
-    /// </summary>
-    public void OnMediumPressed()
-    {
-        HandleButton(GameState.DifficultySelect, () =>
-        {
-            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Medium);
-            StartCoroutine(StartGameFromDifficulty());
-        });
-    }
-    
-    /// <summary>
-    /// Hard difficulty selected.
-    /// </summary>
-    public void OnHardPressed()
-    {
-        HandleButton(GameState.DifficultySelect, () =>
-        {
-            GameManager.Instance?.SetDifficulty(GameManager.DifficultyLevel.Hard);
-            StartCoroutine(StartGameFromDifficulty());
-        });
-    }
-    
-    /// <summary>
-    /// Start the game after difficulty is selected.
-    /// </summary>
-    private IEnumerator StartGameFromDifficulty()
-    {
-        // Hide difficulty panel
-        yield return FadeTransition(difficultyPanel, fadeIn: false);
-        
-        // Continue with normal play sequence
-        yield return PlaySequence();
-    }
-    
+
     public void OnOptionsPressed()
     {
         Debug.Log($"OnOptionsPressed called! CurrentState = {CurrentState}");
