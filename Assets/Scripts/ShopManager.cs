@@ -58,6 +58,7 @@ public class ShopManager : MonoBehaviour
     private Coroutine countUpCoroutine;
     private List<ShopCard> activeCards = new List<ShopCard>();
     private HorizontalLayoutGroup cardsLayoutGroup;
+    private ContentSizeFitter cardsSizeFitter;
 
     // Confirmation popup
     private GameObject confirmationPopup;
@@ -162,9 +163,9 @@ public class ShopManager : MonoBehaviour
         cardsContainer.sizeDelta = new Vector2(800f, cardSize.y + 40f);
 
         // Add ContentSizeFitter to auto-size width based on children
-        ContentSizeFitter csf = cardsObj.AddComponent<ContentSizeFitter>();
-        csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        cardsSizeFitter = cardsObj.AddComponent<ContentSizeFitter>();
+        cardsSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        cardsSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
         // Horizontal layout for cards - centered (will be disabled after spawn)
         cardsLayoutGroup = cardsObj.AddComponent<HorizontalLayoutGroup>();
@@ -388,9 +389,11 @@ public class ShopManager : MonoBehaviour
         // Play shop music (or fallback to menu music)
         PlayShopMusic();
 
-        // Re-enable layout group for fresh card positioning
+        // Re-enable layout components for fresh card positioning
         if (cardsLayoutGroup != null)
             cardsLayoutGroup.enabled = true;
+        if (cardsSizeFitter != null)
+            cardsSizeFitter.enabled = true;
 
         // Reset BP text before counting up
         if (bpAmountText != null)
@@ -594,13 +597,30 @@ public class ShopManager : MonoBehaviour
             }
         }
 
-        // Wait a frame for layout to finalize positions
+        // Wait for layout to finalize positions
         yield return null;
         yield return new WaitForEndOfFrame();
+        Canvas.ForceUpdateCanvases();
+        yield return null;
 
-        // Disable layout group so cards hold their positions when one is removed
-        if (cardsLayoutGroup != null)
-            cardsLayoutGroup.enabled = false;
+        // Freeze the container's current size before disabling layout
+        if (cardsContainer != null)
+        {
+            // Store the current rect size set by the layout system
+            Vector2 finalSize = cardsContainer.rect.size;
+
+            // Disable layout components
+            if (cardsSizeFitter != null)
+                cardsSizeFitter.enabled = false;
+            if (cardsLayoutGroup != null)
+                cardsLayoutGroup.enabled = false;
+
+            // Set the size explicitly to maintain it
+            cardsContainer.sizeDelta = finalSize;
+
+            // Ensure container stays centered
+            cardsContainer.anchoredPosition = new Vector2(0f, 50f);
+        }
 
         Debug.Log($"[ShopManager] Spawned {cardCount} cards, layout frozen");
     }
