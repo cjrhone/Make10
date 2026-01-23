@@ -20,6 +20,10 @@ public class SceneFlowManager : MonoBehaviour
     [SerializeField] private RectTransform tutorialPanel2;
     [SerializeField] private RectTransform countdownPanel;
     [SerializeField] private RectTransform quitPanel;
+    [SerializeField] private RectTransform chillZonePanel;
+
+    [Header("Chill Zone Settings")]
+    [SerializeField] private AudioClip chillZoneMusic;
     
     [Header("Transition Settings")]
     [SerializeField] private float transitionDuration = 0.4f;
@@ -41,7 +45,7 @@ public class SceneFlowManager : MonoBehaviour
     private float screenWidth;
     
     // Current state
-    public enum GameState { Loading, MainMenu, Options, Game, Win, Shop, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, Options, Game, Win, Shop, Tutorial1, Tutorial2, Countdown, Quit, ChillZone, BossFight }
     public GameState CurrentState { get; private set; }
     
     #region Initialization
@@ -72,9 +76,12 @@ public class SceneFlowManager : MonoBehaviour
     
     private void InitializePanels()
     {
+        // Create chill zone panel if it doesn't exist
+        EnsureChillZonePanelExists();
+
         // Position all panels off-screen except loading
         RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, shopPanel, optionsPanel,
-            tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
+            tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel, chillZonePanel };
 
         foreach (var panel in offScreenPanels)
             SetPanelPosition(panel, screenWidth);
@@ -91,6 +98,98 @@ public class SceneFlowManager : MonoBehaviour
         SetPanelActive(tutorialPanel2, true);
         SetPanelActive(countdownPanel, true);
         SetPanelActive(quitPanel, true);
+        SetPanelActive(chillZonePanel, true);
+    }
+
+    /// <summary>
+    /// Create the chill zone panel if not assigned.
+    /// </summary>
+    private void EnsureChillZonePanelExists()
+    {
+        if (chillZonePanel != null) return;
+
+        // Create panel
+        GameObject panelObj = new GameObject("ChillZonePanel");
+        panelObj.transform.SetParent(mainCanvas.transform, false);
+
+        chillZonePanel = panelObj.AddComponent<RectTransform>();
+        chillZonePanel.anchorMin = Vector2.zero;
+        chillZonePanel.anchorMax = Vector2.one;
+        chillZonePanel.offsetMin = Vector2.zero;
+        chillZonePanel.offsetMax = Vector2.zero;
+
+        // Background
+        UnityEngine.UI.Image bg = panelObj.AddComponent<UnityEngine.UI.Image>();
+        bg.color = new Color(0.05f, 0.08f, 0.15f, 0.98f);
+
+        // Title text
+        GameObject titleObj = new GameObject("TitleText");
+        titleObj.transform.SetParent(panelObj.transform, false);
+
+        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
+        titleRT.anchorMin = new Vector2(0.5f, 0.65f);
+        titleRT.anchorMax = new Vector2(0.5f, 0.75f);
+        titleRT.sizeDelta = new Vector2(600f, 120f);
+        titleRT.anchoredPosition = Vector2.zero;
+
+        TMPro.TMP_Text titleText = titleObj.AddComponent<TMPro.TextMeshProUGUI>();
+        titleText.text = "☕ CHILL ZONE ☕";
+        titleText.fontSize = 64f;
+        titleText.fontStyle = TMPro.FontStyles.Bold;
+        titleText.color = new Color(0.7f, 0.85f, 1f);
+        titleText.alignment = TMPro.TextAlignmentOptions.Center;
+
+        // Subtitle text
+        GameObject subtitleObj = new GameObject("SubtitleText");
+        subtitleObj.transform.SetParent(panelObj.transform, false);
+
+        RectTransform subtitleRT = subtitleObj.AddComponent<RectTransform>();
+        subtitleRT.anchorMin = new Vector2(0.5f, 0.5f);
+        subtitleRT.anchorMax = new Vector2(0.5f, 0.6f);
+        subtitleRT.sizeDelta = new Vector2(500f, 80f);
+        subtitleRT.anchoredPosition = Vector2.zero;
+
+        TMPro.TMP_Text subtitleText = subtitleObj.AddComponent<TMPro.TextMeshProUGUI>();
+        subtitleText.text = "Take a breath.\nThe boss fight awaits...";
+        subtitleText.fontSize = 32f;
+        subtitleText.color = new Color(0.6f, 0.7f, 0.8f);
+        subtitleText.alignment = TMPro.TextAlignmentOptions.Center;
+
+        // Fight Boss button
+        GameObject buttonObj = new GameObject("FightBossButton");
+        buttonObj.transform.SetParent(panelObj.transform, false);
+
+        RectTransform buttonRT = buttonObj.AddComponent<RectTransform>();
+        buttonRT.anchorMin = new Vector2(0.5f, 0.25f);
+        buttonRT.anchorMax = new Vector2(0.5f, 0.35f);
+        buttonRT.sizeDelta = new Vector2(350f, 80f);
+        buttonRT.anchoredPosition = Vector2.zero;
+
+        UnityEngine.UI.Image buttonBg = buttonObj.AddComponent<UnityEngine.UI.Image>();
+        buttonBg.color = new Color(0.8f, 0.2f, 0.25f);
+
+        UnityEngine.UI.Button button = buttonObj.AddComponent<UnityEngine.UI.Button>();
+        button.targetGraphic = buttonBg;
+        button.onClick.AddListener(OnFightBossPressed);
+
+        // Button text
+        GameObject buttonTextObj = new GameObject("Text");
+        buttonTextObj.transform.SetParent(buttonObj.transform, false);
+
+        RectTransform btnTextRT = buttonTextObj.AddComponent<RectTransform>();
+        btnTextRT.anchorMin = Vector2.zero;
+        btnTextRT.anchorMax = Vector2.one;
+        btnTextRT.offsetMin = Vector2.zero;
+        btnTextRT.offsetMax = Vector2.zero;
+
+        TMPro.TMP_Text buttonText = buttonTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+        buttonText.text = "FIGHT BOSS";
+        buttonText.fontSize = 36f;
+        buttonText.fontStyle = TMPro.FontStyles.Bold;
+        buttonText.color = Color.white;
+        buttonText.alignment = TMPro.TextAlignmentOptions.Center;
+
+        Debug.Log("[SceneFlowManager] Chill Zone panel created");
     }
     
     #endregion
@@ -410,7 +509,8 @@ public class SceneFlowManager : MonoBehaviour
         // Stop menu music
         AudioManager.Instance?.StopMusic();
 
-        // Start a new run
+        // Start a new campaign and run
+        CampaignManager.Instance?.StartNewCampaign();
         RunManager.Instance?.StartNewRun();
 
         // Transition to game panel
@@ -735,7 +835,136 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log("Next round started");
     }
     
-    public bool IsInGameplay() => CurrentState == GameState.Game;
+    public bool IsInGameplay() => CurrentState == GameState.Game || CurrentState == GameState.BossFight;
+
+    /// <summary>
+    /// Transition to Chill Zone (called by ShopManager when all rounds complete).
+    /// </summary>
+    public void TransitionToChillZone()
+    {
+        if (CurrentState != GameState.Shop)
+        {
+            Debug.LogWarning($"TransitionToChillZone called from invalid state: {CurrentState}");
+            return;
+        }
+
+        StartCoroutine(TransitionToChillZoneSequence());
+    }
+
+    private IEnumerator TransitionToChillZoneSequence()
+    {
+        Debug.Log("TransitionToChillZoneSequence - entering chill zone");
+
+        // Stop shop music
+        AudioManager.Instance?.StopMusic();
+
+        // Hide shop UI
+        ShopManager.Instance?.HideShop();
+
+        // Slide shop panel out, chill zone in
+        yield return SlideTransition(shopPanel, chillZonePanel, slideLeft: true);
+
+        CurrentState = GameState.ChillZone;
+        SetPanelPosition(shopPanel, screenWidth);
+
+        // Play chill zone music if available
+        if (chillZoneMusic != null)
+        {
+            AudioManager.Instance?.PlayMusic(chillZoneMusic);
+        }
+        else
+        {
+            AudioManager.Instance?.PlayMenuMusic();
+        }
+
+        Debug.Log("Now in ChillZone state");
+    }
+
+    /// <summary>
+    /// Fight Boss button pressed in chill zone.
+    /// </summary>
+    public void OnFightBossPressed()
+    {
+        if (CurrentState != GameState.ChillZone)
+        {
+            Debug.LogWarning($"OnFightBossPressed called from invalid state: {CurrentState}");
+            return;
+        }
+
+        AudioManager.Instance?.PlayButtonClick();
+        StartCoroutine(TransitionToBossFightSequence());
+    }
+
+    private IEnumerator TransitionToBossFightSequence()
+    {
+        Debug.Log("TransitionToBossFightSequence - starting boss fight");
+
+        // Stop chill zone music
+        AudioManager.Instance?.StopMusic();
+
+        // Notify CampaignManager to start boss fight
+        CampaignManager.Instance?.StartBossFight();
+
+        // Spawn grid for boss fight
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.SpawnGridOnly();
+
+        // Slide chill zone out, game panel in
+        yield return SlideTransition(chillZonePanel, gamePanel, slideLeft: true);
+
+        SetPanelPosition(chillZonePanel, screenWidth);
+
+        // Run countdown then start boss fight
+        CurrentState = GameState.Countdown;
+        yield return BossFightCountdownSequence();
+    }
+
+    private IEnumerator BossFightCountdownSequence()
+    {
+        Debug.Log("BossFightCountdownSequence started");
+        SetPanelPosition(countdownPanel, 0);
+        countdownPanel.localScale = Vector3.one;
+
+        string[] steps = { "3", "2", "1", "FIGHT!" };
+
+        foreach (string step in steps)
+        {
+            if (countdownText != null)
+            {
+                countdownText.text = step;
+
+                // Play sound
+                if (step == "FIGHT!")
+                    AudioManager.Instance?.PlayCountdownGo();
+                else
+                    AudioManager.Instance?.PlayCountdownBeep();
+
+                // Pop animation
+                yield return CountdownPop();
+            }
+
+            yield return new WaitForSeconds(countdownStepDuration);
+        }
+
+        // Hide countdown and start boss fight
+        Debug.Log("Boss countdown complete - starting boss fight");
+        yield return HidePanel(countdownPanel);
+        CurrentState = GameState.BossFight;
+
+        // Start boss fight music
+        Debug.Log("Starting boss fight music...");
+        AudioManager.Instance?.PlayGameMusic(); // TODO: Boss-specific music
+
+        // Activate boss fight mode
+        Debug.Log("Activating boss fight...");
+        GameManager.Instance?.ActivateBossFight();
+
+        // Start match processing
+        Debug.Log("Starting match processing for boss fight!");
+        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+
+        Debug.Log("BossFightCountdownSequence complete");
+    }
     
     public void RestartWithCountdown()
     {

@@ -305,13 +305,16 @@ public class ShopManager : MonoBehaviour
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
 
-        TMP_Text buttonText = textObj.AddComponent<TextMeshProUGUI>();
-        buttonText.text = "NEXT ROUND";
-        buttonText.fontSize = 36;
-        buttonText.fontStyle = FontStyles.Bold;
-        buttonText.color = Color.white;
-        buttonText.alignment = TextAlignmentOptions.Center;
+        nextRoundButtonText = textObj.AddComponent<TextMeshProUGUI>();
+        nextRoundButtonText.text = "NEXT ROUND";
+        nextRoundButtonText.fontSize = 36;
+        nextRoundButtonText.fontStyle = FontStyles.Bold;
+        nextRoundButtonText.color = Color.white;
+        nextRoundButtonText.alignment = TextAlignmentOptions.Center;
     }
+
+    // Reference to the next round button text for dynamic updates
+    private TMP_Text nextRoundButtonText;
 
     private void CreateConfirmationPopup()
     {
@@ -455,8 +458,50 @@ public class ShopManager : MonoBehaviour
             countUpCoroutine = StartCoroutine(CountUpBPWithDelay(RunManager.Instance.CurrentBP));
         }
 
+        // Update button text based on campaign state
+        UpdateNextRoundButton();
+
         // Spawn cards with real data
         SpawnCards();
+    }
+
+    /// <summary>
+    /// Update the Next Round button text based on campaign state.
+    /// </summary>
+    private void UpdateNextRoundButton()
+    {
+        if (nextRoundButtonText == null)
+        {
+            // Try to find it
+            if (nextRoundButton != null)
+            {
+                nextRoundButtonText = nextRoundButton.GetComponentInChildren<TMP_Text>();
+            }
+        }
+
+        if (nextRoundButtonText != null)
+        {
+            if (CampaignManager.Instance != null && CampaignManager.Instance.AreAllRoundsComplete())
+            {
+                nextRoundButtonText.text = "☕ CHILL ZONE";
+                // Change button color to indicate chill zone
+                Image buttonImg = nextRoundButton?.GetComponent<Image>();
+                if (buttonImg != null)
+                {
+                    buttonImg.color = new Color(0.4f, 0.6f, 0.8f); // Calm blue
+                }
+            }
+            else
+            {
+                nextRoundButtonText.text = "NEXT ROUND";
+                // Standard button color
+                Image buttonImg = nextRoundButton?.GetComponent<Image>();
+                if (buttonImg != null)
+                {
+                    buttonImg.color = buttonColor;
+                }
+            }
+        }
     }
 
     private void PlayShopMusic()
@@ -490,13 +535,25 @@ public class ShopManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Next Round button pressed - return to game.
+    /// Next Round button pressed - return to game or go to chill zone.
     /// </summary>
     public void OnNextRoundPressed()
     {
         AudioManager.Instance?.PlayButtonClick();
         AudioManager.Instance?.StopMusic(); // Stop shop music before transitioning
-        SceneFlowManager.Instance?.TransitionFromShopToGame();
+
+        // Check if all rounds in this stage are complete (time for boss)
+        if (CampaignManager.Instance != null && CampaignManager.Instance.AreAllRoundsComplete())
+        {
+            Debug.Log("[ShopManager] All rounds complete - transitioning to Chill Zone");
+            SceneFlowManager.Instance?.TransitionToChillZone();
+        }
+        else
+        {
+            // Normal flow - next round
+            CampaignManager.Instance?.AdvanceRound();
+            SceneFlowManager.Instance?.TransitionFromShopToGame();
+        }
     }
 
     /// <summary>

@@ -391,11 +391,24 @@ public class GridManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Update grid size based on current difficulty setting.
+    /// Update grid size based on campaign stage settings.
     /// </summary>
     private void UpdateGridSizeFromDifficulty()
     {
-        if (GameManager.Instance != null)
+        // First check CampaignManager for stage-based grid size
+        if (CampaignManager.Instance != null)
+        {
+            int newSize = CampaignManager.Instance.GetCurrentGridSize();
+            if (newSize != gridWidth || newSize != gridHeight)
+            {
+                gridWidth = newSize;
+                gridHeight = newSize;
+                grid = new Tile[gridWidth, gridHeight];
+                Debug.Log($"<color=cyan>Grid size from campaign: {gridWidth}x{gridHeight}</color>");
+            }
+        }
+        // Fallback to GameManager if no campaign
+        else if (GameManager.Instance != null)
         {
             int newSize = GameManager.Instance.GetCurrentGridSize();
             if (newSize != gridWidth || newSize != gridHeight)
@@ -432,20 +445,40 @@ public class GridManager : MonoBehaviour
     
     private int GetWeightedRandomValue()
     {
+        // Get max number from CampaignManager (stage-based) or default to 6
+        int maxNumber = 6;
+        if (CampaignManager.Instance != null)
+        {
+            maxNumber = CampaignManager.Instance.GetCurrentMaxNumber();
+        }
+
         // Get weights from GameManager (difficulty-based) or use fallback
         float[] currentWeights = GetCurrentWeights();
-        
-        float roll = Random.value;
+
+        // Normalize weights to only include values 0 to maxNumber
+        float totalWeight = 0f;
+        for (int i = 0; i <= maxNumber && i < currentWeights.Length; i++)
+        {
+            totalWeight += currentWeights[i];
+        }
+
+        // If no valid weights, return random value in range
+        if (totalWeight <= 0f)
+        {
+            return Random.Range(0, maxNumber + 1);
+        }
+
+        float roll = Random.value * totalWeight;
         float cumulative = 0f;
-        
-        for (int i = 0; i < currentWeights.Length; i++)
+
+        for (int i = 0; i <= maxNumber && i < currentWeights.Length; i++)
         {
             cumulative += currentWeights[i];
             if (roll <= cumulative)
                 return i;
         }
-        
-        return 2;
+
+        return Random.Range(0, maxNumber + 1);
     }
     
     /// <summary>

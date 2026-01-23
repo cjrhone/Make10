@@ -159,7 +159,11 @@ public class CampaignManager : MonoBehaviour
     /// </summary>
     public int GetCurrentThreshold()
     {
-        if (currentStageIndex >= stages.Count) return 0;
+        if (currentStageIndex >= stages.Count)
+        {
+            Debug.LogWarning($"[CampaignManager] GetCurrentThreshold: stageIndex {currentStageIndex} >= stages.Count {stages.Count}");
+            return 0;
+        }
 
         StageData stage = stages[currentStageIndex];
 
@@ -170,10 +174,13 @@ public class CampaignManager : MonoBehaviour
 
         if (currentRoundIndex >= stage.roundThresholds.Length)
         {
+            Debug.LogWarning($"[CampaignManager] GetCurrentThreshold: roundIndex {currentRoundIndex} >= thresholds.Length {stage.roundThresholds.Length} - should be in chill zone!");
             return 0; // Should be in chill zone or boss
         }
 
-        return stage.roundThresholds[currentRoundIndex];
+        int threshold = stage.roundThresholds[currentRoundIndex];
+        Debug.Log($"[CampaignManager] GetCurrentThreshold: Stage {CurrentStage}, Round {CurrentRound}, Threshold = {threshold}");
+        return threshold;
     }
 
     /// <summary>
@@ -205,40 +212,41 @@ public class CampaignManager : MonoBehaviour
 
     /// <summary>
     /// Called when a round is completed (met threshold).
+    /// Note: Game over on failure is handled by GameManager - no BP penalty.
     /// </summary>
-    public void OnRoundCompleted(int bpEarned, bool metThreshold)
+    public void OnRoundCompleted(int bpEarned)
     {
-        StageData stage = stages[currentStageIndex];
+        // Add BP to run total (no penalty - run ends on failure instead)
+        RunManager.Instance?.AddBP(bpEarned);
 
-        // Apply failure penalty if didn't meet threshold
-        int finalBP = bpEarned;
-        if (!metThreshold)
-        {
-            // Tutor snack reduces penalty to 25%
-            float penaltyMultiplier = PlayerInventory.Instance?.HasSnack(SnackType.Tutor) == true ? 0.75f : 0.5f;
-            finalBP = Mathf.RoundToInt(bpEarned * penaltyMultiplier);
-            Debug.Log($"[CampaignManager] Failed threshold - BP reduced to {finalBP}");
-        }
+        // Note: Don't advance round here - shop will call AdvanceRound() when ready
+        Debug.Log($"[CampaignManager] Round completed with {bpEarned} BP, waiting for shop to advance");
+    }
 
-        // Add BP to run total
-        RunManager.Instance?.AddBP(finalBP);
-
-        // Advance to next round
-        AdvanceRound();
+    /// <summary>
+    /// Public method to advance to next round (called by ShopManager).
+    /// </summary>
+    public void AdvanceRound()
+    {
+        Debug.Log($"[CampaignManager] AdvanceRound called. Current: Stage {CurrentStage}, Round {CurrentRound}, RoundIndex={currentRoundIndex}");
+        AdvanceRoundInternal();
     }
 
     /// <summary>
     /// Advance to the next round, chill zone, or boss.
     /// </summary>
-    private void AdvanceRound()
+    private void AdvanceRoundInternal()
     {
         StageData stage = stages[currentStageIndex];
 
+        Debug.Log($"[CampaignManager] Before increment: roundIndex={currentRoundIndex}, thresholds.Length={stage.roundThresholds.Length}");
         currentRoundIndex++;
+        Debug.Log($"[CampaignManager] After increment: roundIndex={currentRoundIndex}");
 
         // Check if all rounds completed
         if (currentRoundIndex >= stage.roundThresholds.Length)
         {
+            Debug.Log($"[CampaignManager] All rounds complete - entering chill zone");
             // Enter chill zone before boss
             EnterChillZone();
             return;
@@ -247,8 +255,21 @@ public class CampaignManager : MonoBehaviour
         // Reset round tracking
         PlayerInventory.Instance?.ResetRoundTracking();
 
-        Debug.Log($"[CampaignManager] Advanced to Stage {CurrentStage}, Round {CurrentRound}");
+        int newThreshold = stage.roundThresholds[currentRoundIndex];
+        Debug.Log($"[CampaignManager] Advanced to Stage {CurrentStage}, Round {CurrentRound}, NEW THRESHOLD = {newThreshold}");
         OnRoundChanged?.Invoke(CurrentRound);
+    }
+
+    /// <summary>
+    /// Check if all rounds in the current stage are complete (ready for boss).
+    /// </summary>
+    public bool AreAllRoundsComplete()
+    {
+        if (currentStageIndex >= stages.Count) return false;
+
+        StageData stage = stages[currentStageIndex];
+        // If round index equals threshold count, we've done all rounds
+        return currentRoundIndex >= stage.roundThresholds.Length;
     }
 
     /// <summary>

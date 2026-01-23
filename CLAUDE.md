@@ -8,15 +8,16 @@ Make10 is a roguelike-style number puzzle game where players swap tiles to creat
 
 ---
 
-## Script Inventory (18 Files)
+## Script Inventory (23 Files)
 
 ### Core Game Logic
 | Script | Purpose |
 |--------|---------|
-| `GameManager.cs` | Game state, scoring, multiplier system, hot streak mode, win/lose conditions |
-| `GridManager.cs` | Grid spawning, tile management, cascade matching, dynamic scaling, hint system |
-| `Tile.cs` | Individual tile behavior, click/swipe input, selection state, values 0-6 |
+| `GameManager.cs` | Game state, scoring, multiplier system, hot streak mode, boss fight mode, win/lose conditions |
+| `GridManager.cs` | Grid spawning, tile management, cascade matching, dynamic scaling from campaign, hint system |
+| `Tile.cs` | Individual tile behavior, click/swipe input, selection state, enhanced visuals |
 | `MatchChecker.cs` | Match detection, row/column sum validation, solvability checks |
+| `CampaignManager.cs` | Stage/round progression, boss fights, campaign flow, threshold tracking |
 
 ### Scene Flow & UI
 | Script | Purpose |
@@ -25,18 +26,20 @@ Make10 is a roguelike-style number puzzle game where players swap tiles to creat
 | `RunManager.cs` | Persistent run state: BP currency, round progression |
 | `UIManager.cs` | Score, timer, multiplier display, win/lose screens, Balatro-style breakdown |
 | `MainMenuUI.cs` | Main menu button handlers |
+| `PopupWindow.cs` | Reusable popup system with scrollbar and auto-size modes |
+| `UpgradeConfirmWindow.cs` | Fancy upgrade detail popup with effects breakdown |
 
 ### Shop System
 | Script | Purpose |
 |--------|---------|
-| `ShopManager.cs` | Shop UI, card management, BP display, purchase confirmation popup |
-| `ShopCard.cs` | Individual upgrade cards with hover/purchase animations |
+| `ShopManager.cs` | Shop UI, pyramid layout, real data loading, purchase flow |
+| `ShopCard.cs` | Individual cards with type badges, color coding, purchase animations |
 
 ### Audio & VFX
 | Script | Purpose |
 |--------|---------|
 | `AudioManager.cs` | Centralized audio (music, SFX, voice), volume persistence |
-| `TenExplosionVFX.cs` | Particle explosion on "10" matches, collection into progress bar |
+| `TenExplosionVFX.cs` | Particle explosion on "10" matches, soft glow particles |
 | `HotStreakEffect.cs` | Fire effects, flames, embers during hot streak mode |
 | `AvatarManager.cs` | Character avatar states and animations |
 | `LoadingBarVFX.cs` | Loading screen procedural effects |
@@ -47,18 +50,21 @@ Make10 is a roguelike-style number puzzle game where players swap tiles to creat
 | `AnimationUtilities.cs` | Static animation library (PunchScale, PopIn, CountUp, etc.) |
 | `ParallaxBackground.cs` | Parallax scrolling for backgrounds |
 | `TutorialDemoWidget.cs` | Tutorial content helper |
+| `GlowTextureGenerator.cs` | Procedural soft glow texture generation (circular & diamond) |
+| `UIStyleGuide.cs` | Centralized UI styling constants and window sizes |
 
 ---
 
 ## Singleton Managers
 
 ```
-GameManager.Instance        → Game state, scoring, multiplier, hot streak
-SceneFlowManager.Instance   → Scene transitions, 9 game states
-UIManager.Instance          → UI updates, win/lose screens
+GameManager.Instance        → Game state, scoring, multiplier, hot streak, boss fight mode
+SceneFlowManager.Instance   → Scene transitions, 11 game states (includes ChillZone, BossFight)
+UIManager.Instance          → UI updates, win/lose screens, campaign display, boss HP bar
 AudioManager.Instance       → Audio playback, volume control
 RunManager.Instance         → BP currency, round progression
-ShopManager.Instance        → Shop UI, card purchases
+CampaignManager.Instance    → Stage/round progression, boss fights, campaign flow
+ShopManager.Instance        → Shop UI, card purchases, chill zone trigger
 AvatarManager.Instance      → Avatar state machine
 TenExplosionVFX.Instance    → Particle effects
 ```
@@ -68,19 +74,27 @@ TenExplosionVFX.Instance    → Particle effects
 ## Game Flow
 
 ```
-Loading → MainMenu → Tutorials → Countdown → Game → Win → Shop → Game (next round)
-                                              ↓
-                                            Lose → Results → MainMenu
+Loading → MainMenu → Tutorials → Countdown → Game → Win → Shop
+                                              ↓                ↓
+                                            Lose          [More Rounds?]
+                                              ↓                 ↓ NO
+                                          MainMenu      ChillZone → BossFight
+                                                              ↓
+                                                        [Boss Defeated?]
+                                                         YES ↓   ↓ NO
+                                                      NextStage  Lose
 ```
 
 ### Game States (SceneFlowManager)
 - **Loading**: Initialization with progress bar (min 1.5s)
 - **MainMenu**: Play, Options, Quit buttons
 - **Tutorial1/2**: 2-part onboarding
-- **Countdown**: "3...2...1...GO!"
-- **Game**: Active gameplay
+- **Countdown**: "3...2...1...GO!" (or "3...2...1...FIGHT!" for boss)
+- **Game**: Active gameplay (normal rounds)
 - **Win**: Score breakdown screen
-- **Shop**: Between-round upgrades
+- **Shop**: Between-round upgrades (6 cards in pyramid)
+- **ChillZone**: Mandatory break before boss fight
+- **BossFight**: Timed boss battle (score = damage)
 - **Options**: Settings overlay
 - **Quit**: Exit confirmation
 
@@ -132,39 +146,48 @@ GAMEPLAY → WIN SCREEN → SHOP → NEXT ROUND
 
 ## Shop System
 
-### Layout
+### Layout (Inverted Pyramid)
 
 ```
 ┌──────────────────────────────────────┐
 │              SHOP                    │
 │                                      │
-│    [Card 1]  [Card 2]  [Card 3]     │  ← Floating animation
+│       [Premium 1]  [Premium 2]       │  ← Top: 2 rare upgrades
 │                                      │
-│   BP: 250                            │  ← Bottom-left, count-up
+│       [Standard 1] [Standard 2]      │  ← Middle: 2 standard upgrades
 │                                      │
-│           [NEXT ROUND]               │
+│         [Snack 1]  [Snack 2]         │  ← Bottom: 2 snacks
+│                                      │
+│   BP: 250              [NEXT ROUND]  │
 └──────────────────────────────────────┘
 ```
 
 ### Card Features
-- **Display**: Title, description, cost (in gold text)
+- **Display**: Title, description, cost, type badge (color-coded)
 - **Animation**: Subtle floating motion (1.2 speed, 4px amplitude)
-- **Interaction**: Click → Confirmation popup → Purchase
+- **Interaction**: Click → UpgradeConfirmWindow (fancy popup) → Purchase
 - **Purchase**: Deducts BP, card disappears with scale-up animation
-- **Positioning**: Cards hold position when one is removed (layout frozen after spawn)
+- **Color Borders**: Each upgrade type has a distinct border color
 
 ### Configuration (ShopManager Inspector)
-- `cardSize`: Card dimensions (default 520×760)
+- `upgradeCardSize`: Upgrade card dimensions (default 380×520)
+- `snackCardSize`: Snack card dimensions (default 340×460)
+- `topRowUpgrades`: Premium upgrade count (default 2)
+- `middleRowUpgrades`: Standard upgrade count (default 2)
+- `bottomRowSnacks`: Snack count (default 2)
+- `rowSpacing`: Vertical spacing between rows
+- `cardSpacingHorizontal`: Horizontal spacing between cards
 - `shopMusic`: Custom music clip (falls back to menu music)
-- `cardCount`: Number of cards to spawn
-- `cardSpawnDelay`: Stagger between card appearances
 
-### Placeholder Cards
-| Title | Description | Cost |
-|-------|-------------|------|
-| Power Up | Increase your base score | 50 BP |
-| Time Boost | Add extra seconds to the clock | 75 BP |
-| Multiplier | Start with a higher multiplier | 100 BP |
+### UpgradeConfirmWindow
+Fancy auto-sizing popup showing:
+- Large upgrade icon (color-coded placeholder if no sprite)
+- Upgrade name and type badge
+- Full description text
+- Effects breakdown
+- Cost display
+- Current BP balance
+- Confirm/Cancel buttons
 
 ---
 
@@ -219,6 +242,36 @@ All elements scale proportionally
 4: Red    (primary)
 5: Orange (1+4)
 6: Purple (2+4)
+```
+
+### Enhanced Tile Visuals
+
+When a tile's number has an "Enhanced Number" upgrade, it displays special effects:
+
+**Visual Components:**
+1. **Soft Radial Glow** - Colored glow behind the tile matching the number's color
+2. **Number Pulse** - Text scales between 1.0→1.15 with slight brightening
+3. **Drop Shadow** - Semi-transparent shadow offset (3px, -3px) for 3D depth
+
+**Animation Settings (Tile.cs Inspector):**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| glowPulseSpeed | 2.0 | Glow alpha oscillation speed |
+| glowMinAlpha | 0.3 | Minimum glow opacity |
+| glowMaxAlpha | 0.7 | Maximum glow opacity |
+| glowSize | 1.3 | Glow size relative to tile |
+| numberPulseSpeed | 3.0 | Number scale oscillation speed |
+| numberPulseMinScale | 1.0 | Minimum number scale |
+| numberPulseMaxScale | 1.15 | Maximum number scale |
+| numberBrightenAmount | 0.3 | How much to brighten toward white |
+| shadowOffset | (3, -3) | Drop shadow position offset |
+| shadowColor | (0,0,0,0.5) | Shadow color with alpha |
+| shadowSoftness | 0.5 | Font dilation for soft shadow |
+
+**Refresh Methods:**
+```csharp
+tile.RefreshEnhancedStatus()     // Update single tile
+Tile.RefreshAllEnhancedStatus()  // Update all tiles (call after upgrade purchase)
 ```
 
 ### Hint System
@@ -341,6 +394,41 @@ OnRunEnded()
 
 ---
 
+## GlowTextureGenerator Utility
+
+Static utility class (`GlowTextureGenerator.cs`) for creating procedural soft glow textures at runtime.
+
+### Available Glow Types
+
+**Circular Glow** - Radial falloff from center (for tile glows, impact flashes)
+```csharp
+Sprite sprite = GlowTextureGenerator.GetCircularGlowSprite(size: 64, falloffPower: 2f);
+GlowTextureGenerator.ApplyCircularGlow(image, textureSize: 64, falloffPower: 1.5f);
+```
+
+**Diamond Glow** - Manhattan distance falloff (for rotated square particles)
+```csharp
+Sprite sprite = GlowTextureGenerator.GetDiamondGlowSprite(size: 64, falloffPower: 2f);
+GlowTextureGenerator.ApplyDiamondGlow(image, textureSize: 64, falloffPower: 1.8f);
+```
+
+### Parameters
+| Parameter | Description |
+|-----------|-------------|
+| size | Texture resolution in pixels (default 64) |
+| falloffPower | How quickly glow fades (1.0 = linear, 2.0+ = sharper edge) |
+
+### Caching
+- Textures are cached by size and falloff power
+- Avoids regenerating identical textures
+- Call `GlowTextureGenerator.ClearCache()` on scene unload if needed
+
+### Usage in Make10
+- **Tile.cs**: Circular glow (falloff 1.5) for enhanced number tiles
+- **TenExplosionVFX.cs**: Diamond glow (falloff 1.8) for particles, circular (falloff 1.2) for impact flash
+
+---
+
 ## Animation Utilities
 
 Available in `AnimationUtilities.cs`:
@@ -356,6 +444,64 @@ Available in `AnimationUtilities.cs`:
 ---
 
 ## Recent Changes
+
+### 2026-01-23
+- **Campaign System Implementation:**
+  - `CampaignManager.cs` - stage/round progression, boss fights
+  - 4 stages with increasing difficulty (grid size, max numbers, BP thresholds)
+  - Boss fight mode with timed encounters (score = damage)
+  - Chill Zone break screen before boss fights
+  - Dynamic grid sizing from campaign stage settings
+  - F4 debug key to instantly complete rounds/kill bosses
+  - Shop button changes to "☕ CHILL ZONE" when all rounds complete
+
+- **UIManager Campaign Updates:**
+  - Stage/Round display during gameplay
+  - Target BP threshold display
+  - Boss HP bar (appears during boss fights)
+  - Campaign event subscriptions
+
+- **SceneFlowManager States:**
+  - Added ChillZone state with auto-generated UI
+  - Added BossFight state with boss countdown sequence
+  - Campaign integration in Play sequence
+
+- **Enhanced Tile Visual System:**
+  - Soft radial glow effect behind enhanced number tiles (using procedural texture)
+  - Number text pulse animation (scale 1.0→1.15) with brightness increase
+  - Drop shadow effect for enhanced numbers (gives 3D "pop" effect)
+  - `GlowTextureGenerator.cs` utility for procedural glow textures
+  - Auto-refresh when upgrades are purchased mid-game
+
+- **Shop System Overhaul:**
+  - **Inverted Pyramid Layout**: 6 cards total (2 top + 2 middle + 2 bottom snacks)
+  - Larger card sizes for better readability
+  - Manual positioning instead of layout group (pyramid formation)
+  - Dedicated snack row at bottom
+  - `UpgradeConfirmWindow.cs` - fancy auto-sizing popup for upgrade details
+
+- **Upgrade Type Color Coding:**
+  - EnhancedNumber: Gold (#FFD933)
+  - Multiplier: Purple (#B34DE6)
+  - Time: Cyan (#4DD9F2)
+  - TileWeight: Green (#4DCC66)
+  - Combo: Orange (#FF8026)
+  - RiskReward: Red (#F24040)
+  - Information: Light Blue (#80B3F2)
+  - Defensive: Teal (#66A680)
+  - BossFight: Crimson (#B32633)
+  - Special: Pink/Magenta (#F266B3)
+  - Snacks: Teal/Mint (#33BFA6)
+
+- **Particle VFX Improvements:**
+  - Soft diamond-shaped glow textures for particles
+  - Soft circular glow for impact flashes
+  - Better visual polish on explosion effects
+
+- **PopupWindow System:**
+  - Added scrollbar support with visible drag handle
+  - Auto-size mode for content-fitting windows
+  - Configurable scrollbar enable/disable
 
 ### 2026-01-22
 - **Shop System Implementation:**
@@ -389,10 +535,75 @@ Available in `AnimationUtilities.cs`:
 
 ---
 
+## Campaign System
+
+### Stage Progression
+
+The game features a 4-stage campaign with rounds leading to boss fights:
+
+```
+Stage 1: "The Basics" (4x4 grid, max number 5)
+├── Round 1: 100 BP threshold
+├── Round 2: 250 BP threshold
+├── Round 3: 500 BP threshold
+├── Chill Zone (break)
+└── Boss: 1000 HP
+
+Stage 2: "Stepping Up" (5x5 grid, max number 6)
+├── Rounds 1-4: 300/600/900/1200 BP
+├── Chill Zone
+└── Boss: 2000 HP
+
+Stage 3: "The Grind" (5x5 grid, max number 7)
+├── Rounds 1-5: 750/1000/1250/1500/1750 BP
+├── Chill Zone
+└── Boss: 3000 HP
+
+Stage 4: "Final Exam" (5x5 grid, max number 7)
+├── Endless Mode (survive as long as possible)
+└── Boss: 10000 HP
+```
+
+### Boss Fight Mode
+
+- **Duration**: 60 seconds (configurable)
+- **Scoring**: BP earned = damage to boss
+- **Win Condition**: Boss HP reaches 0
+- **Lose Condition**: Timer runs out
+- **UI**: Boss HP bar displays above avatar area
+
+### Campaign Manager Events
+```csharp
+OnStageChanged(int stage, int round)
+OnRoundChanged(int round)
+OnBossFightStarted()
+OnBossDamaged(int damage, int remainingHP)
+OnBossDefeated(int bpReward, int goldStars)
+OnChillZoneEntered()
+OnCampaignCompleted()
+```
+
+### Chill Zone
+
+A mandatory break screen before boss fights with:
+- Relaxed atmosphere (optional chill zone music)
+- "FIGHT BOSS" button to start boss fight
+- Lets players prepare mentally
+
+### Debug Commands
+
+| Key | Action |
+|-----|--------|
+| F1 | Debug upgrade panel |
+| F4 | Complete round instantly (reach BP threshold or kill boss) |
+
+---
+
 ## Future Plans
 
-- **Roguelike Progression**: Score milestones unlock permanent upgrades
-- **Real Upgrade Cards**: Actual effects (time boost, multiplier start, etc.)
-- **Dynamic Difficulty**: Tile distribution changes per round
-- **Character Selection**: Multiple avatars with different abilities
+- **Campaign Polish**: Victory screen, stage transition animations
 - **Save System**: Persist progress between sessions
+- **Character Selection**: Multiple avatars with different abilities
+- **More Snacks**: Expand consumable item variety
+- **Artifact System**: Rare passive items with powerful effects
+- **Boss Visuals**: Custom boss sprites and animations

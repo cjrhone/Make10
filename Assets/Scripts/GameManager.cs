@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -65,8 +66,15 @@ public class GameManager : MonoBehaviour
     [SerializeField] private bool debugMode = false;
     [SerializeField] private int debugStartingBP = 500;
 
+    [Header("Boss Fight Settings")]
+    [SerializeField] private float bossFightDuration = 60f;
+
     [Header("References")]
     [SerializeField] private UIManager uiManager;
+
+    // Campaign/Boss state
+    public bool IsBossFight { get; private set; }
+    public int CurrentRoundThreshold => CampaignManager.Instance?.GetCurrentThreshold() ?? WinScore;
 
     // Current state
     public int Score { get; private set; }
@@ -148,25 +156,31 @@ public class GameManager : MonoBehaviour
     {
         if (!IsGameActive) return;
         if (IsSolveAnimationPlaying) return;
-        
+
+        // F4 Debug: Instantly complete round (reach BP threshold)
+        if (Keyboard.current != null && Keyboard.current.f4Key.wasPressedThisFrame)
+        {
+            DebugCompleteRound();
+        }
+
         // Hot Streak mode - pause main timer, run hot streak timer
         if (hotStreakActive)
         {
             hotStreakTimer -= Time.deltaTime;
             OnHotStreakTimerChanged?.Invoke(hotStreakTimer);
-            
+
             if (hotStreakTimer <= 0f)
             {
                 EndHotStreak();
             }
             return; // Skip normal timer drain during hot streak
         }
-        
+
         if (!IsProcessing)
         {
             DrainTime(Time.deltaTime);
         }
-        
+
         if (multiplierActive)
         {
             DrainMultiplierTimer(Time.deltaTime);
@@ -179,6 +193,39 @@ public class GameManager : MonoBehaviour
                 solveCount = 0;
                 timeSinceLastSolve = 0f;
                 Debug.Log("<color=red>Streak timeout!</color> Solve count reset.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Debug: Instantly complete the current round by reaching BP threshold.
+    /// </summary>
+    private void DebugCompleteRound()
+    {
+        if (!IsGameActive) return;
+
+        if (IsBossFight)
+        {
+            // Kill the boss instantly
+            Debug.Log("<color=magenta>[DEBUG F4] Killing boss instantly!</color>");
+            CampaignManager.Instance?.DebugKillBoss();
+        }
+        else
+        {
+            // Set score to threshold
+            int threshold = CurrentRoundThreshold;
+            int pointsNeeded = threshold - Score;
+
+            if (pointsNeeded > 0)
+            {
+                Debug.Log($"<color=magenta>[DEBUG F4] Adding {pointsNeeded} points to reach threshold {threshold}</color>");
+                Score += pointsNeeded;
+                OnScoreChanged?.Invoke(Score, pointsNeeded);
+                CheckWinCondition();
+            }
+            else
+            {
+                Debug.Log("<color=magenta>[DEBUG F4] Already at or above threshold!</color>");
             }
         }
     }
@@ -294,6 +341,45 @@ public class GameManager : MonoBehaviour
         Debug.Log("Game deactivated");
     }
     
+    /// <summary>
+    /// Activate the game for a boss fight (special mode with timer).
+    /// </summary>
+    public void ActivateBossFight()
+    {
+        IsBossFight = true;
+        Score = 0;
+        TimeRemaining = bossFightDuration;
+        IsGameActive = true;
+        IsProcessing = false;
+        IsSolveAnimationPlaying = false;
+
+        solveCount = 0;
+        matchCountThisRound = 0;
+        stopwatchUsedThisRound = false;
+        currentMultiplier = 1f;
+        multiplierTimer = 0f;
+        multiplierActive = false;
+        timeSinceLastSolve = 0f;
+        hotStreakActive = false;
+        hotStreakTimer = 0f;
+        maxMultiplierReached = 1f;
+
+        // Cache effective values from upgrades
+        CacheEffectiveValues();
+
+        OnScoreChanged?.Invoke(Score, 0);
+        OnTimeChanged?.Invoke(TimeRemaining);
+        OnMultiplierChanged?.Invoke(false, 1f, 0f);
+
+        // Reset avatar to default state
+        AvatarManager.Instance?.ResetToDefault();
+
+        // Reset round tracking for snacks
+        PlayerInventory.Instance?.ResetRoundTracking();
+
+        Debug.Log($"<color=red>BOSS FIGHT ACTIVATED!</color> Timer: {bossFightDuration}s");
+    }
+
     /// <summary>
     /// Activate the game without resetting the grid (used when grid was pre-spawned).
     /// </summary>
@@ -588,13 +674,34 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Check if player has reached the win score and trigger win if so.
+    /// Also handles boss damage during boss fights.
     /// </summary>
     private void CheckWinCondition()
     {
-        if (Score >= WinScore && IsGameActive)
+        if (!IsGameActive) return;
+
+        if (IsBossFight)
         {
-            Debug.Log($"<color=cyan>*** WIN THRESHOLD REACHED! ***</color> Score: {Score}/{WinScore}");
-            StartCoroutine(WinGameDelayed());
+            // In boss fight, score = damage to boss
+            // Damage is applied as we score
+            CampaignManager.Instance?.DamageBoss(Score);
+
+            // Check if boss is defeated
+            if (CampaignManager.Instance != null && CampaignManager.Instance.CurrentBossHP <= 0)
+            {
+                Debug.Log($"<color=cyan>*** BOSS DEFEATED! ***</color>");
+                StartCoroutine(WinGameDelayed());
+            }
+        }
+        else
+        {
+            // Normal round - check against threshold
+            int threshold = CurrentRoundThreshold;
+            if (Score >= threshold)
+            {
+                Debug.Log($"<color=cyan>*** WIN THRESHOLD REACHED! ***</color> Score: {Score}/{threshold}");
+                StartCoroutine(WinGameDelayed());
+            }
         }
     }
 
@@ -748,8 +855,17 @@ public class GameManager : MonoBehaviour
         }
 
         IsGameActive = false;
+        int threshold = CurrentRoundThreshold;
 
-        if (Score >= WinScore)
+        if (IsBossFight)
+        {
+            // Boss fight time up = failed to defeat boss
+            Debug.Log($"<color=red>*** BOSS FIGHT FAILED - TIME'S UP ***</color>");
+            IsBossFight = false;
+            SceneFlowManager.Instance?.OnGameEnded(false);
+            OnGameLost?.Invoke();
+        }
+        else if (Score >= threshold)
         {
             Debug.Log("<color=cyan>*** TIME'S UP - YOU WIN! ***</color>");
             SceneFlowManager.Instance?.OnGameEnded(true);
@@ -757,7 +873,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{WinScore}");
+            Debug.Log($"<color=red>*** TIME'S UP - GAME OVER ***</color> Score: {Score}/{threshold}");
             SceneFlowManager.Instance?.OnGameEnded(false);
             OnGameLost?.Invoke();
         }
@@ -772,8 +888,20 @@ public class GameManager : MonoBehaviour
     private void WinGame()
     {
         IsGameActive = false;
-        Debug.Log($"<color=cyan>*** YOU WIN! ***</color> Score: {Score} | Time left: {TimeRemaining:F1}s");
-        
+
+        if (IsBossFight)
+        {
+            Debug.Log($"<color=cyan>*** BOSS DEFEATED! ***</color> Score: {Score} | Time left: {TimeRemaining:F1}s");
+            IsBossFight = false;
+            // CampaignManager handles boss defeat rewards and stage advancement
+        }
+        else
+        {
+            Debug.Log($"<color=cyan>*** YOU WIN! ***</color> Score: {Score} | Time left: {TimeRemaining:F1}s");
+            // Notify CampaignManager that round is completed (BP will be added via UIManager's Continue flow)
+            // Note: UIManager.OnContinueButtonClicked() handles adding BP to RunManager
+        }
+
         SceneFlowManager.Instance?.OnGameEnded(true);
         OnGameWon?.Invoke();
     }

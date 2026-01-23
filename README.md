@@ -90,8 +90,10 @@ When your multiplier exceeds 3.0x, Hot Streak activates:
 
 ### Visual Polish
 - Color-coded tiles (each number 0-6 has a unique color)
+- **Enhanced tile effects** - Soft glow, pulsing numbers, drop shadows for upgraded numbers
 - Smooth swap and fall animations
 - "10" effect with glow, sparkles, and expanding rings
+- **Soft glow particles** - Procedural radial glow textures for polished VFX
 - Particle explosion → collection to progress bar (multiplier scales particle count)
 - Convergence animation - matched tiles spiral to center
 - Score popups floating upward
@@ -162,6 +164,15 @@ Make10/
 | `ArtifactData.cs` | ScriptableObject for passive bonuses |
 | `DebugUpgradePanel.cs` | Runtime debug panel for testing upgrades (F1) |
 
+### UI & Visual Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `PopupWindow.cs` | Reusable popup with scrollbar/auto-size |
+| `UpgradeConfirmWindow.cs` | Upgrade purchase confirmation popup |
+| `GlowTextureGenerator.cs` | Procedural glow texture utility |
+| `UIStyleGuide.cs` | Centralized UI constants |
+
 ---
 
 ## Upgrade System
@@ -169,13 +180,21 @@ Make10/
 Make10 features a roguelike-style upgrade system with three item types:
 
 ### Upgrades (Permanent)
-Persistent enhancements that last the entire run. Examples:
-- **Enhanced Numbers** - Specific tile values give bonus BP when matched
-- **Quick Start** - Begin rounds with bonus time
-- **Momentum** - Consecutive matches give extra multiplier
+Persistent enhancements that last the entire run. Color-coded by type:
+
+| Type | Color | Examples |
+|------|-------|----------|
+| Enhanced Number | Gold | Bonus BP for specific tile values |
+| Multiplier | Purple | Starting multiplier, drain reduction |
+| Time | Cyan | Bonus seconds, time bonuses |
+| Tile Weight | Green | Increase spawn rates for numbers |
+| Combo | Orange | Cascade bonuses, chain rewards |
+| Risk/Reward | Red | Double/half point chances |
+| Special | Pink | Free Space tiles, unique effects |
+| Boss Fight | Crimson | Boss damage, attack reduction |
 
 ### Snacks (Consumables)
-One-time use items triggered during gameplay:
+One-time use items (Teal/Mint colored):
 - **Stopwatch** - Freeze timer for a few seconds
 - **Calculator** - Reveal optimal move
 - **Energy Drink** - Instant multiplier boost
@@ -185,6 +204,12 @@ Rare items with powerful ongoing effects:
 - **Golden Pencil** - All matches worth +2 BP
 - **Teacher's Pet** - Bonus BP at round end
 - **Overachiever** - Multiplier decays slower
+
+### Shop Layout
+The shop displays upgrades in an **inverted pyramid**:
+- **Top Row**: 2 premium/rare upgrades
+- **Middle Row**: 2 standard upgrades
+- **Bottom Row**: 2 snacks (consumables)
 
 ### Debug Panel (Development)
 Press **F1** during gameplay to open the debug panel:
