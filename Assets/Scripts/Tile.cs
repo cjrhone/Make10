@@ -40,7 +40,18 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private float glowMinAlpha = 0.3f;
     [SerializeField] private float glowMaxAlpha = 0.7f;
     [SerializeField] private float glowSize = 1.3f; // Scale relative to tile
-    
+
+    [Header("Enhanced Number Pulse Settings")]
+    [SerializeField] private float numberPulseSpeed = 3f;
+    [SerializeField] private float numberPulseMinScale = 1.0f;
+    [SerializeField] private float numberPulseMaxScale = 1.15f;
+    [SerializeField] private float numberBrightenAmount = 0.3f; // How much to brighten the number
+
+    [Header("Enhanced Number Shadow Settings")]
+    [SerializeField] private Vector2 shadowOffset = new Vector2(3f, -3f);
+    [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.5f);
+    [SerializeField] private float shadowSoftness = 0.5f; // Dilation for soft shadow effect
+
     [Header("Swipe Settings")]
     [SerializeField] private float swipeThreshold = 30f; // Minimum distance to register swipe
     
@@ -60,6 +71,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private Vector2 originalAnchoredPosition; // Store original position for floating
     private bool wasFloating = false; // Track if we actually started floating
     private bool isEnhanced = false; // Track if this tile's number is enhanced
+    private TMP_Text shadowText; // Drop shadow for enhanced numbers
 
     // Swipe tracking
     private Vector2 swipeStartPos;
@@ -110,6 +122,49 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         {
             CreateEnhancedGlow();
         }
+
+        // Create shadow text for enhanced numbers
+        if (shadowText == null && numberText != null)
+        {
+            CreateShadowText();
+        }
+    }
+
+    /// <summary>
+    /// Creates a drop shadow text element behind the main number text.
+    /// </summary>
+    private void CreateShadowText()
+    {
+        GameObject shadowObj = new GameObject("NumberShadow");
+        shadowObj.transform.SetParent(numberText.transform.parent, false);
+
+        // Position shadow behind the number text
+        shadowObj.transform.SetSiblingIndex(numberText.transform.GetSiblingIndex());
+
+        RectTransform shadowRT = shadowObj.AddComponent<RectTransform>();
+        // Copy the number text's rect transform settings
+        RectTransform numberRT = numberText.GetComponent<RectTransform>();
+        shadowRT.anchorMin = numberRT.anchorMin;
+        shadowRT.anchorMax = numberRT.anchorMax;
+        shadowRT.pivot = numberRT.pivot;
+        shadowRT.anchoredPosition = numberRT.anchoredPosition + shadowOffset;
+        shadowRT.sizeDelta = numberRT.sizeDelta;
+
+        shadowText = shadowObj.AddComponent<TextMeshProUGUI>();
+        shadowText.text = numberText.text;
+        shadowText.fontSize = numberText.fontSize;
+        shadowText.fontStyle = numberText.fontStyle;
+        shadowText.font = numberText.font;
+        shadowText.alignment = numberText.alignment;
+        shadowText.color = shadowColor;
+        shadowText.raycastTarget = false;
+
+        // Add slight dilation for softer shadow appearance
+        shadowText.fontMaterial = new Material(numberText.fontMaterial);
+        shadowText.fontMaterial.SetFloat(ShaderUtilities.ID_FaceDilate, shadowSoftness);
+
+        // Start hidden (only show when enhanced)
+        shadowObj.SetActive(false);
     }
 
     /// <summary>
@@ -233,6 +288,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
 
         isEnhanced = enhancedBonus > 0;
 
+        // Update glow
         if (enhancedGlowImage != null)
         {
             if (isEnhanced)
@@ -260,6 +316,20 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
                 StopGlowPulse();
             }
         }
+
+        // Update shadow
+        if (shadowText != null)
+        {
+            if (isEnhanced)
+            {
+                shadowText.gameObject.SetActive(true);
+                shadowText.text = Value.ToString();
+            }
+            else
+            {
+                shadowText.gameObject.SetActive(false);
+            }
+        }
     }
 
     /// <summary>
@@ -284,23 +354,72 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             StopCoroutine(glowCoroutine);
             glowCoroutine = null;
         }
+
+        // Reset number text scale and color
+        if (numberText != null)
+        {
+            numberText.transform.localScale = Vector3.one;
+            numberText.color = NumberColors[Value];
+        }
+
+        // Reset shadow scale
+        if (shadowText != null)
+        {
+            shadowText.transform.localScale = Vector3.one;
+        }
     }
 
     /// <summary>
-    /// Animated glow pulsing for enhanced numbers.
+    /// Animated glow pulsing for enhanced numbers - includes both glow and number text effects.
     /// </summary>
     private IEnumerator GlowPulseCoroutine()
     {
+        Color baseNumberColor = NumberColors[Value];
+        Color brightNumberColor = Color.Lerp(baseNumberColor, Color.white, numberBrightenAmount);
+
         while (isEnhanced && enhancedGlowImage != null && enhancedGlowImage.gameObject.activeSelf)
         {
-            float t = (Mathf.Sin(Time.time * glowPulseSpeed) + 1f) / 2f;
-            float alpha = Mathf.Lerp(glowMinAlpha, glowMaxAlpha, t);
+            // Glow alpha pulse
+            float glowT = (Mathf.Sin(Time.time * glowPulseSpeed) + 1f) / 2f;
+            float alpha = Mathf.Lerp(glowMinAlpha, glowMaxAlpha, glowT);
 
             Color glowColor = NumberColors[Value];
             glowColor.a = alpha;
             enhancedGlowImage.color = glowColor;
 
+            // Number text pulse (slightly different speed for visual interest)
+            float numberT = (Mathf.Sin(Time.time * numberPulseSpeed) + 1f) / 2f;
+
+            // Scale the number text and shadow together
+            if (numberText != null)
+            {
+                float scale = Mathf.Lerp(numberPulseMinScale, numberPulseMaxScale, numberT);
+                numberText.transform.localScale = Vector3.one * scale;
+
+                // Brighten the number color
+                numberText.color = Color.Lerp(baseNumberColor, brightNumberColor, numberT);
+
+                // Scale shadow to match
+                if (shadowText != null)
+                {
+                    shadowText.transform.localScale = Vector3.one * scale;
+                }
+            }
+
             yield return null;
+        }
+
+        // Reset number text when no longer enhanced
+        if (numberText != null)
+        {
+            numberText.transform.localScale = Vector3.one;
+            numberText.color = NumberColors[Value];
+        }
+
+        // Reset shadow scale
+        if (shadowText != null)
+        {
+            shadowText.transform.localScale = Vector3.one;
         }
     }
 

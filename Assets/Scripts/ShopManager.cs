@@ -31,14 +31,20 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private float titleFontSize = 72f;
 
     [Header("Card Settings")]
-    [SerializeField] private Vector2 cardSize = new Vector2(520f, 760f);
+    [SerializeField] private Vector2 upgradeCardSize = new Vector2(380f, 520f);
+    [SerializeField] private Vector2 snackCardSize = new Vector2(340f, 460f);
     [SerializeField] private Color cardBackgroundColor = new Color(0.12f, 0.12f, 0.18f);
     [SerializeField] private Color cardBorderColor = new Color(0.4f, 0.4f, 0.5f);
-    [SerializeField] private int cardCount = 3;
+
+    [Header("Pyramid Layout Settings")]
+    [SerializeField] private int topRowUpgrades = 2;      // Premium/rare upgrades
+    [SerializeField] private int middleRowUpgrades = 2;   // Standard upgrades
+    [SerializeField] private int bottomRowSnacks = 2;     // Consumable snacks
+    [SerializeField] private float rowSpacing = 30f;
+    [SerializeField] private float cardSpacingHorizontal = 25f;
+    [SerializeField] private float pyramidTopOffset = 120f; // How far down from center the top row starts
 
     [Header("Shop Pool Settings")]
-    [Tooltip("Chance for a card slot to be a snack instead of an upgrade (0-1)")]
-    [SerializeField] [Range(0f, 1f)] private float snackChance = 0.33f;
     [Tooltip("Only show items available for current stage")]
     [SerializeField] private bool filterByStage = true;
 
@@ -59,8 +65,6 @@ public class ShopManager : MonoBehaviour
     private bool isInitialized = false;
     private Coroutine countUpCoroutine;
     private List<ShopCard> activeCards = new List<ShopCard>();
-    private HorizontalLayoutGroup cardsLayoutGroup;
-    private ContentSizeFitter cardsSizeFitter;
 
     // Track what's been offered this shop visit (to avoid duplicates)
     private HashSet<string> offeredThisVisit = new HashSet<string>();
@@ -209,33 +213,18 @@ public class ShopManager : MonoBehaviour
 
     private void CreateCardsContainer()
     {
-        // Cards container - centered in screen
+        // Cards container - centered in screen, covers most of the shop area
         GameObject cardsObj = new GameObject("CardsContainer");
         cardsObj.transform.SetParent(shopPanel, false);
 
         cardsContainer = cardsObj.AddComponent<RectTransform>();
-        // Anchor to center of screen
-        cardsContainer.anchorMin = new Vector2(0.5f, 0.5f);
-        cardsContainer.anchorMax = new Vector2(0.5f, 0.5f);
-        cardsContainer.pivot = new Vector2(0.5f, 0.5f);
-        cardsContainer.anchoredPosition = new Vector2(0f, 50f); // Slightly above center
-        // Size will expand based on content
-        cardsContainer.sizeDelta = new Vector2(800f, cardSize.y + 40f);
+        // Anchor to fill most of the screen
+        cardsContainer.anchorMin = new Vector2(0.05f, 0.15f);
+        cardsContainer.anchorMax = new Vector2(0.95f, 0.85f);
+        cardsContainer.offsetMin = Vector2.zero;
+        cardsContainer.offsetMax = Vector2.zero;
 
-        // Add ContentSizeFitter to auto-size width based on children
-        cardsSizeFitter = cardsObj.AddComponent<ContentSizeFitter>();
-        cardsSizeFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        cardsSizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        // Horizontal layout for cards - centered (will be disabled after spawn)
-        cardsLayoutGroup = cardsObj.AddComponent<HorizontalLayoutGroup>();
-        cardsLayoutGroup.spacing = 30f;
-        cardsLayoutGroup.childAlignment = TextAnchor.MiddleCenter;
-        cardsLayoutGroup.childControlWidth = false;
-        cardsLayoutGroup.childControlHeight = false;
-        cardsLayoutGroup.childForceExpandWidth = false;
-        cardsLayoutGroup.childForceExpandHeight = false;
-        cardsLayoutGroup.padding = new RectOffset(20, 20, 20, 20);
+        // No layout group - we'll position cards manually in pyramid formation
     }
 
     private void CreateBPDisplay()
@@ -453,12 +442,6 @@ public class ShopManager : MonoBehaviour
 
         // Play shop music (or fallback to menu music)
         PlayShopMusic();
-
-        // Re-enable layout components for fresh card positioning
-        if (cardsLayoutGroup != null)
-            cardsLayoutGroup.enabled = true;
-        if (cardsSizeFitter != null)
-            cardsSizeFitter.enabled = true;
 
         // Reset BP text before counting up
         if (bpAmountText != null)
@@ -691,106 +674,154 @@ public class ShopManager : MonoBehaviour
     private IEnumerator SpawnCardsSequentially()
     {
         int currentStage = CampaignManager.Instance?.CurrentStage ?? 1;
+        int cardIndex = 0;
 
-        for (int i = 0; i < cardCount; i++)
+        // Calculate total height needed
+        float totalHeight = upgradeCardSize.y + rowSpacing + upgradeCardSize.y + rowSpacing + snackCardSize.y;
+        float startY = totalHeight / 2f - upgradeCardSize.y / 2f;
+
+        // ===== TOP ROW: Premium/Rare Upgrades (2 cards) =====
+        float topRowY = startY;
+        float topRowWidth = topRowUpgrades * upgradeCardSize.x + (topRowUpgrades - 1) * cardSpacingHorizontal;
+        float topRowStartX = -topRowWidth / 2f + upgradeCardSize.x / 2f;
+
+        for (int i = 0; i < topRowUpgrades; i++)
         {
-            // Create card
             ShopCard card = ShopCard.CreateCard(
                 cardsContainer,
-                cardSize,
+                upgradeCardSize,
                 cardBackgroundColor,
                 cardBorderColor
             );
 
-            float floatOffset = i * 2.1f;
+            // Position the card
+            RectTransform cardRT = card.GetComponent<RectTransform>();
+            cardRT.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRT.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRT.pivot = new Vector2(0.5f, 0.5f);
+            float xPos = topRowStartX + i * (upgradeCardSize.x + cardSpacingHorizontal);
+            cardRT.anchoredPosition = new Vector2(xPos, topRowY);
 
-            // Decide if this slot should be a snack or upgrade
-            bool isSnack = Random.value < snackChance;
-
-            if (isSnack)
+            float floatOffset = cardIndex * 2.1f;
+            UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
+            if (upgrade != null)
             {
-                SnackData snack = GetRandomAvailableSnack(currentStage);
-                if (snack != null)
-                {
-                    card.InitializeWithSnack(snack, floatOffset);
-                    offeredThisVisit.Add(snack.id);
-                    Debug.Log($"[ShopManager] Card {i}: Snack - {snack.displayName}");
-                }
-                else
-                {
-                    // No snacks available, fall back to upgrade
-                    UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
-                    if (upgrade != null)
-                    {
-                        card.InitializeWithUpgrade(upgrade, floatOffset);
-                        offeredThisVisit.Add(upgrade.id);
-                        Debug.Log($"[ShopManager] Card {i}: Upgrade (snack fallback) - {upgrade.displayName}");
-                    }
-                    else
-                    {
-                        // No items available at all - use placeholder
-                        card.Initialize($"empty_{i}", "Sold Out", "No items available", 0, floatOffset);
-                        Debug.LogWarning($"[ShopManager] Card {i}: No items available!");
-                    }
-                }
+                card.InitializeWithUpgrade(upgrade, floatOffset);
+                offeredThisVisit.Add(upgrade.id);
+                Debug.Log($"[ShopManager] Top Row {i}: {upgrade.displayName}");
             }
             else
             {
+                card.Initialize($"empty_{cardIndex}", "Sold Out", "No upgrades available", 0, floatOffset);
+            }
+
+            activeCards.Add(card);
+            cardIndex++;
+
+            if (cardSpawnDelay > 0)
+                yield return new WaitForSeconds(cardSpawnDelay);
+        }
+
+        // ===== MIDDLE ROW: Standard Upgrades (2 cards) =====
+        float middleRowY = topRowY - upgradeCardSize.y - rowSpacing;
+        float middleRowWidth = middleRowUpgrades * upgradeCardSize.x + (middleRowUpgrades - 1) * cardSpacingHorizontal;
+        float middleRowStartX = -middleRowWidth / 2f + upgradeCardSize.x / 2f;
+
+        for (int i = 0; i < middleRowUpgrades; i++)
+        {
+            ShopCard card = ShopCard.CreateCard(
+                cardsContainer,
+                upgradeCardSize,
+                cardBackgroundColor,
+                cardBorderColor
+            );
+
+            RectTransform cardRT = card.GetComponent<RectTransform>();
+            cardRT.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRT.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRT.pivot = new Vector2(0.5f, 0.5f);
+            float xPos = middleRowStartX + i * (upgradeCardSize.x + cardSpacingHorizontal);
+            cardRT.anchoredPosition = new Vector2(xPos, middleRowY);
+
+            float floatOffset = cardIndex * 2.1f;
+            UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
+            if (upgrade != null)
+            {
+                card.InitializeWithUpgrade(upgrade, floatOffset);
+                offeredThisVisit.Add(upgrade.id);
+                Debug.Log($"[ShopManager] Middle Row {i}: {upgrade.displayName}");
+            }
+            else
+            {
+                card.Initialize($"empty_{cardIndex}", "Sold Out", "No upgrades available", 0, floatOffset);
+            }
+
+            activeCards.Add(card);
+            cardIndex++;
+
+            if (cardSpawnDelay > 0)
+                yield return new WaitForSeconds(cardSpawnDelay);
+        }
+
+        // ===== BOTTOM ROW: Snacks (2 cards) =====
+        float bottomRowY = middleRowY - upgradeCardSize.y - rowSpacing;
+        float bottomRowWidth = bottomRowSnacks * snackCardSize.x + (bottomRowSnacks - 1) * cardSpacingHorizontal;
+        float bottomRowStartX = -bottomRowWidth / 2f + snackCardSize.x / 2f;
+
+        for (int i = 0; i < bottomRowSnacks; i++)
+        {
+            ShopCard card = ShopCard.CreateCard(
+                cardsContainer,
+                snackCardSize,
+                cardBackgroundColor,
+                cardBorderColor
+            );
+
+            RectTransform cardRT = card.GetComponent<RectTransform>();
+            cardRT.anchorMin = new Vector2(0.5f, 0.5f);
+            cardRT.anchorMax = new Vector2(0.5f, 0.5f);
+            cardRT.pivot = new Vector2(0.5f, 0.5f);
+            float xPos = bottomRowStartX + i * (snackCardSize.x + cardSpacingHorizontal);
+            cardRT.anchoredPosition = new Vector2(xPos, bottomRowY);
+
+            float floatOffset = cardIndex * 2.1f;
+            SnackData snack = GetRandomAvailableSnack(currentStage);
+            if (snack != null)
+            {
+                card.InitializeWithSnack(snack, floatOffset);
+                offeredThisVisit.Add(snack.id);
+                Debug.Log($"[ShopManager] Bottom Row {i}: Snack - {snack.displayName}");
+            }
+            else
+            {
+                // Fall back to upgrade if no snacks
                 UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
                 if (upgrade != null)
                 {
                     card.InitializeWithUpgrade(upgrade, floatOffset);
                     offeredThisVisit.Add(upgrade.id);
-                    Debug.Log($"[ShopManager] Card {i}: Upgrade - {upgrade.displayName}");
                 }
                 else
                 {
-                    // No upgrades available, try snack
-                    SnackData snack = GetRandomAvailableSnack(currentStage);
-                    if (snack != null)
-                    {
-                        card.InitializeWithSnack(snack, floatOffset);
-                        offeredThisVisit.Add(snack.id);
-                        Debug.Log($"[ShopManager] Card {i}: Snack (upgrade fallback) - {snack.displayName}");
-                    }
-                    else
-                    {
-                        card.Initialize($"empty_{i}", "Sold Out", "No items available", 0, floatOffset);
-                        Debug.LogWarning($"[ShopManager] Card {i}: No items available!");
-                    }
+                    card.Initialize($"empty_{cardIndex}", "Sold Out", "Nothing available", 0, floatOffset);
                 }
             }
 
             activeCards.Add(card);
+            cardIndex++;
 
-            // Small delay between card spawns
-            if (cardSpawnDelay > 0 && i < cardCount - 1)
-            {
+            if (cardSpawnDelay > 0)
                 yield return new WaitForSeconds(cardSpawnDelay);
-            }
         }
 
-        // Wait for layout to finalize positions
+        // Wait for layout to finalize
         yield return null;
         yield return new WaitForEndOfFrame();
         Canvas.ForceUpdateCanvases();
         yield return null;
 
-        // Freeze the container's current size before disabling layout
-        if (cardsContainer != null)
-        {
-            Vector2 finalSize = cardsContainer.rect.size;
-
-            if (cardsSizeFitter != null)
-                cardsSizeFitter.enabled = false;
-            if (cardsLayoutGroup != null)
-                cardsLayoutGroup.enabled = false;
-
-            cardsContainer.sizeDelta = finalSize;
-            cardsContainer.anchoredPosition = new Vector2(0f, 50f);
-        }
-
-        Debug.Log($"[ShopManager] Spawned {cardCount} cards with real data");
+        int totalCards = topRowUpgrades + middleRowUpgrades + bottomRowSnacks;
+        Debug.Log($"[ShopManager] Spawned {totalCards} cards in pyramid layout (Top: {topRowUpgrades}, Middle: {middleRowUpgrades}, Bottom: {bottomRowSnacks})");
     }
 
     /// <summary>

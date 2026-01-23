@@ -154,8 +154,8 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         if (costText != null)
             costText.text = $"{Cost} BP";
 
-        // Set icon or colored placeholder (snacks use warm orange color)
-        Color snackColor = new Color(0.9f, 0.6f, 0.2f, 1f);
+        // Set icon or colored placeholder (snacks use teal/mint color)
+        Color snackColor = GetSnackColor();
         SetupIcon(snack.icon, snackColor);
 
         // Set type badge
@@ -227,20 +227,32 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
     private Color GetUpgradeTypeColor(UpgradeType type)
     {
+        // Color coding philosophy:
+        // - Warm colors (gold, orange, red) for offensive/scoring upgrades
+        // - Cool colors (blue, cyan, purple) for defensive/utility upgrades
+        // - Neutral (green) for growth/spawning
         return type switch
         {
-            UpgradeType.EnhancedNumber => new Color(0.3f, 0.7f, 0.4f, 1f),   // Green
-            UpgradeType.Multiplier => new Color(0.9f, 0.6f, 0.2f, 1f),       // Orange
-            UpgradeType.Time => new Color(0.3f, 0.6f, 0.9f, 1f),             // Blue
-            UpgradeType.TileWeight => new Color(0.7f, 0.4f, 0.8f, 1f),       // Purple
-            UpgradeType.Combo => new Color(0.9f, 0.3f, 0.5f, 1f),            // Pink
-            UpgradeType.RiskReward => new Color(0.9f, 0.2f, 0.2f, 1f),       // Red
-            UpgradeType.Information => new Color(0.4f, 0.7f, 0.9f, 1f),      // Light blue
-            UpgradeType.Defensive => new Color(0.2f, 0.5f, 0.3f, 1f),        // Dark green
-            UpgradeType.BossFight => new Color(0.5f, 0.2f, 0.6f, 1f),        // Dark purple
-            UpgradeType.Special => new Color(1f, 0.85f, 0.3f, 1f),           // Gold
+            UpgradeType.EnhancedNumber => new Color(1f, 0.85f, 0.2f, 1f),    // Gold - ties to BP/value
+            UpgradeType.Multiplier => new Color(0.7f, 0.3f, 0.9f, 1f),       // Purple - premium/powerful
+            UpgradeType.Time => new Color(0.3f, 0.85f, 0.95f, 1f),           // Cyan - clock/time
+            UpgradeType.TileWeight => new Color(0.3f, 0.8f, 0.4f, 1f),       // Green - growth/spawning
+            UpgradeType.Combo => new Color(1f, 0.5f, 0.15f, 1f),             // Orange - energy/chains
+            UpgradeType.RiskReward => new Color(0.95f, 0.25f, 0.25f, 1f),    // Red - danger/gambling
+            UpgradeType.Information => new Color(0.5f, 0.7f, 0.95f, 1f),     // Light blue - knowledge
+            UpgradeType.Defensive => new Color(0.4f, 0.65f, 0.5f, 1f),       // Teal - protection
+            UpgradeType.BossFight => new Color(0.7f, 0.15f, 0.2f, 1f),       // Crimson - boss combat
+            UpgradeType.Special => new Color(0.95f, 0.4f, 0.7f, 1f),         // Pink/Magenta - unique
             _ => new Color(0.5f, 0.5f, 0.55f, 1f)
         };
+    }
+
+    /// <summary>
+    /// Get the snack card color (consistent teal/mint for consumables).
+    /// </summary>
+    public static Color GetSnackColor()
+    {
+        return new Color(0.2f, 0.75f, 0.65f, 1f); // Teal/Mint - refreshing/consumable
     }
 
     /// <summary>
