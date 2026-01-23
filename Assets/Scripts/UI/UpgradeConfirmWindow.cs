@@ -109,7 +109,7 @@ public class UpgradeConfirmWindow : MonoBehaviour
         popupObj.transform.SetParent(canvas.transform, false);
 
         popupWindow = popupObj.AddComponent<PopupWindow>();
-        popupWindow.SetAutoSizeMode(windowWidth, minWindowHeight, maxWindowHeight);
+        popupWindow.SetAutoSizeMode(windowWidth, minWindowHeight, maxWindowHeight, enableScrollbar: false);
 
         popupWindow.OnWindowClosed += HandleWindowClosed;
     }

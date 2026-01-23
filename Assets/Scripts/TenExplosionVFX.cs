@@ -262,6 +262,9 @@ public class TenExplosionVFX : MonoBehaviour
         glowImg.color = new Color(particleColor.r, particleColor.g, particleColor.b, glowAlpha);
         glowImg.raycastTarget = false;
 
+        // Apply soft diamond glow texture (since particles are rotated 45 degrees)
+        GlowTextureGenerator.ApplyDiamondGlow(glowImg, 64, 1.8f);
+
         // Create main particle (on top of glow)
         GameObject particleObj = new GameObject(isBig ? "BigParticle" : "SmallParticle");
         particleObj.transform.SetParent(particleContainer, false);
@@ -274,6 +277,9 @@ public class TenExplosionVFX : MonoBehaviour
         Image img = particleObj.AddComponent<Image>();
         img.color = particleColor;
         img.raycastTarget = false;
+
+        // Apply soft diamond glow texture for the main particle too (softer edges)
+        GlowTextureGenerator.ApplyDiamondGlow(img, 64, 3f);
 
         // Random explosion direction using golden angle for even distribution
         float goldenAngle = 137.5f * Mathf.Deg2Rad;
@@ -502,12 +508,16 @@ public class TenExplosionVFX : MonoBehaviour
 
         float size = isBig ? flashSize * 1.5f : flashSize;
         rt.sizeDelta = new Vector2(size, size);
-        rt.localEulerAngles = new Vector3(0, 0, 45f);
+        // No rotation needed - using circular glow for flash
+        rt.localEulerAngles = Vector3.zero;
 
         Image img = flashObj.AddComponent<Image>();
         Color flashColor = isBig ? bigFlashColor : smallFlashColor;
         img.color = flashColor;
         img.raycastTarget = false;
+
+        // Apply soft circular glow for impact flash
+        GlowTextureGenerator.ApplyCircularGlow(img, 64, 1.2f);
 
         // Animate flash: quick scale up, then fade out
         float elapsed = 0f;

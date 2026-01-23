@@ -11170,11 +11170,12 @@ MonoBehaviour:
   bpBackdropColor: {r: 0, g: 0, b: 0, a: 0.7}
   buttonColor: {r: 0.2, g: 0.6, b: 0.9, a: 1}
   titleFontSize: 72
-  bpFontSize: 48
   cardSize: {x: 280, y: 380}
   cardBackgroundColor: {r: 0.15, g: 0.15, b: 0.2, a: 1}
   cardBorderColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
   cardCount: 3
+  snackChance: 0.33
+  filterByStage: 1
   bpCountUpDuration: 0.8
   bpCountUpDelay: 0.3
   cardSpawnDelay: 0.15

@@ -204,12 +204,17 @@ public class PopupWindow : MonoBehaviour
     /// <summary>
     /// Sets the window to auto-size mode with specified parameters.
     /// </summary>
-    public void SetAutoSizeMode(float width = 800f, float minHeight = 300f, float maxHeight = 1400f)
+    /// <param name="width">Fixed width of the window</param>
+    /// <param name="minHeight">Minimum height of the window</param>
+    /// <param name="maxHeight">Maximum height (0 = no limit)</param>
+    /// <param name="enableScrollbar">Whether to show the scrollbar (default true)</param>
+    public void SetAutoSizeMode(float width = 800f, float minHeight = 300f, float maxHeight = 1400f, bool enableScrollbar = true)
     {
         sizePreset = WindowSize.AutoSize;
         autoSizeWidth = width;
         autoSizeMinHeight = minHeight;
         autoSizeMaxHeight = maxHeight;
+        showScrollbar = enableScrollbar;
     }
 
     #endregion

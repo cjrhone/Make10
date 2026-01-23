@@ -471,7 +471,23 @@ public class PlayerInventory : MonoBehaviour
 
     #endregion
 
-    #region Snack Triggers
+    #region Item Queries
+
+    /// <summary>
+    /// Check if player has a specific upgrade by ID.
+    /// </summary>
+    public bool HasUpgrade(string upgradeId)
+    {
+        return upgrades.Keys.Any(u => u.id == upgradeId);
+    }
+
+    /// <summary>
+    /// Check if player has a specific snack by ID.
+    /// </summary>
+    public bool HasSnack(string snackId)
+    {
+        return snacks.Any(s => s.id == snackId);
+    }
 
     /// <summary>
     /// Check if player has a specific snack type.

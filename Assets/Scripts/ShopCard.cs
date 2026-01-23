@@ -6,14 +6,20 @@ using System.Collections;
 
 /// <summary>
 /// Individual shop card with floating animation and click-to-select behavior.
-/// Card structure: Title (bold) | Image (empty) | Description
+/// Card structure: Title (bold) | Image/Icon | Description | Cost
+/// Supports both UpgradeData and SnackData items.
 /// </summary>
 public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
+    public enum CardType { Upgrade, Snack }
+
     [Header("Card Content")]
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private Image iconImage;
     [SerializeField] private TMP_Text descriptionText;
+    [SerializeField] private TMP_Text costText;
+    [SerializeField] private Image typeBadge;
+    [SerializeField] private TMP_Text typeBadgeText;
 
     [Header("Visual Settings")]
     [SerializeField] private Image cardBackground;
@@ -40,10 +46,13 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     private bool isHovered = false;
     private Coroutine hoverCoroutine;
 
-    // Card data
+    // Card data - supports both types
     public string CardId { get; private set; }
     public string CardTitle { get; private set; }
     public int Cost { get; private set; }
+    public CardType Type { get; private set; }
+    public UpgradeData UpgradeData { get; private set; }
+    public SnackData SnackData { get; private set; }
 
     private void Awake()
     {
@@ -85,7 +94,80 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     }
 
     /// <summary>
-    /// Initialize the card with data.
+    /// Initialize the card with an UpgradeData asset.
+    /// </summary>
+    public void InitializeWithUpgrade(UpgradeData upgrade, float floatPhaseOffset)
+    {
+        if (upgrade == null) return;
+
+        Type = CardType.Upgrade;
+        UpgradeData = upgrade;
+        SnackData = null;
+
+        CardId = upgrade.id;
+        CardTitle = upgrade.displayName;
+        Cost = upgrade.GetEffectiveCost(PlayerInventory.Instance?.GetPriceModifier() ?? 1f);
+        floatOffset = floatPhaseOffset;
+
+        if (titleText != null)
+            titleText.text = upgrade.displayName;
+
+        if (descriptionText != null)
+            descriptionText.text = upgrade.description;
+
+        if (costText != null)
+            costText.text = $"{Cost} BP";
+
+        // Set icon or colored placeholder
+        SetupIcon(upgrade.icon, GetUpgradeTypeColor(upgrade.upgradeType));
+
+        // Set type badge
+        SetupTypeBadge(upgrade.upgradeType.ToString(), GetUpgradeTypeColor(upgrade.upgradeType));
+
+        // Tint card border based on type
+        if (cardBorder != null)
+            cardBorder.color = GetUpgradeTypeColor(upgrade.upgradeType);
+    }
+
+    /// <summary>
+    /// Initialize the card with a SnackData asset.
+    /// </summary>
+    public void InitializeWithSnack(SnackData snack, float floatPhaseOffset)
+    {
+        if (snack == null) return;
+
+        Type = CardType.Snack;
+        SnackData = snack;
+        UpgradeData = null;
+
+        CardId = snack.id;
+        CardTitle = snack.displayName;
+        Cost = snack.GetEffectiveCost(PlayerInventory.Instance?.GetPriceModifier() ?? 1f);
+        floatOffset = floatPhaseOffset;
+
+        if (titleText != null)
+            titleText.text = snack.displayName;
+
+        if (descriptionText != null)
+            descriptionText.text = snack.description;
+
+        if (costText != null)
+            costText.text = $"{Cost} BP";
+
+        // Set icon or colored placeholder (snacks use warm orange color)
+        Color snackColor = new Color(0.9f, 0.6f, 0.2f, 1f);
+        SetupIcon(snack.icon, snackColor);
+
+        // Set type badge
+        SetupTypeBadge("SNACK", snackColor);
+
+        // Tint card border
+        if (cardBorder != null)
+            cardBorder.color = snackColor;
+    }
+
+    /// <summary>
+    /// Legacy initialize for placeholder data (backwards compatibility).
     /// </summary>
     public void Initialize(string id, string title, string description, int cost, float floatPhaseOffset)
     {
@@ -93,16 +175,72 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         CardTitle = title;
         Cost = cost;
         floatOffset = floatPhaseOffset;
+        Type = CardType.Upgrade;
+        UpgradeData = null;
+        SnackData = null;
 
         if (titleText != null)
             titleText.text = title;
 
         if (descriptionText != null)
-            descriptionText.text = $"{description}\n\n<color=#FFD700>Cost: {cost} BP</color>";
+            descriptionText.text = description;
 
-        // Icon stays empty/transparent as requested
+        if (costText != null)
+            costText.text = $"{cost} BP";
+
+        // Icon stays empty/transparent for placeholder
         if (iconImage != null)
-            iconImage.color = new Color(1, 1, 1, 0.1f); // Very faint placeholder
+            iconImage.color = new Color(1, 1, 1, 0.1f);
+    }
+
+    private void SetupIcon(Sprite icon, Color placeholderColor)
+    {
+        if (iconImage == null) return;
+
+        if (icon != null)
+        {
+            iconImage.sprite = icon;
+            iconImage.color = Color.white;
+            iconImage.preserveAspect = true;
+        }
+        else
+        {
+            // Colored placeholder
+            iconImage.sprite = null;
+            iconImage.color = new Color(placeholderColor.r, placeholderColor.g, placeholderColor.b, 0.3f);
+        }
+    }
+
+    private void SetupTypeBadge(string typeText, Color color)
+    {
+        if (typeBadge != null)
+        {
+            typeBadge.color = color;
+            typeBadge.gameObject.SetActive(true);
+        }
+
+        if (typeBadgeText != null)
+        {
+            typeBadgeText.text = typeText;
+        }
+    }
+
+    private Color GetUpgradeTypeColor(UpgradeType type)
+    {
+        return type switch
+        {
+            UpgradeType.EnhancedNumber => new Color(0.3f, 0.7f, 0.4f, 1f),   // Green
+            UpgradeType.Multiplier => new Color(0.9f, 0.6f, 0.2f, 1f),       // Orange
+            UpgradeType.Time => new Color(0.3f, 0.6f, 0.9f, 1f),             // Blue
+            UpgradeType.TileWeight => new Color(0.7f, 0.4f, 0.8f, 1f),       // Purple
+            UpgradeType.Combo => new Color(0.9f, 0.3f, 0.5f, 1f),            // Pink
+            UpgradeType.RiskReward => new Color(0.9f, 0.2f, 0.2f, 1f),       // Red
+            UpgradeType.Information => new Color(0.4f, 0.7f, 0.9f, 1f),      // Light blue
+            UpgradeType.Defensive => new Color(0.2f, 0.5f, 0.3f, 1f),        // Dark green
+            UpgradeType.BossFight => new Color(0.5f, 0.2f, 0.6f, 1f),        // Dark purple
+            UpgradeType.Special => new Color(1f, 0.85f, 0.3f, 1f),           // Gold
+            _ => new Color(0.5f, 0.5f, 0.55f, 1f)
+        };
     }
 
     /// <summary>
@@ -128,7 +266,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         RectTransform innerRT = innerBg.AddComponent<RectTransform>();
         innerRT.anchorMin = Vector2.zero;
         innerRT.anchorMax = Vector2.one;
-        float border = Mathf.Max(3f, size.x * 0.02f); // 2% border, min 3px
+        float border = Mathf.Max(4f, size.x * 0.025f); // 2.5% border, min 4px
         innerRT.offsetMin = new Vector2(border, border);
         innerRT.offsetMax = new Vector2(-border, -border);
 
@@ -141,27 +279,52 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         RectTransform contentRT = content.AddComponent<RectTransform>();
         contentRT.anchorMin = Vector2.zero;
         contentRT.anchorMax = Vector2.one;
-        float contentPad = size.x * 0.04f; // 4% content padding
+        float contentPad = size.x * 0.04f;
         contentRT.offsetMin = new Vector2(contentPad, contentPad);
         contentRT.offsetMax = new Vector2(-contentPad, -contentPad);
 
         VerticalLayoutGroup vlg = content.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = size.y * 0.02f; // 2% of card height
+        vlg.spacing = size.y * 0.015f;
         vlg.childAlignment = TextAnchor.UpperCenter;
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
-        int padding = Mathf.RoundToInt(size.x * 0.05f); // 5% padding
+        int padding = Mathf.RoundToInt(size.x * 0.04f);
         vlg.padding = new RectOffset(padding, padding, padding, padding);
 
-        // Title - uses auto-sizing to fit card width
+        // === TYPE BADGE (top) ===
+        GameObject badgeObj = new GameObject("TypeBadge");
+        badgeObj.transform.SetParent(content.transform, false);
+
+        LayoutElement badgeLE = badgeObj.AddComponent<LayoutElement>();
+        badgeLE.preferredHeight = size.y * 0.06f;
+        badgeLE.flexibleWidth = 1;
+
+        card.typeBadge = badgeObj.AddComponent<Image>();
+        card.typeBadge.color = new Color(0.4f, 0.4f, 0.5f, 0.8f);
+
+        GameObject badgeTextObj = new GameObject("BadgeText");
+        badgeTextObj.transform.SetParent(badgeObj.transform, false);
+        RectTransform badgeTextRT = badgeTextObj.AddComponent<RectTransform>();
+        badgeTextRT.anchorMin = Vector2.zero;
+        badgeTextRT.anchorMax = Vector2.one;
+        badgeTextRT.offsetMin = Vector2.zero;
+        badgeTextRT.offsetMax = Vector2.zero;
+
+        card.typeBadgeText = badgeTextObj.AddComponent<TextMeshProUGUI>();
+        card.typeBadgeText.text = "TYPE";
+        card.typeBadgeText.fontSize = size.y * 0.035f;
+        card.typeBadgeText.fontStyle = FontStyles.Bold;
+        card.typeBadgeText.color = Color.white;
+        card.typeBadgeText.alignment = TextAlignmentOptions.Center;
+
+        // === TITLE ===
         GameObject titleObj = new GameObject("Title");
         titleObj.transform.SetParent(content.transform, false);
-        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
 
         LayoutElement titleLE = titleObj.AddComponent<LayoutElement>();
-        titleLE.preferredHeight = size.y * 0.12f; // 12% of card height
+        titleLE.preferredHeight = size.y * 0.10f;
         titleLE.flexibleWidth = 1;
 
         card.titleText = titleObj.AddComponent<TextMeshProUGUI>();
@@ -170,40 +333,67 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         card.titleText.color = Color.white;
         card.titleText.alignment = TextAlignmentOptions.Center;
         card.titleText.enableAutoSizing = true;
-        card.titleText.fontSizeMin = 18;
-        card.titleText.fontSizeMax = 72;
+        card.titleText.fontSizeMin = 20;
+        card.titleText.fontSizeMax = 56;
 
-        // Icon area (empty/transparent) - flexible middle section
+        // === ICON AREA ===
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(content.transform, false);
-        RectTransform iconRT = iconObj.AddComponent<RectTransform>();
 
         LayoutElement iconLE = iconObj.AddComponent<LayoutElement>();
-        iconLE.preferredHeight = size.y * 0.45f; // 45% of card height
-        iconLE.flexibleHeight = 1;
+        iconLE.preferredHeight = size.y * 0.35f;
+        iconLE.flexibleHeight = 0;
         iconLE.flexibleWidth = 1;
 
         card.iconImage = iconObj.AddComponent<Image>();
-        card.iconImage.color = new Color(1, 1, 1, 0.1f); // Faint placeholder
+        card.iconImage.color = new Color(1, 1, 1, 0.15f);
+        card.iconImage.preserveAspect = true;
 
-        // Description - uses auto-sizing to fit card width
+        // === DESCRIPTION ===
         GameObject descObj = new GameObject("Description");
         descObj.transform.SetParent(content.transform, false);
-        RectTransform descRT = descObj.AddComponent<RectTransform>();
 
         LayoutElement descLE = descObj.AddComponent<LayoutElement>();
-        descLE.preferredHeight = size.y * 0.25f; // 25% of card height
+        descLE.preferredHeight = size.y * 0.28f;
         descLE.flexibleWidth = 1;
+        descLE.flexibleHeight = 1;
 
         card.descriptionText = descObj.AddComponent<TextMeshProUGUI>();
         card.descriptionText.text = "Card description goes here";
         card.descriptionText.fontStyle = FontStyles.Normal;
-        card.descriptionText.color = new Color(0.8f, 0.8f, 0.8f);
+        card.descriptionText.color = new Color(0.85f, 0.85f, 0.9f);
         card.descriptionText.alignment = TextAlignmentOptions.Center;
         card.descriptionText.enableAutoSizing = true;
-        card.descriptionText.fontSizeMin = 14;
-        card.descriptionText.fontSizeMax = 48;
+        card.descriptionText.fontSizeMin = 16;
+        card.descriptionText.fontSizeMax = 32;
         card.descriptionText.textWrappingMode = TextWrappingModes.Normal;
+
+        // === COST ===
+        GameObject costObj = new GameObject("Cost");
+        costObj.transform.SetParent(content.transform, false);
+
+        LayoutElement costLE = costObj.AddComponent<LayoutElement>();
+        costLE.preferredHeight = size.y * 0.09f;
+        costLE.flexibleWidth = 1;
+
+        // Cost background
+        Image costBg = costObj.AddComponent<Image>();
+        costBg.color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+
+        GameObject costTextObj = new GameObject("CostText");
+        costTextObj.transform.SetParent(costObj.transform, false);
+        RectTransform costTextRT = costTextObj.AddComponent<RectTransform>();
+        costTextRT.anchorMin = Vector2.zero;
+        costTextRT.anchorMax = Vector2.one;
+        costTextRT.offsetMin = Vector2.zero;
+        costTextRT.offsetMax = Vector2.zero;
+
+        card.costText = costTextObj.AddComponent<TextMeshProUGUI>();
+        card.costText.text = "100 BP";
+        card.costText.fontSize = size.y * 0.055f;
+        card.costText.fontStyle = FontStyles.Bold;
+        card.costText.color = new Color(1f, 0.85f, 0.2f); // Gold
+        card.costText.alignment = TextAlignmentOptions.Center;
 
         return card;
     }

@@ -26,6 +26,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private TMP_Text numberText;
     [SerializeField] private Image backgroundImage;
     [SerializeField] private GameObject selectionHighlight;
+    [SerializeField] private Image enhancedGlowImage;
     
     [Header("Selection Pulse Settings")]
     [SerializeField] private float pulseMinScale = 1.05f;
@@ -33,6 +34,12 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private float pulseSpeed = 4f;
     [SerializeField] private float floatAmount = 8f; // How much the tile floats up/down
     [SerializeField] private float floatSpeed = 3f; // Speed of floating animation
+
+    [Header("Enhanced Glow Settings")]
+    [SerializeField] private float glowPulseSpeed = 2f;
+    [SerializeField] private float glowMinAlpha = 0.3f;
+    [SerializeField] private float glowMaxAlpha = 0.7f;
+    [SerializeField] private float glowSize = 1.3f; // Scale relative to tile
     
     [Header("Swipe Settings")]
     [SerializeField] private float swipeThreshold = 30f; // Minimum distance to register swipe
@@ -49,9 +56,11 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     
     private RectTransform rectTransform;
     private Coroutine pulseCoroutine;
+    private Coroutine glowCoroutine;
     private Vector2 originalAnchoredPosition; // Store original position for floating
     private bool wasFloating = false; // Track if we actually started floating
-    
+    private bool isEnhanced = false; // Track if this tile's number is enhanced
+
     // Swipe tracking
     private Vector2 swipeStartPos;
     private bool isSwiping = false;
@@ -76,17 +85,17 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
-        
+
         if (backgroundImage == null)
         {
             backgroundImage = GetComponent<Image>();
         }
-        
+
         if (numberText == null)
         {
             numberText = GetComponentInChildren<TMP_Text>(true);
         }
-        
+
         if (selectionHighlight == null)
         {
             Transform highlightTransform = transform.Find("SelectionHighlight");
@@ -95,6 +104,47 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
                 selectionHighlight = highlightTransform.gameObject;
             }
         }
+
+        // Create enhanced glow image if not assigned
+        if (enhancedGlowImage == null)
+        {
+            CreateEnhancedGlow();
+        }
+    }
+
+    /// <summary>
+    /// Creates the enhanced glow image behind the tile.
+    /// </summary>
+    private void CreateEnhancedGlow()
+    {
+        GameObject glowObj = new GameObject("EnhancedGlow");
+        glowObj.transform.SetParent(transform, false);
+        glowObj.transform.SetAsFirstSibling(); // Put behind everything
+
+        RectTransform glowRect = glowObj.AddComponent<RectTransform>();
+        glowRect.anchorMin = new Vector2(0.5f, 0.5f);
+        glowRect.anchorMax = new Vector2(0.5f, 0.5f);
+        glowRect.pivot = new Vector2(0.5f, 0.5f);
+        glowRect.anchoredPosition = Vector2.zero;
+
+        // Size relative to tile
+        if (rectTransform != null)
+        {
+            glowRect.sizeDelta = rectTransform.sizeDelta * glowSize;
+        }
+        else
+        {
+            glowRect.sizeDelta = new Vector2(120f, 120f); // Default fallback
+        }
+
+        enhancedGlowImage = glowObj.AddComponent<Image>();
+        enhancedGlowImage.raycastTarget = false;
+
+        // Apply soft circular glow texture
+        GlowTextureGenerator.ApplyCircularGlow(enhancedGlowImage, 64, 1.5f);
+
+        // Start hidden
+        glowObj.SetActive(false);
     }
     
     private void Start()
@@ -108,15 +158,16 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private void ForceResetVisuals()
     {
         IsSelected = false;
-        
+
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(false);
         }
-        
+
         transform.localScale = Vector3.one;
-        
+
         StopPulse();
+        StopGlowPulse();
     }
     
     /// <summary>
@@ -157,12 +208,108 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         {
             Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found!", this);
         }
-        
+
         // Set uniform grey background for all tiles
         if (backgroundImage != null)
         {
             backgroundImage.color = TileBackgroundColor;
         }
+
+        // Check if this number is enhanced and update glow
+        UpdateEnhancedGlow();
+    }
+
+    /// <summary>
+    /// Check if this tile's number has enhanced bonuses and show/hide glow accordingly.
+    /// </summary>
+    private void UpdateEnhancedGlow()
+    {
+        // Check PlayerInventory for enhanced number bonus
+        int enhancedBonus = 0;
+        if (PlayerInventory.Instance != null)
+        {
+            enhancedBonus = PlayerInventory.Instance.GetEnhancedNumberBonus(Value);
+        }
+
+        isEnhanced = enhancedBonus > 0;
+
+        if (enhancedGlowImage != null)
+        {
+            if (isEnhanced)
+            {
+                // Show glow with the number's color
+                enhancedGlowImage.gameObject.SetActive(true);
+                Color glowColor = NumberColors[Value];
+                glowColor.a = glowMaxAlpha;
+                enhancedGlowImage.color = glowColor;
+
+                // Update glow size based on tile size
+                RectTransform glowRect = enhancedGlowImage.GetComponent<RectTransform>();
+                if (glowRect != null && rectTransform != null)
+                {
+                    glowRect.sizeDelta = rectTransform.sizeDelta * glowSize;
+                }
+
+                // Start glow pulse animation
+                StartGlowPulse();
+            }
+            else
+            {
+                // Hide glow
+                enhancedGlowImage.gameObject.SetActive(false);
+                StopGlowPulse();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Start the enhanced glow pulse animation.
+    /// </summary>
+    private void StartGlowPulse()
+    {
+        StopGlowPulse();
+        if (isEnhanced && gameObject.activeInHierarchy)
+        {
+            glowCoroutine = StartCoroutine(GlowPulseCoroutine());
+        }
+    }
+
+    /// <summary>
+    /// Stop the enhanced glow pulse animation.
+    /// </summary>
+    private void StopGlowPulse()
+    {
+        if (glowCoroutine != null)
+        {
+            StopCoroutine(glowCoroutine);
+            glowCoroutine = null;
+        }
+    }
+
+    /// <summary>
+    /// Animated glow pulsing for enhanced numbers.
+    /// </summary>
+    private IEnumerator GlowPulseCoroutine()
+    {
+        while (isEnhanced && enhancedGlowImage != null && enhancedGlowImage.gameObject.activeSelf)
+        {
+            float t = (Mathf.Sin(Time.time * glowPulseSpeed) + 1f) / 2f;
+            float alpha = Mathf.Lerp(glowMinAlpha, glowMaxAlpha, t);
+
+            Color glowColor = NumberColors[Value];
+            glowColor.a = alpha;
+            enhancedGlowImage.color = glowColor;
+
+            yield return null;
+        }
+    }
+
+    /// <summary>
+    /// Refresh enhanced status (call when upgrades change).
+    /// </summary>
+    public void RefreshEnhancedStatus()
+    {
+        UpdateEnhancedGlow();
     }
     
     /// <summary>
@@ -369,6 +516,35 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         return rectTransform;
     }
     
+    private void OnEnable()
+    {
+        // Re-check enhanced status and restart animations if needed
+        if (isEnhanced)
+        {
+            StartGlowPulse();
+        }
+    }
+
+    private void OnDisable()
+    {
+        StopGlowPulse();
+        StopPulse();
+    }
+
+    /// <summary>
+    /// Static method to refresh all tiles' enhanced status.
+    /// Call this after purchasing upgrades that affect enhanced numbers.
+    /// </summary>
+    public static void RefreshAllEnhancedStatus()
+    {
+        Tile[] allTiles = FindObjectsByType<Tile>(FindObjectsSortMode.None);
+        foreach (Tile tile in allTiles)
+        {
+            tile.RefreshEnhancedStatus();
+        }
+        Debug.Log($"[Tile] Refreshed enhanced status for {allTiles.Length} tiles");
+    }
+
     public override string ToString()
     {
         return $"Tile[{GridX},{GridY}] = {Value}";

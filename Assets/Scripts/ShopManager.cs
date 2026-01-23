@@ -3,11 +3,12 @@ using UnityEngine.UI;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// Manages the shop UI between rounds.
-/// Displays BP balance, upgrade cards, and handles purchases.
-/// Auto-generates UI if not manually assigned.
+/// Displays BP balance, upgrade/snack cards, and handles purchases.
+/// Loads real data from Assets/Data/ folders.
 /// </summary>
 public class ShopManager : MonoBehaviour
 {
@@ -28,13 +29,18 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private Color bpBackdropColor = new Color(0f, 0f, 0f, 0.7f);
     [SerializeField] private Color buttonColor = new Color(0.2f, 0.6f, 0.9f);
     [SerializeField] private float titleFontSize = 72f;
-    [SerializeField] private float bpFontSize = 36f;
 
     [Header("Card Settings")]
     [SerializeField] private Vector2 cardSize = new Vector2(520f, 760f);
-    [SerializeField] private Color cardBackgroundColor = new Color(0.15f, 0.15f, 0.2f);
+    [SerializeField] private Color cardBackgroundColor = new Color(0.12f, 0.12f, 0.18f);
     [SerializeField] private Color cardBorderColor = new Color(0.4f, 0.4f, 0.5f);
     [SerializeField] private int cardCount = 3;
+
+    [Header("Shop Pool Settings")]
+    [Tooltip("Chance for a card slot to be a snack instead of an upgrade (0-1)")]
+    [SerializeField] [Range(0f, 1f)] private float snackChance = 0.33f;
+    [Tooltip("Only show items available for current stage")]
+    [SerializeField] private bool filterByStage = true;
 
     [Header("Animation Settings")]
     [SerializeField] private float bpCountUpDuration = 0.8f;
@@ -42,16 +48,12 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private float cardSpawnDelay = 0.15f;
 
     [Header("Audio")]
-    [SerializeField] private AudioClip shopMusic; // Assign in inspector, falls back to menu music if null
+    [SerializeField] private AudioClip shopMusic;
 
-    // Placeholder card data
-    private readonly string[] placeholderTitles = { "Power Up", "Time Boost", "Multiplier" };
-    private readonly string[] placeholderDescriptions = {
-        "Increase your base score",
-        "Add extra seconds to the clock",
-        "Start with a higher multiplier"
-    };
-    private readonly int[] placeholderCosts = { 50, 75, 100 };
+    // Data pools - loaded at runtime
+    private List<UpgradeData> availableUpgrades = new List<UpgradeData>();
+    private List<SnackData> availableSnacks = new List<SnackData>();
+    private bool dataLoaded = false;
 
     // Runtime state
     private bool isInitialized = false;
@@ -60,7 +62,10 @@ public class ShopManager : MonoBehaviour
     private HorizontalLayoutGroup cardsLayoutGroup;
     private ContentSizeFitter cardsSizeFitter;
 
-    // Confirmation popup
+    // Track what's been offered this shop visit (to avoid duplicates)
+    private HashSet<string> offeredThisVisit = new HashSet<string>();
+
+    // Legacy confirmation popup (replaced by UpgradeConfirmWindow but kept for fallback)
     private GameObject confirmationPopup;
     private TMP_Text confirmTitleText;
     private TMP_Text confirmCostText;
@@ -78,7 +83,62 @@ public class ShopManager : MonoBehaviour
 
     private void Start()
     {
+        LoadShopData();
         EnsureUIExists();
+    }
+
+    /// <summary>
+    /// Load all upgrade and snack data from Assets/Data folders.
+    /// </summary>
+    private void LoadShopData()
+    {
+        if (dataLoaded) return;
+
+        // Load upgrades
+        availableUpgrades.Clear();
+        UpgradeData[] upgrades = Resources.LoadAll<UpgradeData>("Upgrades");
+        if (upgrades.Length == 0)
+        {
+            // Fallback: try loading from editor in play mode
+            #if UNITY_EDITOR
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:UpgradeData", new[] { "Assets/Data/Upgrades" });
+            foreach (string guid in guids)
+            {
+                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                UpgradeData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UpgradeData>(path);
+                if (asset != null)
+                    availableUpgrades.Add(asset);
+            }
+            #endif
+        }
+        else
+        {
+            availableUpgrades.AddRange(upgrades);
+        }
+
+        // Load snacks
+        availableSnacks.Clear();
+        SnackData[] snacks = Resources.LoadAll<SnackData>("Snacks");
+        if (snacks.Length == 0)
+        {
+            #if UNITY_EDITOR
+            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:SnackData", new[] { "Assets/Data/Snacks" });
+            foreach (string guid in guids)
+            {
+                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
+                SnackData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<SnackData>(path);
+                if (asset != null)
+                    availableSnacks.Add(asset);
+            }
+            #endif
+        }
+        else
+        {
+            availableSnacks.AddRange(snacks);
+        }
+
+        dataLoaded = true;
+        Debug.Log($"[ShopManager] Loaded {availableUpgrades.Count} upgrades and {availableSnacks.Count} snacks");
     }
 
     /// <summary>
@@ -384,7 +444,12 @@ public class ShopManager : MonoBehaviour
     {
         Debug.Log("[ShopManager] ShowShop called");
 
+        // Ensure data is loaded
+        LoadShopData();
         EnsureUIExists();
+
+        // Clear tracking for this shop visit
+        offeredThisVisit.Clear();
 
         // Play shop music (or fallback to menu music)
         PlayShopMusic();
@@ -407,7 +472,7 @@ public class ShopManager : MonoBehaviour
             countUpCoroutine = StartCoroutine(CountUpBPWithDelay(RunManager.Instance.CurrentBP));
         }
 
-        // Spawn cards
+        // Spawn cards with real data
         SpawnCards();
     }
 
@@ -453,14 +518,88 @@ public class ShopManager : MonoBehaviour
 
     /// <summary>
     /// Called when a card is clicked - shows confirmation popup.
+    /// Uses UpgradeConfirmWindow for upgrades, legacy popup for snacks.
     /// </summary>
     public void OnCardSelected(ShopCard card)
     {
-        Debug.Log($"[ShopManager] Card clicked: {card.CardId}, Cost: {card.Cost} BP");
+        Debug.Log($"[ShopManager] Card clicked: {card.CardId}, Type: {card.Type}, Cost: {card.Cost} BP");
 
-        // Store pending card and show confirmation
         pendingCard = card;
-        ShowConfirmationPopup(card);
+
+        // Use the fancy UpgradeConfirmWindow for upgrades
+        if (card.Type == ShopCard.CardType.Upgrade && card.UpgradeData != null && UpgradeConfirmWindow.Instance != null)
+        {
+            UpgradeConfirmWindow.Instance.ShowUpgrade(
+                card.UpgradeData,
+                onConfirm: () => CompletePurchase(card),
+                onCancel: () => { pendingCard = null; }
+            );
+        }
+        // For snacks or if UpgradeConfirmWindow isn't available, use legacy popup
+        else
+        {
+            ShowConfirmationPopup(card);
+        }
+    }
+
+    /// <summary>
+    /// Complete the purchase of an item.
+    /// </summary>
+    private void CompletePurchase(ShopCard card)
+    {
+        if (card == null) return;
+
+        int cost = card.Cost;
+
+        // Check if player can afford
+        if (RunManager.Instance == null || !RunManager.Instance.SpendBP(cost))
+        {
+            Debug.Log($"[ShopManager] Cannot afford {card.CardTitle} - need {cost} BP");
+            return;
+        }
+
+        Debug.Log($"[ShopManager] Purchased {card.CardTitle} for {cost} BP");
+
+        // Add to inventory based on type
+        bool success = false;
+        if (card.Type == ShopCard.CardType.Upgrade && card.UpgradeData != null)
+        {
+            success = PlayerInventory.Instance?.AddUpgrade(card.UpgradeData) ?? false;
+        }
+        else if (card.Type == ShopCard.CardType.Snack && card.SnackData != null)
+        {
+            success = PlayerInventory.Instance?.AddSnack(card.SnackData) ?? false;
+        }
+
+        if (success)
+        {
+            Debug.Log($"[ShopManager] Added {card.CardTitle} to inventory");
+
+            // If an upgrade was purchased, refresh all tiles' enhanced status
+            // (in case it was an EnhancedNumber upgrade)
+            if (card.Type == ShopCard.CardType.Upgrade)
+            {
+                Tile.RefreshAllEnhancedStatus();
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[ShopManager] Failed to add {card.CardTitle} to inventory!");
+            // Refund the BP if add failed
+            RunManager.Instance?.AddBP(cost);
+            return;
+        }
+
+        // Remove from active list
+        activeCards.Remove(card);
+
+        // Trigger card's disappear animation
+        card.ConfirmPurchase();
+
+        // Update BP display
+        RefreshBPDisplay();
+
+        pendingCard = null;
     }
 
     private void ShowConfirmationPopup(ShopCard card)
@@ -469,7 +608,10 @@ public class ShopManager : MonoBehaviour
 
         // Update popup text
         if (confirmTitleText != null)
-            confirmTitleText.text = $"Purchase {card.CardTitle}?";
+        {
+            string typeLabel = card.Type == ShopCard.CardType.Snack ? "Snack" : "Upgrade";
+            confirmTitleText.text = $"Purchase {typeLabel}?\n{card.CardTitle}";
+        }
 
         if (confirmCostText != null)
             confirmCostText.text = $"Cost: {card.Cost} BP";
@@ -482,33 +624,11 @@ public class ShopManager : MonoBehaviour
     {
         AudioManager.Instance?.PlayButtonClick();
 
-        if (pendingCard == null)
+        if (pendingCard != null)
         {
-            HideConfirmationPopup();
-            return;
+            CompletePurchase(pendingCard);
         }
 
-        // Check if player can afford
-        if (RunManager.Instance != null && RunManager.Instance.SpendBP(pendingCard.Cost))
-        {
-            Debug.Log($"[ShopManager] Purchased {pendingCard.CardTitle} for {pendingCard.Cost} BP");
-
-            // Remove from active list
-            activeCards.Remove(pendingCard);
-
-            // Trigger card's disappear animation
-            pendingCard.ConfirmPurchase();
-
-            // Update BP display
-            RefreshBPDisplay();
-        }
-        else
-        {
-            Debug.Log($"[ShopManager] Cannot afford {pendingCard.CardTitle} - need {pendingCard.Cost} BP");
-            // Could show "insufficient funds" feedback here
-        }
-
-        pendingCard = null;
         HideConfirmationPopup();
     }
 
@@ -570,6 +690,8 @@ public class ShopManager : MonoBehaviour
 
     private IEnumerator SpawnCardsSequentially()
     {
+        int currentStage = CampaignManager.Instance?.CurrentStage ?? 1;
+
         for (int i = 0; i < cardCount; i++)
         {
             // Create card
@@ -580,17 +702,68 @@ public class ShopManager : MonoBehaviour
                 cardBorderColor
             );
 
-            // Initialize with placeholder data
-            string title = placeholderTitles[i % placeholderTitles.Length];
-            string desc = placeholderDescriptions[i % placeholderDescriptions.Length];
-            int cost = placeholderCosts[i % placeholderCosts.Length];
-            float floatOffset = i * 2.1f; // Different phase for each card
+            float floatOffset = i * 2.1f;
 
-            card.Initialize($"card_{i}", title, desc, cost, floatOffset);
+            // Decide if this slot should be a snack or upgrade
+            bool isSnack = Random.value < snackChance;
+
+            if (isSnack)
+            {
+                SnackData snack = GetRandomAvailableSnack(currentStage);
+                if (snack != null)
+                {
+                    card.InitializeWithSnack(snack, floatOffset);
+                    offeredThisVisit.Add(snack.id);
+                    Debug.Log($"[ShopManager] Card {i}: Snack - {snack.displayName}");
+                }
+                else
+                {
+                    // No snacks available, fall back to upgrade
+                    UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
+                    if (upgrade != null)
+                    {
+                        card.InitializeWithUpgrade(upgrade, floatOffset);
+                        offeredThisVisit.Add(upgrade.id);
+                        Debug.Log($"[ShopManager] Card {i}: Upgrade (snack fallback) - {upgrade.displayName}");
+                    }
+                    else
+                    {
+                        // No items available at all - use placeholder
+                        card.Initialize($"empty_{i}", "Sold Out", "No items available", 0, floatOffset);
+                        Debug.LogWarning($"[ShopManager] Card {i}: No items available!");
+                    }
+                }
+            }
+            else
+            {
+                UpgradeData upgrade = GetRandomAvailableUpgrade(currentStage);
+                if (upgrade != null)
+                {
+                    card.InitializeWithUpgrade(upgrade, floatOffset);
+                    offeredThisVisit.Add(upgrade.id);
+                    Debug.Log($"[ShopManager] Card {i}: Upgrade - {upgrade.displayName}");
+                }
+                else
+                {
+                    // No upgrades available, try snack
+                    SnackData snack = GetRandomAvailableSnack(currentStage);
+                    if (snack != null)
+                    {
+                        card.InitializeWithSnack(snack, floatOffset);
+                        offeredThisVisit.Add(snack.id);
+                        Debug.Log($"[ShopManager] Card {i}: Snack (upgrade fallback) - {snack.displayName}");
+                    }
+                    else
+                    {
+                        card.Initialize($"empty_{i}", "Sold Out", "No items available", 0, floatOffset);
+                        Debug.LogWarning($"[ShopManager] Card {i}: No items available!");
+                    }
+                }
+            }
 
             activeCards.Add(card);
 
-            // Small delay between card spawns for visual effect
+            // Small delay between card spawns
             if (cardSpawnDelay > 0 && i < cardCount - 1)
             {
                 yield return new WaitForSeconds(cardSpawnDelay);
@@ -606,23 +779,52 @@ public class ShopManager : MonoBehaviour
         // Freeze the container's current size before disabling layout
         if (cardsContainer != null)
         {
-            // Store the current rect size set by the layout system
             Vector2 finalSize = cardsContainer.rect.size;
 
-            // Disable layout components
             if (cardsSizeFitter != null)
                 cardsSizeFitter.enabled = false;
             if (cardsLayoutGroup != null)
                 cardsLayoutGroup.enabled = false;
 
-            // Set the size explicitly to maintain it
             cardsContainer.sizeDelta = finalSize;
-
-            // Ensure container stays centered
             cardsContainer.anchoredPosition = new Vector2(0f, 50f);
         }
 
-        Debug.Log($"[ShopManager] Spawned {cardCount} cards, layout frozen");
+        Debug.Log($"[ShopManager] Spawned {cardCount} cards with real data");
+    }
+
+    /// <summary>
+    /// Get a random upgrade that's available for the current stage and not already offered.
+    /// </summary>
+    private UpgradeData GetRandomAvailableUpgrade(int currentStage)
+    {
+        var candidates = availableUpgrades
+            .Where(u => u != null)
+            .Where(u => !offeredThisVisit.Contains(u.id))
+            .Where(u => !filterByStage || u.IsAvailableInStage(currentStage))
+            .Where(u => !PlayerInventory.Instance?.HasUpgrade(u.id) ?? true || u.isStackable)
+            .ToList();
+
+        if (candidates.Count == 0) return null;
+
+        return candidates[Random.Range(0, candidates.Count)];
+    }
+
+    /// <summary>
+    /// Get a random snack that's available and not already owned.
+    /// </summary>
+    private SnackData GetRandomAvailableSnack(int currentStage)
+    {
+        var candidates = availableSnacks
+            .Where(s => s != null)
+            .Where(s => !offeredThisVisit.Contains(s.id))
+            .Where(s => !filterByStage || s.IsAvailableInStage(currentStage))
+            .Where(s => !PlayerInventory.Instance?.HasSnack(s.id) ?? true) // Snacks are unique
+            .ToList();
+
+        if (candidates.Count == 0) return null;
+
+        return candidates[Random.Range(0, candidates.Count)];
     }
 
     private void ClearCards()
