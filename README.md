@@ -149,6 +149,61 @@ Make10/
 | `AvatarManager.cs` | Animated character with reactive states |
 | `HotStreakEffect.cs` | Fire particle effects during hot streak |
 | `AudioManager.cs` | Music and SFX management |
+| `PlayerInventory.cs` | Tracks owned upgrades, snacks, and artifacts |
+| `CampaignManager.cs` | Stage/round progression tracking |
+| `RunManager.cs` | Per-run BP currency and Gold Stars |
+
+### Upgrade System Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `UpgradeData.cs` | ScriptableObject for permanent upgrades |
+| `SnackData.cs` | ScriptableObject for consumable items |
+| `ArtifactData.cs` | ScriptableObject for passive bonuses |
+| `DebugUpgradePanel.cs` | Runtime debug panel for testing upgrades (F1) |
+
+---
+
+## Upgrade System
+
+Make10 features a roguelike-style upgrade system with three item types:
+
+### Upgrades (Permanent)
+Persistent enhancements that last the entire run. Examples:
+- **Enhanced Numbers** - Specific tile values give bonus BP when matched
+- **Quick Start** - Begin rounds with bonus time
+- **Momentum** - Consecutive matches give extra multiplier
+
+### Snacks (Consumables)
+One-time use items triggered during gameplay:
+- **Stopwatch** - Freeze timer for a few seconds
+- **Calculator** - Reveal optimal move
+- **Energy Drink** - Instant multiplier boost
+
+### Artifacts (Passive)
+Rare items with powerful ongoing effects:
+- **Golden Pencil** - All matches worth +2 BP
+- **Teacher's Pet** - Bonus BP at round end
+- **Overachiever** - Multiplier decays slower
+
+### Debug Panel (Development)
+Press **F1** during gameplay to open the debug panel:
+- Add any upgrade/snack/artifact instantly
+- Test scoring bonuses without playing through
+- Print inventory contents to console
+
+### Data Flow
+```
+ScriptableObject Assets (Assets/Data/Upgrades, Snacks, Artifacts)
+        ↓
+DebugUpgradePanel or ShopManager (adds to inventory)
+        ↓
+PlayerInventory.ownedUpgrades / ownedSnacks / ownedArtifacts
+        ↓
+GameManager queries PlayerInventory during scoring
+        ↓
+Bonuses applied (enhanced numbers, multiplier boosts, etc.)
+```
 
 ---
 
