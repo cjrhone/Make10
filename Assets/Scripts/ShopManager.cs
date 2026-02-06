@@ -31,8 +31,8 @@ public class ShopManager : MonoBehaviour
     [SerializeField] private float titleFontSize = 72f;
 
     [Header("Card Settings")]
-    [SerializeField] private Vector2 upgradeCardSize = new Vector2(380f, 520f);
-    [SerializeField] private Vector2 snackCardSize = new Vector2(340f, 460f);
+    [SerializeField] private Vector2 upgradeCardSize = new Vector2(260f, 300f);
+    [SerializeField] private Vector2 snackCardSize = new Vector2(240f, 280f);
     [SerializeField] private Color cardBackgroundColor = new Color(0.12f, 0.12f, 0.18f);
     [SerializeField] private Color cardBorderColor = new Color(0.4f, 0.4f, 0.5f);
 

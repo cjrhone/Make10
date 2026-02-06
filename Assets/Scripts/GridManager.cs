@@ -852,19 +852,24 @@ public class GridManager : MonoBehaviour
     
     private Vector2 CalculateMatchCenter(HashSet<Tile> tiles, MatchResult result)
     {
-        if (result.matchedRows.Count > 0)
+        // For single-line matches, center on that line
+        if (result.TotalLines == 1)
         {
-            int row = result.matchedRows[0];
-            int midX = gridWidth / 2;
-            return GridToWorldPosition(midX, row);
+            if (result.matchedRows.Count == 1)
+            {
+                int row = result.matchedRows[0];
+                int midX = gridWidth / 2;
+                return GridToWorldPosition(midX, row);
+            }
+            else if (result.matchedColumns.Count == 1)
+            {
+                int col = result.matchedColumns[0];
+                int midY = gridHeight / 2;
+                return GridToWorldPosition(col, midY);
+            }
         }
-        else if (result.matchedColumns.Count > 0)
-        {
-            int col = result.matchedColumns[0];
-            int midY = gridHeight / 2;
-            return GridToWorldPosition(col, midY);
-        }
-        
+
+        // For multiple simultaneous matches, center on all matched tiles
         Vector2 sum = Vector2.zero;
         int count = 0;
         foreach (Tile tile in tiles)
@@ -880,8 +885,6 @@ public class GridManager : MonoBehaviour
     
     private IEnumerator ShowTenEffectSpectacular(Vector2 position)
     {
-        AudioManager.Instance?.PlayTenPopSound();
-
         // Track consecutive 10s for scaling
         if (Time.time - lastTenTime > consecutiveResetTime)
         {
@@ -889,6 +892,9 @@ public class GridManager : MonoBehaviour
         }
         consecutive10Count++;
         lastTenTime = Time.time;
+
+        // Play ascending pitch SFX based on chain count
+        AudioManager.Instance?.PlayTenPopSound(consecutive10Count);
 
         // Calculate scale based on consecutive 10s
         float tenScale = Mathf.Min(baseTenScale + (consecutive10Count - 1) * tenScaleIncrement, maxTenScale);

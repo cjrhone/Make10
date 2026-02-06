@@ -15,7 +15,6 @@ public class CampaignManager : MonoBehaviour
     public class StageData
     {
         public string stageName;
-        public int gridSize = 5;
         public int maxNumber = 6; // 0 to maxNumber (inclusive)
         public int[] roundThresholds; // BP required to pass each round
         public int bossHP = 1000;
@@ -79,11 +78,10 @@ public class CampaignManager : MonoBehaviour
     {
         if (stages.Count > 0) return;
 
-        // Stage 1: Tutorial-friendly
+        // Stage 1: Tutorial-friendly (grid always 6x6, difficulty via maxNumber/weights)
         stages.Add(new StageData
         {
             stageName = "The Basics",
-            gridSize = 4,
             maxNumber = 5,
             roundThresholds = new int[] { 100, 250, 500 },
             bossHP = 1000,
@@ -95,7 +93,6 @@ public class CampaignManager : MonoBehaviour
         stages.Add(new StageData
         {
             stageName = "Stepping Up",
-            gridSize = 5,
             maxNumber = 6,
             roundThresholds = new int[] { 300, 600, 900, 1200 },
             bossHP = 2000,
@@ -107,7 +104,6 @@ public class CampaignManager : MonoBehaviour
         stages.Add(new StageData
         {
             stageName = "The Grind",
-            gridSize = 5,
             maxNumber = 7,
             roundThresholds = new int[] { 750, 1000, 1250, 1500, 1750 },
             bossHP = 3000,
@@ -119,7 +115,6 @@ public class CampaignManager : MonoBehaviour
         stages.Add(new StageData
         {
             stageName = "Final Exam",
-            gridSize = 5,
             maxNumber = 7,
             roundThresholds = new int[] { }, // Endless - no thresholds
             bossHP = 10000,
@@ -184,12 +179,11 @@ public class CampaignManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Get current grid size for the stage.
+    /// Get current grid size. Always 5x5 - difficulty is controlled via maxNumber and weights.
     /// </summary>
     public int GetCurrentGridSize()
     {
-        if (currentStageIndex >= stages.Count) return 5;
-        return stages[currentStageIndex].gridSize;
+        return 5;
     }
 
     /// <summary>

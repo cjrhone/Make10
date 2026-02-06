@@ -95,7 +95,7 @@ public class MatchChecker : MonoBehaviour
     }
 
     /// <summary>
-    /// Get detailed match info - returns only ONE match at a time.
+    /// Get detailed match info - returns ALL matching rows and columns simultaneously.
     /// </summary>
     public MatchResult GetMatchResult()
     {
@@ -103,7 +103,7 @@ public class MatchChecker : MonoBehaviour
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
 
-        // Check rows first
+        // Check all rows
         for (int y = 0; y < gridSize.y; y++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, y, isRow: true);
@@ -112,11 +112,10 @@ public class MatchChecker : MonoBehaviour
                 result.matchedRows.Add(y);
                 foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
-                return result;
             }
         }
 
-        // Check columns
+        // Check all columns
         for (int x = 0; x < gridSize.x; x++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, x, isRow: false);
@@ -125,7 +124,6 @@ public class MatchChecker : MonoBehaviour
                 result.matchedColumns.Add(x);
                 foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
-                return result;
             }
         }
 

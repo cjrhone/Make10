@@ -212,8 +212,27 @@ public class AudioManager : MonoBehaviour
     // One-liner SFX methods
     public void PlayButtonClick() => PlaySFX(buttonClickSFX);
     public void PlayConvergenceSound() => PlaySFX(convergenceSFX);
-    public void PlayTenPopSound() => PlaySFX(tenPopSFX);
-    public void PlayMatchSound() => PlaySFX(tenPopSFX); // Legacy alias for compatibility
+    public void PlayTenPopSound() => PlayTenPopSound(1);
+    public void PlayMatchSound() => PlayTenPopSound(1); // Legacy alias for compatibility
+
+    /// <summary>
+    /// Play the "10" pop sound with ascending pitch based on chain count.
+    /// Chain 1 = base pitch (1.0), each subsequent chain raises pitch.
+    /// </summary>
+    public void PlayTenPopSound(int chainCount)
+    {
+        float basePitch = 1.0f;
+        float pitchStep = 0.12f;   // Pitch increase per chain
+        float maxPitch = 2.0f;
+
+        float pitch = Mathf.Min(basePitch + (chainCount - 1) * pitchStep, maxPitch);
+
+        if (sfxSource != null && tenPopSFX != null)
+        {
+            sfxSource.pitch = pitch;
+            sfxSource.PlayOneShot(tenPopSFX, sfxVolume);
+        }
+    }
     public void PlaySwapSound() => PlaySFX(swapSFX);
     public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);
     public void PlayCountdownGo() => PlaySFX(countdownGoSFX);

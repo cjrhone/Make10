@@ -213,6 +213,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
     private void SetupTypeBadge(string typeText, Color color)
     {
+        // Type badge may not exist in simplified floating box layout
         if (typeBadge != null)
         {
             typeBadge.color = color;
@@ -222,6 +223,12 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         if (typeBadgeText != null)
         {
             typeBadgeText.text = typeText;
+        }
+
+        // Tint the accent bar with the type color
+        if (cardBorder != null)
+        {
+            cardBorder.color = color;
         }
     }
 
@@ -233,7 +240,8 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     public static Color GetSnackColor() => UIStyleGuide.GetSnackColor();
 
     /// <summary>
-    /// Create the card UI structure programmatically.
+    /// Create a simplified floating box card: icon/placeholder + title + cost.
+    /// Clicking opens the confirmation window for full details.
     /// </summary>
     public static ShopCard CreateCard(Transform parent, Vector2 size, Color bgColor, Color borderColor)
     {
@@ -245,92 +253,46 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
         ShopCard card = cardObj.AddComponent<ShopCard>();
 
-        // Card border (outer frame)
-        card.cardBorder = cardObj.AddComponent<Image>();
-        card.cardBorder.color = borderColor;
-
-        // Inner background - border thickness proportional to card size
-        GameObject innerBg = new GameObject("Background");
-        innerBg.transform.SetParent(cardObj.transform, false);
-        RectTransform innerRT = innerBg.AddComponent<RectTransform>();
-        innerRT.anchorMin = Vector2.zero;
-        innerRT.anchorMax = Vector2.one;
-        float border = Mathf.Max(4f, size.x * 0.025f); // 2.5% border, min 4px
-        innerRT.offsetMin = new Vector2(border, border);
-        innerRT.offsetMax = new Vector2(-border, -border);
-
-        card.cardBackground = innerBg.AddComponent<Image>();
+        // Simple rounded-feel background (no separate border frame)
+        card.cardBackground = cardObj.AddComponent<Image>();
         card.cardBackground.color = bgColor;
+
+        // Thin accent bar at top for type color
+        GameObject accentBar = new GameObject("AccentBar");
+        accentBar.transform.SetParent(cardObj.transform, false);
+        RectTransform accentRT = accentBar.AddComponent<RectTransform>();
+        accentRT.anchorMin = new Vector2(0, 1);
+        accentRT.anchorMax = new Vector2(1, 1);
+        accentRT.pivot = new Vector2(0.5f, 1);
+        accentRT.offsetMin = new Vector2(0, -6f);
+        accentRT.offsetMax = Vector2.zero;
+        card.cardBorder = accentBar.AddComponent<Image>();
+        card.cardBorder.color = borderColor;
 
         // Content container with vertical layout
         GameObject content = new GameObject("Content");
-        content.transform.SetParent(innerBg.transform, false);
+        content.transform.SetParent(cardObj.transform, false);
         RectTransform contentRT = content.AddComponent<RectTransform>();
         contentRT.anchorMin = Vector2.zero;
         contentRT.anchorMax = Vector2.one;
-        float contentPad = size.x * 0.04f;
-        contentRT.offsetMin = new Vector2(contentPad, contentPad);
-        contentRT.offsetMax = new Vector2(-contentPad, -contentPad);
+        contentRT.offsetMin = new Vector2(8f, 8f);
+        contentRT.offsetMax = new Vector2(-8f, -10f);
 
         VerticalLayoutGroup vlg = content.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = size.y * 0.015f;
-        vlg.childAlignment = TextAnchor.UpperCenter;
+        vlg.spacing = 6f;
+        vlg.childAlignment = TextAnchor.MiddleCenter;
         vlg.childControlWidth = true;
         vlg.childControlHeight = true;
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
-        int padding = Mathf.RoundToInt(size.x * 0.04f);
-        vlg.padding = new RectOffset(padding, padding, padding, padding);
+        vlg.padding = new RectOffset(4, 4, 4, 4);
 
-        // === TYPE BADGE (top) ===
-        GameObject badgeObj = new GameObject("TypeBadge");
-        badgeObj.transform.SetParent(content.transform, false);
-
-        LayoutElement badgeLE = badgeObj.AddComponent<LayoutElement>();
-        badgeLE.preferredHeight = size.y * 0.06f;
-        badgeLE.flexibleWidth = 1;
-
-        card.typeBadge = badgeObj.AddComponent<Image>();
-        card.typeBadge.color = new Color(0.4f, 0.4f, 0.5f, 0.8f);
-
-        GameObject badgeTextObj = new GameObject("BadgeText");
-        badgeTextObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform badgeTextRT = badgeTextObj.AddComponent<RectTransform>();
-        badgeTextRT.anchorMin = Vector2.zero;
-        badgeTextRT.anchorMax = Vector2.one;
-        badgeTextRT.offsetMin = Vector2.zero;
-        badgeTextRT.offsetMax = Vector2.zero;
-
-        card.typeBadgeText = badgeTextObj.AddComponent<TextMeshProUGUI>();
-        card.typeBadgeText.text = "TYPE";
-        card.typeBadgeText.fontSize = size.y * 0.035f;
-        card.typeBadgeText.fontStyle = FontStyles.Bold;
-        card.typeBadgeText.color = Color.white;
-        card.typeBadgeText.alignment = TextAlignmentOptions.Center;
-
-        // === TITLE ===
-        GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(content.transform, false);
-
-        LayoutElement titleLE = titleObj.AddComponent<LayoutElement>();
-        titleLE.preferredHeight = size.y * 0.10f;
-        titleLE.flexibleWidth = 1;
-
-        card.titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        card.titleText.text = "Card Title";
-        card.titleText.fontStyle = FontStyles.Bold;
-        card.titleText.color = Color.white;
-        card.titleText.alignment = TextAlignmentOptions.Center;
-        card.titleText.enableAutoSizing = true;
-        card.titleText.fontSizeMin = 20;
-        card.titleText.fontSizeMax = 56;
-
-        // === ICON AREA ===
+        // === ICON / PLACEHOLDER (large, central focus) ===
         GameObject iconObj = new GameObject("Icon");
         iconObj.transform.SetParent(content.transform, false);
 
         LayoutElement iconLE = iconObj.AddComponent<LayoutElement>();
-        iconLE.preferredHeight = size.y * 0.35f;
+        iconLE.preferredHeight = size.y * 0.50f;
         iconLE.flexibleHeight = 0;
         iconLE.flexibleWidth = 1;
 
@@ -338,51 +300,42 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         card.iconImage.color = new Color(1, 1, 1, 0.15f);
         card.iconImage.preserveAspect = true;
 
-        // === DESCRIPTION ===
-        GameObject descObj = new GameObject("Description");
-        descObj.transform.SetParent(content.transform, false);
+        // === TITLE (compact) ===
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(content.transform, false);
 
-        LayoutElement descLE = descObj.AddComponent<LayoutElement>();
-        descLE.preferredHeight = size.y * 0.28f;
-        descLE.flexibleWidth = 1;
-        descLE.flexibleHeight = 1;
+        LayoutElement titleLE = titleObj.AddComponent<LayoutElement>();
+        titleLE.preferredHeight = size.y * 0.18f;
+        titleLE.flexibleWidth = 1;
 
-        card.descriptionText = descObj.AddComponent<TextMeshProUGUI>();
-        card.descriptionText.text = "Card description goes here";
-        card.descriptionText.fontStyle = FontStyles.Normal;
-        card.descriptionText.color = new Color(0.85f, 0.85f, 0.9f);
-        card.descriptionText.alignment = TextAlignmentOptions.Center;
-        card.descriptionText.enableAutoSizing = true;
-        card.descriptionText.fontSizeMin = 16;
-        card.descriptionText.fontSizeMax = 32;
-        card.descriptionText.textWrappingMode = TextWrappingModes.Normal;
+        card.titleText = titleObj.AddComponent<TextMeshProUGUI>();
+        card.titleText.text = "Item";
+        card.titleText.fontStyle = FontStyles.Bold;
+        card.titleText.color = Color.white;
+        card.titleText.alignment = TextAlignmentOptions.Center;
+        card.titleText.enableAutoSizing = true;
+        card.titleText.fontSizeMin = 16;
+        card.titleText.fontSizeMax = 36;
 
-        // === COST ===
+        // === COST (small, at bottom) ===
         GameObject costObj = new GameObject("Cost");
         costObj.transform.SetParent(content.transform, false);
 
         LayoutElement costLE = costObj.AddComponent<LayoutElement>();
-        costLE.preferredHeight = size.y * 0.09f;
+        costLE.preferredHeight = size.y * 0.12f;
         costLE.flexibleWidth = 1;
 
-        // Cost background
-        Image costBg = costObj.AddComponent<Image>();
-        costBg.color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
-
-        GameObject costTextObj = new GameObject("CostText");
-        costTextObj.transform.SetParent(costObj.transform, false);
-        RectTransform costTextRT = costTextObj.AddComponent<RectTransform>();
-        costTextRT.anchorMin = Vector2.zero;
-        costTextRT.anchorMax = Vector2.one;
-        costTextRT.offsetMin = Vector2.zero;
-        costTextRT.offsetMax = Vector2.zero;
-
-        card.costText = costTextObj.AddComponent<TextMeshProUGUI>();
+        card.costText = costObj.AddComponent<TextMeshProUGUI>();
         card.costText.text = "100 BP";
-        card.costText.fontSize = size.y * 0.055f;
+        card.costText.fontSize = size.y * 0.065f;
         card.costText.fontStyle = FontStyles.Bold;
         card.costText.color = new Color(1f, 0.85f, 0.2f); // Gold
         card.costText.alignment = TextAlignmentOptions.Center;
+
+        // Hidden fields not used in simple box but kept for compatibility
+        card.descriptionText = null;
+        card.typeBadge = null;
+        card.typeBadgeText = null;
 
         return card;
     }
