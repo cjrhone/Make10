@@ -311,7 +311,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &68437846
 RectTransform:
   m_ObjectHideFlags: 0
@@ -904,7 +904,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -12}
+  m_AnchoredPosition: {x: 0, y: -12.000122}
   m_SizeDelta: {x: -132.82, y: -1126.408}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &118860727
@@ -1728,6 +1728,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIManager
   roundText: {fileID: 0}
+  stageText: {fileID: 0}
+  targetText: {fileID: 0}
+  bossHPPanel: {fileID: 0}
+  bossHPSlider: {fileID: 0}
+  bossNameText: {fileID: 0}
+  bossHPText: {fileID: 0}
+  bossHPFill: {fileID: 0}
+  bossHPFullColor: {r: 0.8, g: 0.2, b: 0.2, a: 1}
+  bossHPLowColor: {r: 0.3, g: 0.1, b: 0.1, a: 1}
   scoreText: {fileID: 1970017510}
   targetScoreText: {fileID: 542730252}
   scoreProgressSlider: {fileID: 1529845908}
@@ -1785,6 +1794,7 @@ MonoBehaviour:
   timeBonusPerSecond: 1
   unsolvablePopup: {fileID: 731897464}
   unsolvablePopupDuration: 1
+  campaignCompleteScreen: {fileID: 0}
   gameManager: {fileID: 1333256939}
   gridManager: {fileID: 901072115}
   multiplierTextCoolColor: {r: 1, g: 1, b: 1, a: 1}
@@ -2552,7 +2562,7 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 64.7606, y: 544.0485}
+  m_SizeDelta: {x: 449.584, y: 544.049}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &257004038
 MonoBehaviour:
@@ -6790,7 +6800,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -48.356445}
+  m_AnchoredPosition: {x: 0, y: -48.35614}
   m_SizeDelta: {x: -184.9, y: -1053.688}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &695977313
@@ -7552,7 +7562,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 69.64172, y: -12}
+  m_AnchoredPosition: {x: 69.64172, y: -12.000122}
   m_SizeDelta: {x: -305.3718, y: -238.3313}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &734454016
@@ -8975,6 +8985,7 @@ GameObject:
   m_Component:
   - component: {fileID: 901072114}
   - component: {fileID: 901072115}
+  - component: {fileID: 901072116}
   m_Layer: 5
   m_Name: GridManager
   m_TagString: Untagged
@@ -9055,6 +9066,49 @@ MonoBehaviour:
   hintParticleLifetime: 0.5
   hintParticleSize: 12
   hintParticleColor: {r: 1, g: 0.9, b: 0.3, a: 0.9}
+--- !u!114 &901072116
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901072113}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8fd5b15cad4bb4cff86299b1a1288f75, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridVFX
+  beamSprite: {fileID: 8389134475083476877, guid: cd11c48a4a1cb4b1ca26b54e315c7518, type: 3}
+  sparkleSprites:
+  - {fileID: -6470460504253458178, guid: e4c5ced3827974a6aa9192fca2d9a8fa, type: 3}
+  - {fileID: 4130640169021434097, guid: 105dd55d53e33415dba92a1e73062421, type: 3}
+  - {fileID: 8288426215254106694, guid: 916b822703ac94263bc9faf0ff2f4141, type: 3}
+  - {fileID: 4113829005332862926, guid: 3fdd7b56fffdb4f4fb5f03ac3834faa4, type: 3}
+  beamFlashDuration: 0.45
+  beamOvershoot: 1.2
+  beamColor: {r: 1, g: 1, b: 0.85, a: 1}
+  beamSparkleCount: 8
+  beamSparkleSize: 28
+  beamThickness: 1.6
+  baseShakeIntensity: 4
+  shakeIntensityPerChain: 2
+  maxShakeIntensity: 18
+  shakeDuration: 0.2
+  shakeFrequency: 35
+  sparklesPerTile: 3
+  sparkleLifetime: 0.4
+  sparkleSpeed: 80
+  sparkleSize: 10
+  sparkleColorA: {r: 1, g: 0.95, b: 0.6, a: 0.9}
+  sparkleColorB: {r: 0.6, g: 0.9, b: 1, a: 0.9}
+  enableAmbientParticles: 1
+  ambientParticleCount: 15
+  ambientSpeed: 20
+  ambientSizeMin: 4
+  ambientSizeMax: 10
+  ambientAlpha: 0.15
+  ambientColorA: {r: 1, g: 0.9, b: 0.4, a: 1}
+  ambientColorB: {r: 0.5, g: 0.7, b: 1, a: 1}
 --- !u!1 &921248713
 GameObject:
   m_ObjectHideFlags: 0
@@ -11170,11 +11224,16 @@ MonoBehaviour:
   bpBackdropColor: {r: 0, g: 0, b: 0, a: 0.7}
   buttonColor: {r: 0.2, g: 0.6, b: 0.9, a: 1}
   titleFontSize: 72
-  cardSize: {x: 280, y: 380}
+  upgradeCardSize: {x: 380, y: 520}
+  snackCardSize: {x: 340, y: 460}
   cardBackgroundColor: {r: 0.15, g: 0.15, b: 0.2, a: 1}
   cardBorderColor: {r: 0.4, g: 0.4, b: 0.5, a: 1}
-  cardCount: 3
-  snackChance: 0.33
+  topRowUpgrades: 2
+  middleRowUpgrades: 2
+  bottomRowSnacks: 2
+  rowSpacing: 30
+  cardSpacingHorizontal: 25
+  pyramidTopOffset: 120
   filterByStage: 1
   bpCountUpDuration: 0.8
   bpCountUpDelay: 0.3
@@ -11650,6 +11709,7 @@ MonoBehaviour:
   hotStreakMultiplier: 5
   debugMode: 0
   debugStartingBP: 500
+  bossFightDuration: 60
   uiManager: {fileID: 178623199}
 --- !u!4 &1333256940
 Transform:
@@ -16323,6 +16383,8 @@ MonoBehaviour:
   tutorialPanel2: {fileID: 801159656}
   countdownPanel: {fileID: 158306165}
   quitPanel: {fileID: 747134862}
+  chillZonePanel: {fileID: 0}
+  chillZoneMusic: {fileID: 0}
   transitionDuration: 0.5
   transitionCurve:
     serializedVersion: 2
@@ -20313,8 +20375,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 88}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 1.3862915}
+  m_SizeDelta: {x: 0, y: -2.7723}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2126877257
 MonoBehaviour:
@@ -20365,8 +20427,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 120
-  m_fontSizeBase: 120
+  m_fontSize: 193.74
+  m_fontSizeBase: 193.74
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

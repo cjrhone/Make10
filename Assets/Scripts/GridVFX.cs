@@ -15,12 +15,17 @@ public class GridVFX : MonoBehaviour
     [Header("Beam Flash Settings")]
     [SerializeField] private Sprite beamSprite;          // Assign particles/12.png or 13.png (vertical light streak)
     [SerializeField] private Sprite[] sparkleSprites;    // Assign particles/3, 5, 8, 9 (sparkle/star shapes)
-    [SerializeField] private float beamFlashDuration = 0.45f;
+    [SerializeField] private float beamFlashDuration = 0.30f;
     [SerializeField] private float beamOvershoot = 1.2f; // Beam extends slightly past grid edges
-    [SerializeField] private Color beamColor = new Color(1f, 1f, 0.85f, 1f);
-    [SerializeField] private int beamSparkleCount = 8;   // Sparkles scattered along the beam
+    [SerializeField] private int beamSparkleCount = 8;
     [SerializeField] private float beamSparkleSize = 28f;
-    [SerializeField] private float beamThickness = 1.6f; // Multiplier on tile height for beam thickness
+    [SerializeField] private float beamThickness = 1.6f;
+
+    [Header("Beam Gold Gradient")]
+    [SerializeField] private Color goldEdgeColor = new Color(1f, 0.75f, 0.2f, 1f);
+    [SerializeField] private float gradientPower = 1.5f;
+    [SerializeField] private float uvScrollSpeed = 3.0f;
+    [SerializeField] private float edgeFade = 0.12f;
 
     [Header("Screen Shake Settings")]
     [SerializeField] private float baseShakeIntensity = 4f;
@@ -53,7 +58,8 @@ public class GridVFX : MonoBehaviour
     private Coroutine ambientCoroutine;
     private bool isShaking = false;
     private Vector2 originalGridPosition;
-    private Material additiveMaterial; // Cached additive UI material
+    private Material additiveMaterial;  // Basic additive — for glow, sparkles
+    private Material beamMaterial;      // Enhanced additive — gold gradient, UV scroll, edge fade
 
     private void Awake()
     {
@@ -64,16 +70,28 @@ public class GridVFX : MonoBehaviour
         }
         Instance = this;
 
-        // Create additive UI material at runtime
         Shader additiveShader = Shader.Find("UI/Additive");
         if (additiveShader != null)
         {
+            // Basic additive: no gradient, no scroll, no edge fade
             additiveMaterial = new Material(additiveShader);
-            Debug.Log("[GridVFX] Additive UI material created successfully.");
+            additiveMaterial.SetFloat("_GradientStrength", 0f);
+            additiveMaterial.SetFloat("_ScrollSpeed", 0f);
+            additiveMaterial.SetFloat("_EdgeFade", 0f);
+
+            // Enhanced beam: gold gradient + UV scroll + soft edges
+            beamMaterial = new Material(additiveShader);
+            beamMaterial.SetColor("_GradientColor", goldEdgeColor);
+            beamMaterial.SetFloat("_GradientStrength", 1f);
+            beamMaterial.SetFloat("_GradientPower", gradientPower);
+            beamMaterial.SetFloat("_ScrollSpeed", uvScrollSpeed);
+            beamMaterial.SetFloat("_EdgeFade", edgeFade);
+
+            Debug.Log("[GridVFX] Additive materials created (basic + beam).");
         }
         else
         {
-            Debug.LogWarning("[GridVFX] Could not find 'UI/Additive' shader. Beam particles will use default UI shader (black backgrounds will show).");
+            Debug.LogWarning("[GridVFX] Could not find 'UI/Additive' shader.");
         }
     }
 
@@ -96,8 +114,8 @@ public class GridVFX : MonoBehaviour
     private void OnDestroy()
     {
         CleanupAmbient();
-        if (additiveMaterial != null)
-            Destroy(additiveMaterial);
+        if (additiveMaterial != null) Destroy(additiveMaterial);
+        if (beamMaterial != null) Destroy(beamMaterial);
     }
 
     #region Beam Flash
@@ -148,7 +166,7 @@ public class GridVFX : MonoBehaviour
     }
 
     /// <summary>
-    /// Helper: create an additive Image on a new GameObject parented to gridContainer.
+    /// Helper: create an additive Image (basic material — glow/sparkles).
     /// </summary>
     private Image CreateAdditiveImage(string name, Vector2 position, Vector2 sizeDelta, Sprite sprite = null, float rotation = 0f)
     {
@@ -165,12 +183,22 @@ public class GridVFX : MonoBehaviour
         img.raycastTarget = false;
         if (sprite != null)
             img.sprite = sprite;
-        img.color = new Color(1f, 1f, 1f, 0f); // Start invisible
+        img.color = new Color(1f, 1f, 1f, 0f);
 
-        // Apply additive material so black = transparent, white = glow
         if (additiveMaterial != null)
             img.material = additiveMaterial;
 
+        return img;
+    }
+
+    /// <summary>
+    /// Helper: create a beam Image (enhanced material — gold gradient + scroll + edge fade).
+    /// </summary>
+    private Image CreateBeamImage(string name, Vector2 position, Vector2 sizeDelta, Sprite sprite = null, float rotation = 0f)
+    {
+        Image img = CreateAdditiveImage(name, position, sizeDelta, sprite, rotation);
+        if (beamMaterial != null)
+            img.material = beamMaterial;
         return img;
     }
 
@@ -178,34 +206,30 @@ public class GridVFX : MonoBehaviour
     {
         float rot = isHorizontal ? 90f : 0f;
 
-        // When rotating 90°, RectTransform sizeDelta X becomes visual Y and vice versa.
-        // Swap dimensions so the beam visually stretches the correct way.
-        // After this swap: size.x = thickness (short), size.y = length (long) — always.
+        // Swap dimensions for 90° rotation so size.x = thickness, size.y = length — always.
         if (isHorizontal)
             size = new Vector2(size.y, size.x);
 
         List<GameObject> allObjects = new List<GameObject>();
 
-        // === LAYER 1: Wide soft glow (biggest, softest — the "bloom") ===
-        Image glowImg = CreateAdditiveImage("BeamGlow", center, size * 2.2f, null, rot);
+        // === LAYER 1: Wide soft bloom (basic additive, no gradient) ===
+        Image glowImg = CreateAdditiveImage("BeamGlow", center, size * 2.5f, null, rot);
         GlowTextureGenerator.ApplyCircularGlow(glowImg, 64, 1.5f);
-        if (additiveMaterial != null) glowImg.material = additiveMaterial;
         allObjects.Add(glowImg.gameObject);
 
-        // === LAYER 2: Core beam sprite (the main light streak) ===
-        Image beamImg = CreateAdditiveImage("BeamCore", center, size, beamSprite, rot);
+        // === LAYER 2: Core beam sprite (enhanced material — gold gradient + scroll + edge fade) ===
+        Image beamImg = CreateBeamImage("BeamCore", center, size, beamSprite, rot);
         allObjects.Add(beamImg.gameObject);
 
-        // === LAYER 3: Hot center (narrow, extra bright — the "core" of the light) ===
-        Vector2 coreSize = new Vector2(size.x * 0.4f, size.y);
-        Image coreImg = CreateAdditiveImage("BeamHotCore", center, coreSize, beamSprite, rot);
+        // === LAYER 3: Hot center (enhanced material — narrower, extra bright) ===
+        Vector2 coreSize = new Vector2(size.x * 0.35f, size.y);
+        Image coreImg = CreateBeamImage("BeamHotCore", center, coreSize, beamSprite, rot);
         allObjects.Add(coreImg.gameObject);
 
-        // === LAYER 4: Sparkle sprites scattered along the beam ===
+        // === LAYER 4: Sparkle sprites scattered along the beam (basic additive) ===
         List<Image> sparkleImages = new List<Image>();
         for (int i = 0; i < beamSparkleCount; i++)
         {
-            // Spread sparkles along the line length, with slight off-axis jitter based on thickness
             float posAlongLine = Random.Range(-lineLength * 0.5f, lineLength * 0.5f);
             float posOffAxis = Random.Range(-size.x * 0.4f, size.x * 0.4f);
             Vector2 sparkPos;
@@ -225,12 +249,15 @@ public class GridVFX : MonoBehaviour
             allObjects.Add(sImg.gameObject);
         }
 
-        // === Animate: flash in → hold → fade out ===
+        // === Animate: BURST in → brief hold → fade out + afterglow ===
         float elapsed = 0f;
-        float flashInTime = 0.07f;
-        float holdTime = 0.13f;
-        float fadeOutTime = beamFlashDuration - flashInTime - holdTime;
+        float burstTime = 0.04f;         // Explosive expand (faster = snappier)
+        float holdTime = 0.06f;           // Brief peak brightness
+        float fadeTime = beamFlashDuration - burstTime - holdTime;
         bool sparklesActivated = false;
+
+        // Gold tint for the glow layer
+        Color glowGold = new Color(goldEdgeColor.r, goldEdgeColor.g, goldEdgeColor.b, 1f);
 
         while (elapsed < beamFlashDuration)
         {
@@ -240,19 +267,19 @@ public class GridVFX : MonoBehaviour
             float alpha;
             float thicknessScale;
 
-            if (elapsed < flashInTime)
+            if (elapsed < burstTime)
             {
-                // FLASH IN — rapid expand from thin line to full beam
-                float ft = elapsed / flashInTime;
-                alpha = Mathf.Pow(ft, 0.5f); // Fast rise (sqrt curve)
-                thicknessScale = Mathf.Lerp(0.15f, 1.1f, ft); // Overshoot slightly
+                // BURST — explosive expand from thin slit to 1.4x overshoot
+                float bt = elapsed / burstTime;
+                alpha = Mathf.Pow(bt, 0.3f); // Very fast rise
+                thicknessScale = Mathf.Lerp(0.05f, 1.4f, bt * bt); // Accelerating expand with big overshoot
             }
-            else if (elapsed < flashInTime + holdTime)
+            else if (elapsed < burstTime + holdTime)
             {
-                // HOLD — full brightness with gentle pulse
-                float ht = (elapsed - flashInTime) / holdTime;
+                // HOLD — snap back from overshoot to 1.0, full brightness
+                float ht = (elapsed - burstTime) / holdTime;
                 alpha = 1f;
-                thicknessScale = 1.1f - Mathf.Sin(ht * Mathf.PI) * 0.1f; // Settle from overshoot
+                thicknessScale = Mathf.Lerp(1.4f, 1.0f, ht); // Snap from overshoot to normal
 
                 if (!sparklesActivated)
                 {
@@ -263,56 +290,55 @@ public class GridVFX : MonoBehaviour
             }
             else
             {
-                // FADE OUT — beam thins and fades
-                float ft = (elapsed - flashInTime - holdTime) / fadeOutTime;
+                // FADE OUT — beam thins and fades, glow lingers (afterglow)
+                float ft = (elapsed - burstTime - holdTime) / fadeTime;
                 alpha = 1f - (ft * ft); // Quadratic ease out
-                thicknessScale = Mathf.Lerp(1f, 0.3f, ft); // Beam gets thinner as it fades
+                thicknessScale = Mathf.Lerp(1.0f, 0.15f, ft * ft); // Beam collapses back to thin line
             }
 
-            // Unified sizing: size.x = thickness, size.y = length (rotation handles orientation)
-
-            // --- Apply to glow (layer 1) ---
-            float glowAlpha = alpha * 0.5f;
-            glowImg.color = new Color(beamColor.r, beamColor.g, beamColor.b, glowAlpha);
+            // --- Glow (layer 1) — trails behind the beam, fades slower (afterglow) ---
+            float glowFade = (elapsed < burstTime + holdTime)
+                ? alpha * 0.6f
+                : Mathf.Max(alpha * 0.6f, (1f - t) * 0.35f); // Afterglow lingers
+            glowImg.color = new Color(glowGold.r, glowGold.g, glowGold.b, glowFade);
             RectTransform glowRT = glowImg.GetComponent<RectTransform>();
-            glowRT.sizeDelta = new Vector2(size.x * thicknessScale * 2.2f, size.y * 2.2f);
+            float glowThick = Mathf.Max(thicknessScale, 0.5f); // Glow never fully collapses
+            glowRT.sizeDelta = new Vector2(size.x * glowThick * 2.5f, size.y * 2.5f);
 
-            // --- Apply to core beam (layer 2) ---
-            beamImg.color = new Color(beamColor.r, beamColor.g, beamColor.b, alpha);
+            // --- Core beam (layer 2) — the main light, shader handles gold gradient ---
+            beamImg.color = new Color(1f, 1f, 1f, alpha);
             RectTransform beamRT = beamImg.GetComponent<RectTransform>();
             beamRT.sizeDelta = new Vector2(size.x * thicknessScale, size.y);
 
-            // --- Apply to hot core (layer 3) — stays bright longer ---
-            float coreAlpha = Mathf.Min(alpha * 1.3f, 1f);
-            coreImg.color = new Color(1f, 1f, 1f, coreAlpha); // Pure white for maximum brightness
+            // --- Hot core (layer 3) — pure white, stays bright slightly longer ---
+            float coreAlpha = Mathf.Min(alpha * 1.4f, 1f);
+            coreImg.color = new Color(1f, 1f, 1f, coreAlpha);
             RectTransform coreRT = coreImg.GetComponent<RectTransform>();
-            coreRT.sizeDelta = new Vector2(size.x * thicknessScale * 0.4f, size.y);
+            coreRT.sizeDelta = new Vector2(size.x * thicknessScale * 0.35f, size.y);
 
-            // --- Animate sparkles (layer 4) ---
+            // --- Sparkles (layer 4) ---
             foreach (var sImg in sparkleImages)
             {
                 if (sImg == null) continue;
                 RectTransform srt = sImg.GetComponent<RectTransform>();
                 if (srt == null) continue;
 
-                sImg.color = new Color(1f, 1f, 0.9f, alpha * 0.85f);
+                sImg.color = new Color(1f, 0.95f, 0.7f, alpha * 0.9f); // Warm gold sparkles
 
-                // Pop scale: grow fast then shrink
                 float sparkScale;
-                if (t < 0.25f)
-                    sparkScale = Mathf.Pow(t / 0.25f, 0.5f); // Quick pop
+                if (t < 0.2f)
+                    sparkScale = Mathf.Pow(t / 0.2f, 0.4f); // Explosive pop
                 else
-                    sparkScale = Mathf.Max(0f, 1f - (t - 0.25f) / 0.75f);
+                    sparkScale = Mathf.Max(0f, 1f - (t - 0.2f) / 0.8f);
                 srt.localScale = Vector3.one * sparkScale;
 
-                // Slow spin
-                srt.localEulerAngles += new Vector3(0, 0, 120f * Time.deltaTime);
+                srt.localEulerAngles += new Vector3(0, 0, 150f * Time.deltaTime);
             }
 
             yield return null;
         }
 
-        // Cleanup all objects
+        // Cleanup
         foreach (var obj in allObjects)
             if (obj != null) Destroy(obj);
     }

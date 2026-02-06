@@ -400,11 +400,22 @@ public class GridManager : MonoBehaviour
         
         Debug.Log($"Grid spawned: {gridWidth}x{gridHeight} (tile size: {tileSize:F0})");
 
-        // Initialize VFX system with grid container
+        // Initialize VFX system with grid container (delayed one frame so Canvas layout is calculated)
         if (GridVFX.Instance != null)
-            GridVFX.Instance.Initialize(gridContainer);
+            StartCoroutine(DelayedVFXInit());
     }
     
+    /// <summary>
+    /// Wait one frame for Canvas layout to calculate grid container dimensions,
+    /// then initialize VFX so ambient particles spawn in the correct area.
+    /// </summary>
+    private IEnumerator DelayedVFXInit()
+    {
+        yield return null; // Wait one frame for layout pass
+        if (GridVFX.Instance != null && gridContainer != null)
+            GridVFX.Instance.Initialize(gridContainer);
+    }
+
     /// <summary>
     /// Update grid size based on campaign stage settings.
     /// </summary>
@@ -799,9 +810,12 @@ public class GridManager : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = true;
         
-        // Line highlight sweep before convergence
+        // Fire beam flash (non-blocking — animates on its own, overlaps with convergence)
         if (GridVFX.Instance != null)
-            yield return StartCoroutine(GridVFX.Instance.PlayLineSweeps(result, tileSize, tileSpacing));
+            StartCoroutine(GridVFX.Instance.PlayLineSweeps(result, tileSize, tileSpacing));
+
+        // Brief pause so the beam burst registers visually before convergence starts
+        yield return new WaitForSeconds(0.08f);
 
         // Trigger avatar solve animation immediately when converge starts
         AvatarManager.Instance?.OnSolve();
@@ -870,7 +884,38 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
         
-        yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
+        // === Chain tracking, SFX, and shake — done ONCE regardless of match count ===
+        if (Time.time - lastTenTime > consecutiveResetTime)
+            consecutive10Count = 0;
+        consecutive10Count++;
+        lastTenTime = Time.time;
+
+        AudioManager.Instance?.PlayTenPopSound(consecutive10Count);
+        if (GridVFX.Instance != null)
+        {
+            GridVFX.Instance.TriggerShake(consecutive10Count);
+            GridVFX.Instance.PulseAmbientParticles();
+        }
+
+        // Spawn a "10" popup + explosion for EACH matched line simultaneously
+        List<Vector2> lineCenters = GetPerLineCenters(result);
+        if (lineCenters.Count <= 1)
+        {
+            // Single match — use the convergence center (more precise)
+            yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
+        }
+        else
+        {
+            // Multiple simultaneous matches — fire one popup per line, all at once
+            List<Coroutine> tenEffects = new List<Coroutine>();
+            foreach (Vector2 lineCenter in lineCenters)
+            {
+                tenEffects.Add(StartCoroutine(ShowTenEffectSpectacular(lineCenter)));
+            }
+            // Wait for all to finish
+            foreach (Coroutine c in tenEffects)
+                yield return c;
+        }
 
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = false;
@@ -908,26 +953,30 @@ public class GridManager : MonoBehaviour
         }
         return count > 0 ? sum / count : Vector2.zero;
     }
+
+    /// <summary>
+    /// Get a separate center position for each matched row and column.
+    /// Used to spawn one "10" popup per match line.
+    /// </summary>
+    private List<Vector2> GetPerLineCenters(MatchResult result)
+    {
+        List<Vector2> centers = new List<Vector2>();
+        int midX = gridWidth / 2;
+        int midY = gridHeight / 2;
+
+        foreach (int row in result.matchedRows)
+            centers.Add(GridToWorldPosition(midX, row));
+
+        foreach (int col in result.matchedColumns)
+            centers.Add(GridToWorldPosition(col, midY));
+
+        return centers;
+    }
     
     private IEnumerator ShowTenEffectSpectacular(Vector2 position)
     {
-        // Track consecutive 10s for scaling
-        if (Time.time - lastTenTime > consecutiveResetTime)
-        {
-            consecutive10Count = 0; // Reset if too much time passed
-        }
-        consecutive10Count++;
-        lastTenTime = Time.time;
-
-        // Play ascending pitch SFX based on chain count
-        AudioManager.Instance?.PlayTenPopSound(consecutive10Count);
-
-        // Screen shake and ambient particle burst
-        if (GridVFX.Instance != null)
-        {
-            GridVFX.Instance.TriggerShake(consecutive10Count);
-            GridVFX.Instance.PulseAmbientParticles();
-        }
+        // Chain tracking, SFX, and shake are handled in AnimateSolveSequence (once per cascade).
+        // This method now only handles the visual "10" popup + particle explosion per position.
 
         // Calculate scale based on consecutive 10s
         float tenScale = Mathf.Min(baseTenScale + (consecutive10Count - 1) * tenScaleIncrement, maxTenScale);
