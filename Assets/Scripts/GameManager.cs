@@ -793,6 +793,11 @@ public class GameManager : MonoBehaviour
         }
 
         IsGameActive = false;
+
+        // Freeze the grid immediately to stop any in-progress cascades
+        GridManager gm = FindFirstObjectByType<GridManager>();
+        gm?.FreezeGrid();
+
         int threshold = CurrentRoundThreshold;
 
         if (IsBossFight)
@@ -826,6 +831,10 @@ public class GameManager : MonoBehaviour
     private void WinGame()
     {
         IsGameActive = false;
+
+        // Immediately freeze the grid to prevent cascading auto-wins
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.FreezeGrid();
 
         if (IsBossFight)
         {

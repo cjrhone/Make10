@@ -1,0 +1,676 @@
+fileFormatVersion: 2
+guid: eb61269df069f45ab82b91c39fe0b0c5
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -292275199904584488
+    second: ether_UV-Recovered_0
+  - first:
+      213: 7603957037268431698
+    second: ether_UV-Recovered_1
+  - first:
+      213: -7097105709022280433
+    second: ether_UV-Recovered_2
+  - first:
+      213: 5681757947109347731
+    second: ether_UV-Recovered_3
+  - first:
+      213: 3040574026103060514
+    second: ether_UV-Recovered_4
+  - first:
+      213: -8845044658995507665
+    second: ether_UV-Recovered_5
+  - first:
+      213: 7396432716028501688
+    second: ether_UV-Recovered_6
+  - first:
+      213: -6363904722384206420
+    second: ether_UV-Recovered_7
+  - first:
+      213: 8134046895328470122
+    second: ether_UV-Recovered_8
+  - first:
+      213: 1451532021736560351
+    second: ether_UV-Recovered_9
+  - first:
+      213: -3820208049798503210
+    second: ether_UV-Recovered_10
+  - first:
+      213: 414889097414279129
+    second: ether_UV-Recovered_11
+  - first:
+      213: -5447583353845708763
+    second: ether_UV-Recovered_12
+  - first:
+      213: -5265197128330763593
+    second: ether_UV-Recovered_13
+  - first:
+      213: 6926618778819923086
+    second: ether_UV-Recovered_14
+  - first:
+      213: -7014679807797609900
+    second: ether_UV-Recovered_15
+  - first:
+      213: 8426635294590957890
+    second: ether_UV-Recovered_16
+  - first:
+      213: 6092221715504128932
+    second: ether_UV-Recovered_17
+  - first:
+      213: 2062974018544401753
+    second: ether_UV-Recovered_18
+  - first:
+      213: -5246996773667771567
+    second: ether_UV-Recovered_19
+  - first:
+      213: 2691438674210492769
+    second: ether_UV-Recovered_20
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: ether_UV-Recovered_0
+      rect:
+        serializedVersion: 2
+        x: 6
+        y: 652
+        width: 62
+        height: 66
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8dce7051141a1fbf0800000000000000
+      internalID: -292275199904584488
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_1
+      rect:
+        serializedVersion: 2
+        x: 68
+        y: 691
+        width: 123
+        height: 39
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 25377bd43aea68960800000000000000
+      internalID: 7603957037268431698
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_2
+      rect:
+        serializedVersion: 2
+        x: 87
+        y: 712
+        width: 8
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f058450b5f3028d90800000000000000
+      internalID: -7097105709022280433
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_3
+      rect:
+        serializedVersion: 2
+        x: 107
+        y: 716
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3919439efb8a9de40800000000000000
+      internalID: 5681757947109347731
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_4
+      rect:
+        serializedVersion: 2
+        x: 111
+        y: 709
+        width: 7
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 228f62397f9423a20800000000000000
+      internalID: 3040574026103060514
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_5
+      rect:
+        serializedVersion: 2
+        x: 113
+        y: 714
+        width: 8
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f2e4b16eeb6104580800000000000000
+      internalID: -8845044658995507665
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_6
+      rect:
+        serializedVersion: 2
+        x: 137
+        y: 714
+        width: 6
+        height: 12
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8bed4f30e5865a660800000000000000
+      internalID: 7396432716028501688
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_7
+      rect:
+        serializedVersion: 2
+        x: 193
+        y: 708
+        width: 21
+        height: 21
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ca5cbd55f5edea7a0800000000000000
+      internalID: -6363904722384206420
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_8
+      rect:
+        serializedVersion: 2
+        x: 211
+        y: 0
+        width: 813
+        height: 1024
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a642c662e80f1e070800000000000000
+      internalID: 8134046895328470122
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_9
+      rect:
+        serializedVersion: 2
+        x: 213
+        y: 703
+        width: 12
+        height: 8
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fd656b7eea0e42410800000000000000
+      internalID: 1451532021736560351
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_10
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 663
+        width: 10
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6d42cafd405ebfac0800000000000000
+      internalID: -3820208049798503210
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_11
+      rect:
+        serializedVersion: 2
+        x: 10
+        y: 631
+        width: 22
+        height: 19
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9df7f889f6bf1c500800000000000000
+      internalID: 414889097414279129
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_12
+      rect:
+        serializedVersion: 2
+        x: 24
+        y: 644
+        width: 7
+        height: 7
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 52802bd5dcb4664b0800000000000000
+      internalID: -5447583353845708763
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_13
+      rect:
+        serializedVersion: 2
+        x: 4
+        y: 586
+        width: 39
+        height: 45
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7b22075ab134ee6b0800000000000000
+      internalID: -5265197128330763593
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_14
+      rect:
+        serializedVersion: 2
+        x: 27
+        y: 617
+        width: 7
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e8c8c1e941b402060800000000000000
+      internalID: 6926618778819923086
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_15
+      rect:
+        serializedVersion: 2
+        x: 4
+        y: 271
+        width: 84
+        height: 130
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 45a3e1351e9d6ae90800000000000000
+      internalID: -7014679807797609900
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_16
+      rect:
+        serializedVersion: 2
+        x: 52
+        y: 392
+        width: 27
+        height: 29
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 249fcd9772c61f470800000000000000
+      internalID: 8426635294590957890
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_17
+      rect:
+        serializedVersion: 2
+        x: 16
+        y: 336
+        width: 14
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4a36b8d4f5beb8450800000000000000
+      internalID: 6092221715504128932
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_18
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 315
+        width: 11
+        height: 6
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 95df23490f721ac10800000000000000
+      internalID: 2062974018544401753
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_19
+      rect:
+        serializedVersion: 2
+        x: 49
+        y: 259
+        width: 28
+        height: 25
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 15b69efeb3cee27b0800000000000000
+      internalID: -5246996773667771567
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: ether_UV-Recovered_20
+      rect:
+        serializedVersion: 2
+        x: 70
+        y: 275
+        width: 8
+        height: 9
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 161901fd639e95520800000000000000
+      internalID: 2691438674210492769
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      ether_UV-Recovered_0: -292275199904584488
+      ether_UV-Recovered_1: 7603957037268431698
+      ether_UV-Recovered_10: -3820208049798503210
+      ether_UV-Recovered_11: 414889097414279129
+      ether_UV-Recovered_12: -5447583353845708763
+      ether_UV-Recovered_13: -5265197128330763593
+      ether_UV-Recovered_14: 6926618778819923086
+      ether_UV-Recovered_15: -7014679807797609900
+      ether_UV-Recovered_16: 8426635294590957890
+      ether_UV-Recovered_17: 6092221715504128932
+      ether_UV-Recovered_18: 2062974018544401753
+      ether_UV-Recovered_19: -5246996773667771567
+      ether_UV-Recovered_2: -7097105709022280433
+      ether_UV-Recovered_20: 2691438674210492769
+      ether_UV-Recovered_3: 5681757947109347731
+      ether_UV-Recovered_4: 3040574026103060514
+      ether_UV-Recovered_5: -8845044658995507665
+      ether_UV-Recovered_6: 7396432716028501688
+      ether_UV-Recovered_7: -6363904722384206420
+      ether_UV-Recovered_8: 8134046895328470122
+      ether_UV-Recovered_9: 1451532021736560351
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

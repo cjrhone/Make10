@@ -89,7 +89,18 @@ public class GridManager : MonoBehaviour
     private List<GameObject> activeHintParticles = new List<GameObject>();
     
     public event System.Action OnGridUnsolvable;
-    
+
+    /// <summary>
+    /// Immediately halt all grid processing and tile interaction.
+    /// Used when game ends (win/loss) to prevent cascading auto-wins.
+    /// </summary>
+    public void FreezeGrid()
+    {
+        StopAllCoroutines();
+        isProcessing = false;
+        Debug.Log("[GridManager] Grid frozen - all processing halted.");
+    }
+
     private void Awake()
     {
         weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
@@ -388,6 +399,10 @@ public class GridManager : MonoBehaviour
         }
         
         Debug.Log($"Grid spawned: {gridWidth}x{gridHeight} (tile size: {tileSize:F0})");
+
+        // Initialize VFX system with grid container
+        if (GridVFX.Instance != null)
+            GridVFX.Instance.Initialize(gridContainer);
     }
     
     /// <summary>
@@ -630,14 +645,21 @@ public class GridManager : MonoBehaviour
         
         while (true)
         {
+            // Stop processing if game is no longer active (e.g. win/loss triggered)
+            if (GameManager.Instance != null && !GameManager.Instance.IsGameActive)
+            {
+                Debug.Log("Game no longer active - halting cascade processing.");
+                break;
+            }
+
             if (matchChecker == null)
             {
                 Debug.LogWarning("MatchChecker not assigned!");
                 break;
             }
-            
+
             MatchResult result = matchChecker.GetMatchResult();
-            
+
             if (!result.HasMatches)
             {
                 if (cascadeCount > 0)
@@ -646,7 +668,7 @@ public class GridManager : MonoBehaviour
                     Debug.Log("No matches found.");
                 break;
             }
-            
+
             cascadeCount++;
             Debug.Log($"<color=yellow>MATCH {cascadeCount}!</color> " +
                     $"{result.matchedRows.Count} rows, {result.matchedColumns.Count} columns, " +
@@ -777,9 +799,13 @@ public class GridManager : MonoBehaviour
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = true;
         
+        // Line highlight sweep before convergence
+        if (GridVFX.Instance != null)
+            yield return StartCoroutine(GridVFX.Instance.PlayLineSweeps(result, tileSize, tileSpacing));
+
         // Trigger avatar solve animation immediately when converge starts
         AvatarManager.Instance?.OnSolve();
-        
+
         AudioManager.Instance?.PlayConvergenceSound();
         
         Vector2 centerPos = CalculateMatchCenter(tiles, result);
@@ -895,6 +921,13 @@ public class GridManager : MonoBehaviour
 
         // Play ascending pitch SFX based on chain count
         AudioManager.Instance?.PlayTenPopSound(consecutive10Count);
+
+        // Screen shake and ambient particle burst
+        if (GridVFX.Instance != null)
+        {
+            GridVFX.Instance.TriggerShake(consecutive10Count);
+            GridVFX.Instance.PulseAmbientParticles();
+        }
 
         // Calculate scale based on consecutive 10s
         float tenScale = Mathf.Min(baseTenScale + (consecutive10Count - 1) * tenScaleIncrement, maxTenScale);
@@ -1163,9 +1196,13 @@ public class GridManager : MonoBehaviour
     private IEnumerator TileLandBounce(Tile tile)
     {
         if (tile == null) yield break;
-        
+
         Transform t = tile.transform;
         t.localScale = new Vector3(1.1f, 0.9f, 1f);
+
+        // Sparkle on land — spread across tile width
+        GridVFX.Instance?.SpawnLandSparkle(tile.GetRectTransform().anchoredPosition, tileSize);
+
         yield return new WaitForSeconds(0.05f);
         t.localScale = new Vector3(0.95f, 1.05f, 1f);
         yield return new WaitForSeconds(0.05f);

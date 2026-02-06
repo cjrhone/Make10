@@ -20,18 +20,18 @@ public class TenExplosionVFX : MonoBehaviour
     [SerializeField] private float collectionDuration = 0.5f;
 
     [Header("Explosion Settings")]
-    [SerializeField] private float explosionRadius = 150f;
+    [SerializeField] private float explosionRadius = 180f;
     [SerializeField] private float explosionDecay = 3f; // Exponential decay rate
     [SerializeField] private Vector2 forceMultiplierRange = new Vector2(0.7f, 1.3f); // Min/max force variation
 
     [Header("Small Particle Settings")]
-    [SerializeField] private Vector2 smallSizeRange = new Vector2(20f, 28f);
-    [SerializeField] private Color smallParticleColor = new Color(1f, 0.9f, 0.5f); // Gold
+    [SerializeField] private Vector2 smallSizeRange = new Vector2(24f, 34f);
+    [SerializeField] private Color smallParticleColor = new Color(1f, 0.95f, 0.65f); // Bright Gold
     [SerializeField] private float smallRotationSpeed = 150f;
 
     [Header("Big Particle Settings")]
-    [SerializeField] private Vector2 bigSizeRange = new Vector2(40f, 52f);
-    [SerializeField] private Color bigParticleColor = new Color(0.7f, 0.4f, 1f); // Purple
+    [SerializeField] private Vector2 bigSizeRange = new Vector2(48f, 62f);
+    [SerializeField] private Color bigParticleColor = new Color(0.85f, 0.55f, 1f); // Bright Purple
     [SerializeField] private float bigRotationSpeed = 75f;
 
     [Header("Collection Settings")]
@@ -48,14 +48,14 @@ public class TenExplosionVFX : MonoBehaviour
     [SerializeField] private float bounceDuration = 0.08f;
 
     [Header("Glow Settings")]
-    [SerializeField] private float glowSizeMultiplier = 1.8f;
-    [SerializeField] private float glowAlpha = 0.35f;
+    [SerializeField] private float glowSizeMultiplier = 2.2f;
+    [SerializeField] private float glowAlpha = 0.55f;
 
     [Header("Impact Flash Settings")]
-    [SerializeField] private float flashSize = 40f;
-    [SerializeField] private float flashDuration = 0.15f;
-    [SerializeField] private Color smallFlashColor = new Color(1f, 0.95f, 0.7f, 0.8f);
-    [SerializeField] private Color bigFlashColor = new Color(0.85f, 0.6f, 1f, 0.9f);
+    [SerializeField] private float flashSize = 50f;
+    [SerializeField] private float flashDuration = 0.18f;
+    [SerializeField] private Color smallFlashColor = new Color(1f, 0.97f, 0.8f, 0.9f);
+    [SerializeField] private Color bigFlashColor = new Color(0.9f, 0.7f, 1f, 0.95f);
 
     // Particle data
     private class ExplosionParticle

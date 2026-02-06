@@ -136,9 +136,9 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private void CreateShadowText()
     {
         GameObject shadowObj = new GameObject("NumberShadow");
-        shadowObj.transform.SetParent(numberText.transform.parent, false);
+        shadowObj.transform.SetParent(transform, false);
 
-        // Position shadow behind the number text
+        // Position shadow just behind the number text in sibling order
         shadowObj.transform.SetSiblingIndex(numberText.transform.GetSiblingIndex());
 
         RectTransform shadowRT = shadowObj.AddComponent<RectTransform>();
