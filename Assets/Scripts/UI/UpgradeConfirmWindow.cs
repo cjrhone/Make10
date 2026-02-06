@@ -65,19 +65,12 @@ public class UpgradeConfirmWindow : MonoBehaviour
 
     private void LoadTestUpgrades()
     {
-        #if UNITY_EDITOR
         if (testUpgrades == null || testUpgrades.Length == 0)
         {
-            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:UpgradeData", new[] { "Assets/Data/Upgrades" });
-            testUpgrades = new UpgradeData[guids.Length];
-            for (int i = 0; i < guids.Length; i++)
-            {
-                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[i]);
-                testUpgrades[i] = UnityEditor.AssetDatabase.LoadAssetAtPath<UpgradeData>(path);
-            }
+            var loaded = DataLoader.LoadUpgrades();
+            testUpgrades = loaded.ToArray();
             Debug.Log($"[UpgradeConfirmWindow] Loaded {testUpgrades.Length} test upgrades");
         }
-        #endif
     }
 
     private void TestWithRandomUpgrade()
@@ -220,23 +213,7 @@ public class UpgradeConfirmWindow : MonoBehaviour
         );
     }
 
-    private Color GetUpgradeTypeColor(UpgradeType type)
-    {
-        return type switch
-        {
-            UpgradeType.EnhancedNumber => new Color(0.3f, 0.7f, 0.4f, 1f),   // Green
-            UpgradeType.Multiplier => new Color(0.9f, 0.6f, 0.2f, 1f),       // Orange
-            UpgradeType.Time => new Color(0.3f, 0.6f, 0.9f, 1f),             // Blue
-            UpgradeType.TileWeight => new Color(0.7f, 0.4f, 0.8f, 1f),       // Purple
-            UpgradeType.Combo => new Color(0.9f, 0.3f, 0.5f, 1f),            // Pink
-            UpgradeType.RiskReward => new Color(0.9f, 0.2f, 0.2f, 1f),       // Red
-            UpgradeType.Information => new Color(0.4f, 0.7f, 0.9f, 1f),      // Light blue
-            UpgradeType.Defensive => new Color(0.2f, 0.5f, 0.3f, 1f),        // Dark green
-            UpgradeType.BossFight => new Color(0.5f, 0.2f, 0.6f, 1f),        // Dark purple
-            UpgradeType.Special => new Color(1f, 0.85f, 0.3f, 1f),           // Gold
-            _ => UIStyleGuide.ColorTextMuted
-        };
-    }
+    private Color GetUpgradeTypeColor(UpgradeType type) => UIStyleGuide.GetUpgradeTypeColor(type);
 
     private string GetUpgradeEffectsText(UpgradeData upgrade)
     {

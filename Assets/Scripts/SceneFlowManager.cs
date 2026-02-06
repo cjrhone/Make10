@@ -528,49 +528,49 @@ public class SceneFlowManager : MonoBehaviour
     
     private IEnumerator CountdownSequence()
     {
-        Debug.Log("CountdownSequence started");
+        yield return RunCountdown("GO!", GameState.Game, () =>
+        {
+            GameManager.Instance?.ActivateGame();
+            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+        });
+    }
+
+    /// <summary>
+    /// Shared countdown logic used by both normal rounds and boss fights.
+    /// </summary>
+    private IEnumerator RunCountdown(string finalWord, GameState targetState, System.Action onComplete)
+    {
+        Debug.Log($"Countdown started (final: {finalWord})");
         SetPanelPosition(countdownPanel, 0);
         countdownPanel.localScale = Vector3.one;
-        
-        string[] steps = { "3", "2", "1", "GO!" };
-        
+
+        string[] steps = { "3", "2", "1", finalWord };
+
         foreach (string step in steps)
         {
             if (countdownText != null)
             {
                 countdownText.text = step;
-                
-                // Play sound
-                if (step == "GO!")
+
+                if (step == finalWord)
                     AudioManager.Instance?.PlayCountdownGo();
                 else
                     AudioManager.Instance?.PlayCountdownBeep();
-                
-                // Pop animation
+
                 yield return CountdownPop();
             }
-            
+
             yield return new WaitForSeconds(countdownStepDuration);
         }
-        
-        // Hide countdown and start game
-        Debug.Log("Countdown complete - starting game");
+
+        Debug.Log($"Countdown complete - entering {targetState}");
         yield return HidePanel(countdownPanel);
-        CurrentState = GameState.Game;
-        
-        // Start game music
-        Debug.Log("Starting game music...");
+        CurrentState = targetState;
+
         AudioManager.Instance?.PlayGameMusic();
-        
-        // Activate gameplay (starts timer, enables scoring)
-        Debug.Log("Activating game...");
-        GameManager.Instance?.ActivateGame();
-        
-        // NOW process matches - this is where the freebies happen!
-        Debug.Log("Starting match processing - let the freebies flow!");
-        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
-        
-        Debug.Log("CountdownSequence complete");
+        onComplete?.Invoke();
+
+        Debug.Log($"Countdown sequence complete ({targetState})");
     }
     
     private IEnumerator CountdownPop()
@@ -921,49 +921,11 @@ public class SceneFlowManager : MonoBehaviour
 
     private IEnumerator BossFightCountdownSequence()
     {
-        Debug.Log("BossFightCountdownSequence started");
-        SetPanelPosition(countdownPanel, 0);
-        countdownPanel.localScale = Vector3.one;
-
-        string[] steps = { "3", "2", "1", "FIGHT!" };
-
-        foreach (string step in steps)
+        yield return RunCountdown("FIGHT!", GameState.BossFight, () =>
         {
-            if (countdownText != null)
-            {
-                countdownText.text = step;
-
-                // Play sound
-                if (step == "FIGHT!")
-                    AudioManager.Instance?.PlayCountdownGo();
-                else
-                    AudioManager.Instance?.PlayCountdownBeep();
-
-                // Pop animation
-                yield return CountdownPop();
-            }
-
-            yield return new WaitForSeconds(countdownStepDuration);
-        }
-
-        // Hide countdown and start boss fight
-        Debug.Log("Boss countdown complete - starting boss fight");
-        yield return HidePanel(countdownPanel);
-        CurrentState = GameState.BossFight;
-
-        // Start boss fight music
-        Debug.Log("Starting boss fight music...");
-        AudioManager.Instance?.PlayGameMusic(); // TODO: Boss-specific music
-
-        // Activate boss fight mode
-        Debug.Log("Activating boss fight...");
-        GameManager.Instance?.ActivateBossFight();
-
-        // Start match processing
-        Debug.Log("Starting match processing for boss fight!");
-        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
-
-        Debug.Log("BossFightCountdownSequence complete");
+            GameManager.Instance?.ActivateBossFight();
+            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+        });
     }
     
     public void RestartWithCountdown()

@@ -25,6 +25,29 @@ public class MatchChecker : MonoBehaviour
     }
     
     /// <summary>
+    /// Collect tiles along a line (row or column) and return them with their sum.
+    /// When isRow=true, lineIndex is the y coordinate; when false, it's the x coordinate.
+    /// </summary>
+    private (List<Tile> tiles, int sum) GetLineTiles(Tile[,] grid, Vector2Int gridSize, int lineIndex, bool isRow)
+    {
+        List<Tile> tiles = new List<Tile>();
+        int sum = 0;
+        int count = isRow ? gridSize.x : gridSize.y;
+
+        for (int i = 0; i < count; i++)
+        {
+            Tile tile = isRow ? grid[i, lineIndex] : grid[lineIndex, i];
+            if (tile != null)
+            {
+                tiles.Add(tile);
+                sum += tile.Value;
+            }
+        }
+
+        return (tiles, sum);
+    }
+
+    /// <summary>
     /// Check all rows and columns for matches.
     /// Returns a HashSet of tiles that are part of any match.
     /// </summary>
@@ -33,62 +56,36 @@ public class MatchChecker : MonoBehaviour
         HashSet<Tile> matchedTiles = new HashSet<Tile>();
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
-        
+
         // Check all rows
         for (int y = 0; y < gridSize.y; y++)
         {
-            List<Tile> rowTiles = new List<Tile>();
-            int rowSum = 0;
-            
-            for (int x = 0; x < gridSize.x; x++)
+            var (tiles, sum) = GetLineTiles(grid, gridSize, y, isRow: true);
+            if (sum == targetSum)
             {
-                Tile tile = grid[x, y];
-                if (tile != null)
-                {
-                    rowTiles.Add(tile);
-                    rowSum += tile.Value;
-                }
-            }
-            
-            if (rowSum == targetSum)
-            {
-                foreach (Tile tile in rowTiles)
+                foreach (Tile tile in tiles)
                     matchedTiles.Add(tile);
-                
                 if (logMatches)
-                    Debug.Log($"<color=green>ROW {y} MATCH!</color> Sum = {rowSum}");
+                    Debug.Log($"<color=green>ROW {y} MATCH!</color> Sum = {sum}");
             }
         }
-        
+
         // Check all columns
         for (int x = 0; x < gridSize.x; x++)
         {
-            List<Tile> colTiles = new List<Tile>();
-            int colSum = 0;
-            
-            for (int y = 0; y < gridSize.y; y++)
+            var (tiles, sum) = GetLineTiles(grid, gridSize, x, isRow: false);
+            if (sum == targetSum)
             {
-                Tile tile = grid[x, y];
-                if (tile != null)
-                {
-                    colTiles.Add(tile);
-                    colSum += tile.Value;
-                }
-            }
-            
-            if (colSum == targetSum)
-            {
-                foreach (Tile tile in colTiles)
+                foreach (Tile tile in tiles)
                     matchedTiles.Add(tile);
-                
                 if (logMatches)
-                    Debug.Log($"<color=cyan>COLUMN {x} MATCH!</color> Sum = {colSum}");
+                    Debug.Log($"<color=cyan>COLUMN {x} MATCH!</color> Sum = {sum}");
             }
         }
-        
+
         return matchedTiles;
     }
-    
+
     /// <summary>
     /// Check if there are any matches on the board.
     /// </summary>
@@ -96,7 +93,7 @@ public class MatchChecker : MonoBehaviour
     {
         return CheckForMatches().Count > 0;
     }
-    
+
     /// <summary>
     /// Get detailed match info - returns only ONE match at a time.
     /// </summary>
@@ -105,57 +102,33 @@ public class MatchChecker : MonoBehaviour
         MatchResult result = new MatchResult();
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
-        
+
         // Check rows first
         for (int y = 0; y < gridSize.y; y++)
         {
-            int rowSum = 0;
-            List<Tile> rowTiles = new List<Tile>();
-            
-            for (int x = 0; x < gridSize.x; x++)
-            {
-                Tile tile = grid[x, y];
-                if (tile != null)
-                {
-                    rowTiles.Add(tile);
-                    rowSum += tile.Value;
-                }
-            }
-            
-            if (rowSum == targetSum)
+            var (tiles, sum) = GetLineTiles(grid, gridSize, y, isRow: true);
+            if (sum == targetSum)
             {
                 result.matchedRows.Add(y);
-                foreach (Tile tile in rowTiles)
+                foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
                 return result;
             }
         }
-        
+
         // Check columns
         for (int x = 0; x < gridSize.x; x++)
         {
-            int colSum = 0;
-            List<Tile> colTiles = new List<Tile>();
-            
-            for (int y = 0; y < gridSize.y; y++)
-            {
-                Tile tile = grid[x, y];
-                if (tile != null)
-                {
-                    colTiles.Add(tile);
-                    colSum += tile.Value;
-                }
-            }
-            
-            if (colSum == targetSum)
+            var (tiles, sum) = GetLineTiles(grid, gridSize, x, isRow: false);
+            if (sum == targetSum)
             {
                 result.matchedColumns.Add(x);
-                foreach (Tile tile in colTiles)
+                foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
                 return result;
             }
         }
-        
+
         return result;
     }
     

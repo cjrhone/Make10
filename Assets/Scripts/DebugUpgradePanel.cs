@@ -67,46 +67,19 @@ public class DebugUpgradePanel : MonoBehaviour
 
     private void LoadAllUpgrades()
     {
-        #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:UpgradeData", new[] { "Assets/Data/Upgrades" });
-        foreach (string guid in guids)
-        {
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-            UpgradeData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UpgradeData>(path);
-            if (asset != null && !availableUpgrades.Contains(asset))
-                availableUpgrades.Add(asset);
-        }
-        #endif
+        availableUpgrades = DataLoader.LoadUpgrades();
         Debug.Log($"[DebugUpgradePanel] Loaded {availableUpgrades.Count} upgrades");
     }
 
     private void LoadAllSnacks()
     {
-        #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:SnackData", new[] { "Assets/Data/Snacks" });
-        foreach (string guid in guids)
-        {
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-            SnackData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<SnackData>(path);
-            if (asset != null && !availableSnacks.Contains(asset))
-                availableSnacks.Add(asset);
-        }
-        #endif
+        availableSnacks = DataLoader.LoadSnacks();
         Debug.Log($"[DebugUpgradePanel] Loaded {availableSnacks.Count} snacks");
     }
 
     private void LoadAllArtifacts()
     {
-        #if UNITY_EDITOR
-        string[] guids = UnityEditor.AssetDatabase.FindAssets("t:ArtifactData", new[] { "Assets/Data/Artifacts" });
-        foreach (string guid in guids)
-        {
-            string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-            ArtifactData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<ArtifactData>(path);
-            if (asset != null && !availableArtifacts.Contains(asset))
-                availableArtifacts.Add(asset);
-        }
-        #endif
+        availableArtifacts = DataLoader.LoadArtifacts();
         Debug.Log($"[DebugUpgradePanel] Loaded {availableArtifacts.Count} artifacts");
     }
 

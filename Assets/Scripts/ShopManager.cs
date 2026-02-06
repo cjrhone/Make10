@@ -98,48 +98,8 @@ public class ShopManager : MonoBehaviour
     {
         if (dataLoaded) return;
 
-        // Load upgrades
-        availableUpgrades.Clear();
-        UpgradeData[] upgrades = Resources.LoadAll<UpgradeData>("Upgrades");
-        if (upgrades.Length == 0)
-        {
-            // Fallback: try loading from editor in play mode
-            #if UNITY_EDITOR
-            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:UpgradeData", new[] { "Assets/Data/Upgrades" });
-            foreach (string guid in guids)
-            {
-                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                UpgradeData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<UpgradeData>(path);
-                if (asset != null)
-                    availableUpgrades.Add(asset);
-            }
-            #endif
-        }
-        else
-        {
-            availableUpgrades.AddRange(upgrades);
-        }
-
-        // Load snacks
-        availableSnacks.Clear();
-        SnackData[] snacks = Resources.LoadAll<SnackData>("Snacks");
-        if (snacks.Length == 0)
-        {
-            #if UNITY_EDITOR
-            string[] guids = UnityEditor.AssetDatabase.FindAssets("t:SnackData", new[] { "Assets/Data/Snacks" });
-            foreach (string guid in guids)
-            {
-                string path = UnityEditor.AssetDatabase.GUIDToAssetPath(guid);
-                SnackData asset = UnityEditor.AssetDatabase.LoadAssetAtPath<SnackData>(path);
-                if (asset != null)
-                    availableSnacks.Add(asset);
-            }
-            #endif
-        }
-        else
-        {
-            availableSnacks.AddRange(snacks);
-        }
+        availableUpgrades = DataLoader.LoadUpgrades();
+        availableSnacks = DataLoader.LoadSnacks();
 
         dataLoaded = true;
         Debug.Log($"[ShopManager] Loaded {availableUpgrades.Count} upgrades and {availableSnacks.Count} snacks");
