@@ -57,6 +57,9 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float maxMultiplier = 3f;
     [SerializeField] private float streakTimeout = 10f;
 
+    [Header("Time Bonus")]
+    [SerializeField] private float timeBonusPerMatch = 3f;
+
     [Header("Hot Streak Mode")]
     [SerializeField] private float hotStreakDuration = 10f;
     [SerializeField] private float hotStreakMultiplier = 5f;
@@ -308,10 +311,27 @@ public class GameManager : MonoBehaviour
 
         int linesCleared = rowsMatched + columnsMatched;
 
+        // Add time bonus for each line cleared
+        if (linesCleared > 0)
+        {
+            AddTime(timeBonusPerMatch * linesCleared);
+        }
+
         for (int i = 0; i < linesCleared; i++)
         {
             ProcessSingleSolve(tileValues);
         }
+    }
+
+    /// <summary>
+    /// Add time to the game clock (e.g. as a reward for making matches).
+    /// </summary>
+    public void AddTime(float seconds)
+    {
+        if (!IsGameActive) return;
+        TimeRemaining += seconds;
+        OnTimeChanged?.Invoke(TimeRemaining);
+        Debug.Log($"<color=cyan>+{seconds:F1}s added!</color> Timer: {TimeRemaining:F1}s");
     }
 
     #endregion

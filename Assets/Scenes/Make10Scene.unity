@@ -8365,7 +8365,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Continue
+  m_text: Play Again
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
   m_sharedMaterial: {fileID: -2455441069498650917, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
@@ -11048,7 +11048,7 @@ GameObject:
   - component: {fileID: 1212490387}
   - component: {fileID: 1212490386}
   m_Layer: 5
-  m_Name: ContinueToShopButton
+  m_Name: PlayAgainButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

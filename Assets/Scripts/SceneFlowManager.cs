@@ -745,18 +745,21 @@ public class SceneFlowManager : MonoBehaviour
     private IEnumerator RestartWithCountdownSequence()
     {
         Debug.Log("RestartWithCountdown - spawning grid and starting countdown");
-        
+
         // Stop any current music (win/lose music)
         AudioManager.Instance?.StopMusic();
-        
+
         // Hide any win/lose screens first
         UIManager uiManager = FindFirstObjectByType<UIManager>();
         uiManager?.HideAllGameOverScreens();
-        
+
+        // Advance to next round
+        RunManager.Instance?.AdvanceRound();
+
         // Spawn the grid (visible during countdown) but DON'T process matches yet
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         gridManager?.SpawnGridOnly();
-        
+
         // Reset game state (score, timer, etc.) but don't activate yet
         GameManager.Instance?.StartNewGame();
         

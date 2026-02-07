@@ -1075,7 +1075,7 @@ public class UIManager : MonoBehaviour
     #region Public Methods
 
     /// <summary>
-    /// Continue button clicked on win screen - proceeds to shop.
+    /// Continue button clicked on results screen - restarts the game.
     /// </summary>
     public void OnContinueButtonClicked()
     {
@@ -1095,15 +1095,15 @@ public class UIManager : MonoBehaviour
             // Add BP to RunManager
             RunManager.Instance?.AddBP(totalBP);
 
-            Debug.Log($"<color=green>[UIManager] Continue pressed - Added {totalBP} BP to run total</color>");
+            Debug.Log($"<color=green>[UIManager] Play Again pressed - Added {totalBP} BP to run total</color>");
         }
 
         // Hide win screen immediately
         SetActiveIfNotNull(winScreen, false);
         HideBreakdownElements();
 
-        // Notify SceneFlowManager to transition to shop
-        SceneFlowManager.Instance?.TransitionToShop();
+        // Restart the game with countdown
+        SceneFlowManager.Instance?.RestartWithCountdown();
     }
 
     /// <summary>
