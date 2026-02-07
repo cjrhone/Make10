@@ -279,57 +279,12 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     private void UpdateEnhancedGlow()
     {
-        // Check PlayerInventory for enhanced number bonus
-        int enhancedBonus = 0;
-        if (PlayerInventory.Instance != null)
-        {
-            enhancedBonus = PlayerInventory.Instance.GetEnhancedNumberBonus(Value);
-        }
-
-        isEnhanced = enhancedBonus > 0;
-
-        // Update glow
+        isEnhanced = false;
         if (enhancedGlowImage != null)
-        {
-            if (isEnhanced)
-            {
-                // Show glow with the number's color
-                enhancedGlowImage.gameObject.SetActive(true);
-                Color glowColor = NumberColors[Value];
-                glowColor.a = glowMaxAlpha;
-                enhancedGlowImage.color = glowColor;
-
-                // Update glow size based on tile size
-                RectTransform glowRect = enhancedGlowImage.GetComponent<RectTransform>();
-                if (glowRect != null && rectTransform != null)
-                {
-                    glowRect.sizeDelta = rectTransform.sizeDelta * glowSize;
-                }
-
-                // Start glow pulse animation
-                StartGlowPulse();
-            }
-            else
-            {
-                // Hide glow
-                enhancedGlowImage.gameObject.SetActive(false);
-                StopGlowPulse();
-            }
-        }
-
-        // Update shadow
+            enhancedGlowImage.gameObject.SetActive(false);
         if (shadowText != null)
-        {
-            if (isEnhanced)
-            {
-                shadowText.gameObject.SetActive(true);
-                shadowText.text = Value.ToString();
-            }
-            else
-            {
-                shadowText.gameObject.SetActive(false);
-            }
-        }
+            shadowText.gameObject.SetActive(false);
+        StopGlowPulse();
     }
 
     /// <summary>
@@ -428,7 +383,12 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void RefreshEnhancedStatus()
     {
-        UpdateEnhancedGlow();
+        isEnhanced = false;
+
+        if (enhancedGlowImage != null)
+            enhancedGlowImage.gameObject.SetActive(false);
+
+        StopGlowPulse();
     }
     
     /// <summary>

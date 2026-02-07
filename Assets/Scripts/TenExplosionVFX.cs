@@ -73,9 +73,17 @@ public class TenExplosionVFX : MonoBehaviour
         public int arrivalOrder; // For bounce intensity calculation
     }
 
-    private List<ExplosionParticle> activeParticles = new List<ExplosionParticle>();
-    private Coroutine currentVFXCoroutine;
-    private int totalSmallArrived = 0;
+    /// <summary>
+    /// Per-explosion context so multiple explosions can run concurrently.
+    /// </summary>
+    private class ExplosionContext
+    {
+        public List<ExplosionParticle> particles = new List<ExplosionParticle>();
+        public int totalSmallArrived = 0;
+    }
+
+    // Track all particle GameObjects globally for OnDestroy cleanup
+    private List<GameObject> allParticleObjects = new List<GameObject>();
 
     private void Awake()
     {
@@ -104,23 +112,22 @@ public class TenExplosionVFX : MonoBehaviour
 
     /// <summary>
     /// Trigger the explosion VFX at a world position with the current multiplier.
+    /// Supports concurrent explosions — multiple can run simultaneously.
     /// </summary>
     /// <param name="worldPosition">Position in the grid container's local space</param>
     /// <param name="multiplier">Current score multiplier (affects particle count)</param>
     /// <param name="gridContainer">The container transform for proper positioning</param>
     public void TriggerExplosion(Vector2 worldPosition, float multiplier, RectTransform gridContainer)
     {
-        if (currentVFXCoroutine != null)
-        {
-            StopCoroutine(currentVFXCoroutine);
-            CleanupParticles();
-        }
-
-        currentVFXCoroutine = StartCoroutine(ExplosionSequence(worldPosition, multiplier, gridContainer));
+        // Allow concurrent explosions — don't cancel previous ones
+        StartCoroutine(ExplosionSequence(worldPosition, multiplier, gridContainer));
     }
 
     private IEnumerator ExplosionSequence(Vector2 originPosition, float multiplier, RectTransform gridContainer)
     {
+        // Each explosion gets its own context for concurrent support
+        ExplosionContext ctx = new ExplosionContext();
+
         // Calculate particle counts
         int totalPoints = CalculateTotalPoints(multiplier);
         int smallCount, bigCount;
@@ -142,16 +149,14 @@ public class TenExplosionVFX : MonoBehaviour
         // Convert target position to our container's space
         Vector2 targetPosition = ConvertPosition(Vector2.zero, targetSlider, particleContainer);
 
-        // Spawn all particles
-        SpawnParticles(localOrigin, smallCount, bigCount);
-
-        totalSmallArrived = 0;
+        // Spawn all particles into this explosion's context
+        SpawnParticles(ctx, localOrigin, smallCount, bigCount);
 
         // Phase 1: Explosion
-        yield return StartCoroutine(ExplosionPhase());
+        yield return StartCoroutine(ExplosionPhase(ctx));
 
         // Store peak positions (glow follows main particle, so just store once)
-        foreach (var particle in activeParticles)
+        foreach (var particle in ctx.particles)
         {
             if (particle.transform != null)
             {
@@ -163,14 +168,13 @@ public class TenExplosionVFX : MonoBehaviour
         yield return new WaitForSeconds(pauseDuration);
 
         // Phase 3: Collection
-        yield return StartCoroutine(CollectionPhase(targetPosition, targetSlider));
+        yield return StartCoroutine(CollectionPhase(ctx, targetPosition, targetSlider));
 
         // Flush any remaining pending score (safety net)
         UIManager.Instance?.FlushPendingScore();
 
-        // Cleanup
-        CleanupParticles();
-        currentVFXCoroutine = null;
+        // Cleanup this explosion's particles
+        CleanupParticles(ctx);
     }
 
     private int CalculateTotalPoints(float multiplier)
@@ -194,20 +198,18 @@ public class TenExplosionVFX : MonoBehaviour
         }
     }
 
-    private void SpawnParticles(Vector2 origin, int smallCount, int bigCount)
+    private void SpawnParticles(ExplosionContext ctx, Vector2 origin, int smallCount, int bigCount)
     {
-        activeParticles.Clear();
-
         // Spawn small particles
         for (int i = 0; i < smallCount; i++)
         {
-            SpawnParticle(origin, false, i);
+            SpawnParticle(ctx, origin, false, i);
         }
 
         // Spawn big particles
         for (int i = 0; i < bigCount; i++)
         {
-            SpawnParticle(origin, true, smallCount + i);
+            SpawnParticle(ctx, origin, true, smallCount + i);
         }
 
         // Assign arrival times with randomness
@@ -215,7 +217,7 @@ public class TenExplosionVFX : MonoBehaviour
         int arrivalOrder = 0;
 
         // Small particles - staggered with random variation
-        foreach (var particle in activeParticles)
+        foreach (var particle in ctx.particles)
         {
             if (!particle.isBig)
             {
@@ -229,7 +231,7 @@ public class TenExplosionVFX : MonoBehaviour
 
         // Big particles arrive after small ones, also with randomness
         baseArrivalTime += 0.1f; // Small gap before big particles start
-        foreach (var particle in activeParticles)
+        foreach (var particle in ctx.particles)
         {
             if (particle.isBig)
             {
@@ -241,7 +243,7 @@ public class TenExplosionVFX : MonoBehaviour
         }
     }
 
-    private void SpawnParticle(Vector2 origin, bool isBig, int index)
+    private void SpawnParticle(ExplosionContext ctx, Vector2 origin, bool isBig, int index)
     {
         Color particleColor = isBig ? bigParticleColor : smallParticleColor;
 
@@ -265,6 +267,9 @@ public class TenExplosionVFX : MonoBehaviour
         // Apply soft diamond glow texture (since particles are rotated 45 degrees)
         GlowTextureGenerator.ApplyDiamondGlow(glowImg, 64, 1.8f);
 
+        // Track globally for OnDestroy cleanup
+        allParticleObjects.Add(glowObj);
+
         // Create main particle (on top of glow)
         GameObject particleObj = new GameObject(isBig ? "BigParticle" : "SmallParticle");
         particleObj.transform.SetParent(particleContainer, false);
@@ -280,6 +285,9 @@ public class TenExplosionVFX : MonoBehaviour
 
         // Apply soft diamond glow texture for the main particle too (softer edges)
         GlowTextureGenerator.ApplyDiamondGlow(img, 64, 3f);
+
+        // Track globally for OnDestroy cleanup
+        allParticleObjects.Add(particleObj);
 
         // Random explosion direction using golden angle for even distribution
         float goldenAngle = 137.5f * Mathf.Deg2Rad;
@@ -303,10 +311,10 @@ public class TenExplosionVFX : MonoBehaviour
             rotationSpeed = (isBig ? bigRotationSpeed : smallRotationSpeed) * (Random.value > 0.5f ? 1f : -1f)
         };
 
-        activeParticles.Add(particle);
+        ctx.particles.Add(particle);
     }
 
-    private IEnumerator ExplosionPhase()
+    private IEnumerator ExplosionPhase(ExplosionContext ctx)
     {
         float elapsed = 0f;
 
@@ -318,7 +326,7 @@ public class TenExplosionVFX : MonoBehaviour
             // Exponential decay for fast-to-slow motion
             float decayFactor = Mathf.Exp(-explosionDecay * t);
 
-            foreach (var particle in activeParticles)
+            foreach (var particle in ctx.particles)
             {
                 if (particle.transform == null) continue;
 
@@ -348,11 +356,11 @@ public class TenExplosionVFX : MonoBehaviour
         }
     }
 
-    private IEnumerator CollectionPhase(Vector2 targetPosition, RectTransform targetSlider)
+    private IEnumerator CollectionPhase(ExplosionContext ctx, Vector2 targetPosition, RectTransform targetSlider)
     {
         // Calculate total collection time based on staggered arrivals
         float maxArrivalTime = 0f;
-        foreach (var particle in activeParticles)
+        foreach (var particle in ctx.particles)
         {
             if (particle.arrivalTime > maxArrivalTime)
                 maxArrivalTime = particle.arrivalTime;
@@ -362,11 +370,11 @@ public class TenExplosionVFX : MonoBehaviour
         float elapsed = 0f;
         HashSet<ExplosionParticle> arrivedParticles = new HashSet<ExplosionParticle>();
 
-        while (elapsed < totalTime && activeParticles.Count > 0)
+        while (elapsed < totalTime && ctx.particles.Count > 0)
         {
             elapsed += Time.deltaTime;
 
-            foreach (var particle in activeParticles)
+            foreach (var particle in ctx.particles)
             {
                 if (particle.transform == null || arrivedParticles.Contains(particle)) continue;
 
@@ -442,7 +450,7 @@ public class TenExplosionVFX : MonoBehaviour
                 if (t >= 1f)
                 {
                     arrivedParticles.Add(particle);
-                    OnParticleArrived(particle, targetSlider);
+                    OnParticleArrived(ctx, particle, targetSlider);
                 }
             }
 
@@ -450,7 +458,7 @@ public class TenExplosionVFX : MonoBehaviour
         }
     }
 
-    private void OnParticleArrived(ExplosionParticle particle, RectTransform targetSlider)
+    private void OnParticleArrived(ExplosionContext ctx, ExplosionParticle particle, RectTransform targetSlider)
     {
         // Hide particle and glow
         if (particle.transform != null)
@@ -478,12 +486,12 @@ public class TenExplosionVFX : MonoBehaviour
         }
         else
         {
-            totalSmallArrived++;
+            ctx.totalSmallArrived++;
             pointsValue = 1; // Small particle = 1 point
 
-            if (totalSmallArrived <= 5)
+            if (ctx.totalSmallArrived <= 5)
                 bounceScale = smallBounceSubtle;
-            else if (totalSmallArrived <= 15)
+            else if (ctx.totalSmallArrived <= 15)
                 bounceScale = smallBounceMedium;
             else
                 bounceScale = smallBounceStrong;
@@ -548,24 +556,41 @@ public class TenExplosionVFX : MonoBehaviour
         return new Vector2(localPos.x, localPos.y);
     }
 
-    private void CleanupParticles()
+    /// <summary>
+    /// Cleanup particles for a specific explosion context.
+    /// </summary>
+    private void CleanupParticles(ExplosionContext ctx)
     {
-        foreach (var particle in activeParticles)
+        foreach (var particle in ctx.particles)
         {
             if (particle.transform != null)
             {
+                allParticleObjects.Remove(particle.transform.gameObject);
                 Destroy(particle.transform.gameObject);
             }
             if (particle.glowTransform != null)
             {
+                allParticleObjects.Remove(particle.glowTransform.gameObject);
                 Destroy(particle.glowTransform.gameObject);
             }
         }
-        activeParticles.Clear();
+        ctx.particles.Clear();
+    }
+
+    /// <summary>
+    /// Cleanup ALL remaining particles (safety net for scene teardown).
+    /// </summary>
+    private void CleanupAllParticles()
+    {
+        foreach (var obj in allParticleObjects)
+        {
+            if (obj != null) Destroy(obj);
+        }
+        allParticleObjects.Clear();
     }
 
     private void OnDestroy()
     {
-        CleanupParticles();
+        CleanupAllParticles();
     }
 }

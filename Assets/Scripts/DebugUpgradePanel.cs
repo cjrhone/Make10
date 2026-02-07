@@ -230,7 +230,7 @@ public class DebugUpgradePanel : MonoBehaviour
         }
 
         CreateSectionHeader("=== ACTIONS ===");
-        CreateActionButton("Print Inventory", () => PlayerInventory.Instance?.DebugPrintInventory());
+        CreateActionButton("Print Inventory", () => Debug.Log("[DebugUpgradePanel] Inventory disabled in arcade mode"));
         CreateActionButton("Add 500 BP", () => RunManager.Instance?.AddBP(500));
         CreateActionButton("Clear Inventory", () => PlayerInventory.Instance?.ClearInventory());
         buttonCount += 3;
@@ -305,15 +305,7 @@ public class DebugUpgradePanel : MonoBehaviour
             upgrade.displayName,
             new Color(0.15f, 0.35f, 0.15f, 1f),
             $"{upgrade.displayName} ({upgrade.baseCost}BP)",
-            () => {
-                if (PlayerInventory.Instance != null)
-                {
-                    if (PlayerInventory.Instance.AddUpgrade(upgrade))
-                        Debug.Log($"<color=green>Added upgrade: {upgrade.displayName}</color>");
-                    else
-                        Debug.Log($"<color=red>Failed to add: {upgrade.displayName}</color>");
-                }
-            }
+            () => Debug.Log($"<color=yellow>[Arcade Mode] Upgrades disabled: {upgrade.displayName}</color>")
         );
     }
 
@@ -324,15 +316,7 @@ public class DebugUpgradePanel : MonoBehaviour
             snack.displayName,
             new Color(0.35f, 0.25f, 0.1f, 1f),
             $"{snack.displayName} ({snack.cost}BP)",
-            () => {
-                if (PlayerInventory.Instance != null)
-                {
-                    if (PlayerInventory.Instance.AddSnack(snack))
-                        Debug.Log($"<color=yellow>Added snack: {snack.displayName}</color>");
-                    else
-                        Debug.Log($"<color=red>Failed to add: {snack.displayName}</color>");
-                }
-            }
+            () => Debug.Log($"<color=yellow>[Arcade Mode] Snacks disabled: {snack.displayName}</color>")
         );
     }
 
@@ -343,15 +327,7 @@ public class DebugUpgradePanel : MonoBehaviour
             artifact.displayName,
             new Color(0.4f, 0.2f, 0.4f, 1f),
             artifact.displayName,
-            () => {
-                if (PlayerInventory.Instance != null)
-                {
-                    if (PlayerInventory.Instance.AddArtifact(artifact))
-                        Debug.Log($"<color=magenta>Added artifact: {artifact.displayName}</color>");
-                    else
-                        Debug.Log($"<color=red>Failed to add: {artifact.displayName}</color>");
-                }
-            }
+            () => Debug.Log($"<color=yellow>[Arcade Mode] Artifacts disabled: {artifact.displayName}</color>")
         );
     }
 

@@ -11,26 +11,11 @@ public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
 
-    [Header("Campaign Display")]
-    [SerializeField] private TMP_Text roundText;
-    [SerializeField] private TMP_Text stageText;
-    [SerializeField] private TMP_Text targetText;
-
-    [Header("Boss HP Bar")]
-    [SerializeField] private GameObject bossHPPanel;
-    [SerializeField] private Slider bossHPSlider;
-    [SerializeField] private TMP_Text bossNameText;
-    [SerializeField] private TMP_Text bossHPText;
-    [SerializeField] private Image bossHPFill;
-    [SerializeField] private Color bossHPFullColor = new Color(0.8f, 0.2f, 0.2f);
-    [SerializeField] private Color bossHPLowColor = new Color(0.3f, 0.1f, 0.1f);
-
     [Header("Score Display")]
     [SerializeField] private TMP_Text scoreText;
-    [SerializeField] private TMP_Text targetScoreText;
     [SerializeField] private Slider scoreProgressSlider;
     [SerializeField] private Image scoreProgressFillImage;
-    
+
     [Header("Score Progress Colors")]
     [SerializeField] private Color scoreProgressStartColor = new Color(0.3f, 0.5f, 0.9f);
     [SerializeField] private Color scoreProgressMidColor = new Color(0.9f, 0.7f, 0.2f);
@@ -50,7 +35,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TMP_Text timerShadowText;
     [SerializeField] private Image timerFillImage;
     [SerializeField] private Slider timerSlider;
-    
+
     [Header("Timer Colors")]
     [SerializeField] private bool useTimerTextColorChange = false;
     [SerializeField] private bool useTimerFillColorChange = true;
@@ -59,40 +44,38 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Color timerDangerColor = new Color(0.9f, 0.2f, 0.2f);
     [SerializeField] private float timerWarningThreshold = 20f;
     [SerializeField] private float timerDangerThreshold = 10f;
-    
+
     [Header("Multiplier Bar")]
     [SerializeField] private GameObject multiplierPanel;
     [SerializeField] private Slider multiplierSlider;
     [SerializeField] private TMP_Text multiplierValueText;
     [SerializeField] private TMP_Text multiplierTimerText;
     [SerializeField] private Image multiplierFillImage;
-    
+
     [Header("Multiplier Bar Colors")]
     [SerializeField] private Color multiplierFullColor = new Color(1f, 0.8f, 0.2f);
     [SerializeField] private Color multiplierLowColor = new Color(1f, 0.3f, 0.2f);
     [SerializeField] private float multiplierLowThreshold = 2f;
-    
+
     [Header("Hot Streak Effect")]
     [SerializeField] private HotStreakEffect hotStreakEffect;
     [SerializeField] private bool enableHotStreak = true;
-    
+
     [Header("Hot Streak Mode UI")]
     [SerializeField] private GameObject hotStreakBackground;
     [SerializeField] private Color hotStreakFireColor1 = new Color(1f, 0.3f, 0.1f); // Red-orange
     [SerializeField] private Color hotStreakFireColor2 = new Color(1f, 0.9f, 0.2f); // Yellow
     [SerializeField] private float hotStreakPulseSpeed = 8f;
-    
+
     [Header("Score Popup")]
     [SerializeField] private GameObject scorePopupPrefab;
     [SerializeField] private Transform scorePopupParent;
-    
+
     [Header("Game Over")]
     [SerializeField] private GameObject finishTextObject;
     [SerializeField] private float finishTextDuration = 1.5f;
     [SerializeField] private GameObject winScreen;
-    [SerializeField] private GameObject loseScreen;
     [SerializeField] private TMP_Text winScoreText;
-    [SerializeField] private TMP_Text loseScoreText;
 
     [Header("Win Screen Breakdown")]
     [SerializeField] private TMP_Text scoreLabelText;
@@ -107,23 +90,15 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float breakdownLineDelay = 0.3f;
     [SerializeField] private float countUpDuration = 0.5f;
     [SerializeField] private float timeBonusPerSecond = 1f;
-    
+
     [Header("Unsolvable Grid Popup")]
     [SerializeField] private GameObject unsolvablePopup;
     [SerializeField] private float unsolvablePopupDuration = 1f;
 
-    [Header("Campaign Complete Screen")]
-    [SerializeField] private GameObject campaignCompleteScreen;
-    private TMP_Text graduationTitleText;
-    private TMP_Text graduationMessageText;
-    private TMP_Text graduationStarsText;
-    private TMP_Text graduationScoreText;
-    private Button graduationMainMenuButton;
-
     [Header("References")]
     [SerializeField] private GameManager gameManager;
     [SerializeField] private GridManager gridManager;
-    
+
     // Coroutine tracking
     private Coroutine timerPulseCoroutine;
     private Coroutine multiplierPulseCoroutine;
@@ -133,11 +108,11 @@ public class UIManager : MonoBehaviour
     private bool isSubscribed = false;
     private bool hotStreakActive = false;
     private bool isInHotStreakMode = false;
-    
+
     // Hot Streak UI elements (created via code)
     private GameObject hotStreakTextObject;
     private TMPro.TMP_Text hotStreakText;
-    
+
     // Multiplier text animation
     private float lastMultiplierValue = 1f;
     [Header("Multiplier Text Animation")]
@@ -147,7 +122,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float multiplierMinScale = 1f;
     [SerializeField] private float multiplierMaxScale = 1.5f;
     [SerializeField] private float multiplierScaleAtMax = 3f; // What multiplier value = max scale
-    
+
     #region Initialization
 
     private void Awake()
@@ -162,41 +137,40 @@ public class UIManager : MonoBehaviour
 
         TrySubscribeToEvents();
     }
-    
+
     private void Start()
     {
         if (!isSubscribed)
             TrySubscribeToEvents();
-        
+
         InitializeUI();
         Debug.Log("UIManager initialized successfully!");
     }
-    
+
     private void TrySubscribeToEvents()
     {
         if (isSubscribed) return;
-        
+
         if (gameManager == null)
             gameManager = GameManager.Instance;
-        
+
         if (gameManager == null)
         {
             Debug.LogWarning("UIManager: GameManager not found yet, will retry...");
             return;
         }
-        
+
         // Subscribe to events
         gameManager.OnScoreChanged += HandleScoreChanged;
         gameManager.OnTimeChanged += HandleTimeChanged;
         gameManager.OnMultiplierChanged += HandleMultiplierChanged;
         gameManager.OnGameWon += HandleGameWon;
-        gameManager.OnGameLost += HandleGameLost;
         gameManager.OnHotStreakStarted += HandleHotStreakStarted;
         gameManager.OnHotStreakEnded += HandleHotStreakEnded;
-        
+
         if (gridManager == null)
             gridManager = FindFirstObjectByType<GridManager>();
-        
+
         if (gridManager != null)
             gridManager.OnGridUnsolvable += HandleGridUnsolvable;
 
@@ -207,19 +181,9 @@ public class UIManager : MonoBehaviour
             RunManager.Instance.OnRunStarted += HandleRunStarted;
         }
 
-        // Subscribe to CampaignManager events
-        if (CampaignManager.Instance != null)
-        {
-            CampaignManager.Instance.OnStageChanged += HandleStageChanged;
-            CampaignManager.Instance.OnBossFightStarted += HandleBossFightStarted;
-            CampaignManager.Instance.OnBossDamaged += HandleBossDamaged;
-            CampaignManager.Instance.OnBossDefeated += HandleBossDefeated;
-            CampaignManager.Instance.OnCampaignCompleted += HandleCampaignCompleted;
-        }
-
         isSubscribed = true;
     }
-    
+
     private void OnDestroy()
     {
         if (gameManager != null)
@@ -228,11 +192,10 @@ public class UIManager : MonoBehaviour
             gameManager.OnTimeChanged -= HandleTimeChanged;
             gameManager.OnMultiplierChanged -= HandleMultiplierChanged;
             gameManager.OnGameWon -= HandleGameWon;
-            gameManager.OnGameLost -= HandleGameLost;
             gameManager.OnHotStreakStarted -= HandleHotStreakStarted;
             gameManager.OnHotStreakEnded -= HandleHotStreakEnded;
         }
-        
+
         if (gridManager != null)
             gridManager.OnGridUnsolvable -= HandleGridUnsolvable;
 
@@ -241,22 +204,12 @@ public class UIManager : MonoBehaviour
             RunManager.Instance.OnRoundChanged -= HandleRoundChanged;
             RunManager.Instance.OnRunStarted -= HandleRunStarted;
         }
-
-        if (CampaignManager.Instance != null)
-        {
-            CampaignManager.Instance.OnStageChanged -= HandleStageChanged;
-            CampaignManager.Instance.OnBossFightStarted -= HandleBossFightStarted;
-            CampaignManager.Instance.OnBossDamaged -= HandleBossDamaged;
-            CampaignManager.Instance.OnBossDefeated -= HandleBossDefeated;
-            CampaignManager.Instance.OnCampaignCompleted -= HandleCampaignCompleted;
-        }
     }
-    
+
     private void InitializeUI()
     {
         // Hide overlays
         SetActiveIfNotNull(winScreen, false);
-        SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
         SetActiveIfNotNull(unsolvablePopup, false);
         SetActiveIfNotNull(multiplierPanel, true);
@@ -269,18 +222,13 @@ public class UIManager : MonoBehaviour
             multiplierValueText.color = multiplierTextCoolColor;
         }
 
-        // Initialize from GameManager (use campaign threshold if available)
+        // Initialize from GameManager
         if (gameManager != null)
         {
-            int targetScore = gameManager.CurrentRoundThreshold;
-
-            if (targetScoreText != null)
-                targetScoreText.text = $"/ {targetScore}";
-
             if (scoreProgressSlider != null)
             {
                 scoreProgressSlider.minValue = 0;
-                scoreProgressSlider.maxValue = targetScore;
+                scoreProgressSlider.maxValue = 1000; // Default max
                 scoreProgressSlider.value = 0;
             }
 
@@ -291,58 +239,51 @@ public class UIManager : MonoBehaviour
             // Hide glow initially
             if (scoreProgressGlow != null)
                 scoreProgressGlow.gameObject.SetActive(false);
-            
+
             if (timerSlider != null)
             {
                 timerSlider.maxValue = gameManager.GameDuration;
                 timerSlider.value = gameManager.GameDuration;
             }
-            
+
             if (multiplierSlider != null)
             {
                 multiplierSlider.maxValue = gameManager.MultiplierDuration;
                 multiplierSlider.value = gameManager.MultiplierDuration;
             }
         }
-        
+
         UpdateScoreDisplay(0);
         UpdateTimerDisplay(gameManager?.GameDuration ?? 60f);
 
-        // Initialize campaign display
-        UpdateCampaignDisplay();
-
-        // Hide boss HP panel initially
-        if (bossHPPanel != null)
-            bossHPPanel.SetActive(false);
-        
         // Auto-find HotStreakEffect if not assigned
         if (hotStreakEffect == null && multiplierPanel != null)
             hotStreakEffect = multiplierPanel.GetComponent<HotStreakEffect>();
-        
+
         // Hide hot streak background initially
         if (hotStreakBackground != null)
             hotStreakBackground.SetActive(false);
-        
+
         // Create the HOT-STREAK text object (hidden initially)
         CreateHotStreakText();
 
         // Create breakdown UI elements if not assigned in inspector
         EnsureBreakdownElementsExist();
     }
-    
+
     private void CreateHotStreakText()
     {
         // Create a canvas for the hot streak text that renders on top
         hotStreakTextObject = new GameObject("HotStreakText");
         hotStreakTextObject.transform.SetParent(transform, false);
-        
+
         // Add RectTransform and position in center of screen
         RectTransform rt = hotStreakTextObject.AddComponent<RectTransform>();
         rt.anchorMin = new Vector2(0.5f, 0.5f);
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(800f, 0f); // Start off-screen right
         rt.sizeDelta = new Vector2(600f, 150f);
-        
+
         // Add TextMeshPro component
         hotStreakText = hotStreakTextObject.AddComponent<TMPro.TextMeshProUGUI>();
         hotStreakText.text = "HOT STREAK!";
@@ -350,23 +291,23 @@ public class UIManager : MonoBehaviour
         hotStreakText.fontStyle = TMPro.FontStyles.Bold;
         hotStreakText.alignment = TMPro.TextAlignmentOptions.Center;
         hotStreakText.color = hotStreakFireColor1;
-        
+
         // Enable gradient for fire effect
         hotStreakText.enableVertexGradient = true;
         hotStreakText.colorGradient = new TMPro.VertexGradient(
             hotStreakFireColor2, // top left - yellow
-            hotStreakFireColor2, // top right - yellow  
+            hotStreakFireColor2, // top right - yellow
             hotStreakFireColor1, // bottom left - red
             hotStreakFireColor1  // bottom right - red
         );
-        
+
         hotStreakTextObject.SetActive(false);
     }
-    
+
     #endregion
-    
+
     #region Event Handlers
-    
+
     private void HandleScoreChanged(int newScore, int delta)
     {
         if (delta > 0)
@@ -383,17 +324,17 @@ public class UIManager : MonoBehaviour
             UpdateScoreDisplay(newScore);
         }
     }
-    
+
     private void HandleTimeChanged(float timeRemaining)
     {
         UpdateTimerDisplay(timeRemaining);
     }
-    
+
     private void HandleMultiplierChanged(bool active, float multiplier, float timer)
     {
         UpdateMultiplierBar(active, multiplier, timer);
     }
-    
+
     private void HandleGameWon()
     {
         StopTimeWarningSound();
@@ -401,25 +342,17 @@ public class UIManager : MonoBehaviour
         CleanupHotStreakMode();
         StartCoroutine(ShowFinishThenResult(true));
     }
-    
-    private void HandleGameLost()
-    {
-        StopTimeWarningSound();
-        DeactivateHotStreak();
-        CleanupHotStreakMode();
-        StartCoroutine(ShowFinishThenResult(false));
-    }
-    
+
     private void HandleHotStreakStarted()
     {
         StartCoroutine(HotStreakIntroSequence());
     }
-    
+
     private void HandleHotStreakEnded()
     {
         CleanupHotStreakMode();
     }
-    
+
     private void HandleGridUnsolvable()
     {
         if (unsolvablePopup != null)
@@ -428,115 +361,20 @@ public class UIManager : MonoBehaviour
 
     private void HandleRoundChanged(int roundNumber)
     {
-        UpdateRoundDisplay(roundNumber);
+        Debug.Log($"Round changed to: {roundNumber}");
     }
 
     private void HandleRunStarted()
     {
-        // Reset campaign display when new run starts
-        UpdateCampaignDisplay();
-    }
-
-    private void HandleStageChanged(int stage, int round)
-    {
-        UpdateCampaignDisplay();
-    }
-
-    private void HandleBossFightStarted()
-    {
-        ShowBossUI();
-    }
-
-    private void HandleBossDamaged(int damage, int remainingHP)
-    {
-        UpdateBossHP(remainingHP, CampaignManager.Instance?.MaxBossHP ?? 1);
-    }
-
-    private void HandleBossDefeated(int bpReward, int goldStars)
-    {
-        HideBossUI();
-    }
-
-    private void HandleCampaignCompleted()
-    {
-        StartCoroutine(ShowCampaignCompleteScreen());
+        // Reset score display when new run starts
+        displayedScore = 0;
+        pendingScoreToAdd = 0;
+        UpdateScoreDisplay(0);
     }
 
     #endregion
-    
+
     #region Display Updates
-
-    /// <summary>
-    /// Update the campaign stage/round/target display.
-    /// </summary>
-    private void UpdateCampaignDisplay()
-    {
-        if (CampaignManager.Instance == null) return;
-
-        // Stage text
-        if (stageText != null)
-        {
-            string stageName = CampaignManager.Instance.GetCurrentStageName();
-            stageText.text = $"Stage {CampaignManager.Instance.CurrentStage}: {stageName}";
-        }
-
-        // Round text
-        if (roundText != null)
-        {
-            if (CampaignManager.Instance.IsInBossFight)
-            {
-                roundText.text = "BOSS FIGHT";
-                roundText.color = new Color(1f, 0.3f, 0.3f);
-            }
-            else
-            {
-                int totalRounds = CampaignManager.Instance.GetTotalRoundsInStage();
-                int currentRound = CampaignManager.Instance.CurrentRound;
-
-                // Stage 4 is endless
-                if (totalRounds == 0)
-                {
-                    roundText.text = "Endless Mode";
-                }
-                else
-                {
-                    roundText.text = $"Round {currentRound}/{totalRounds}";
-                }
-                roundText.color = Color.white;
-            }
-            StartCoroutine(AnimationUtilities.PunchScale(roundText.transform, 1.15f, 0.15f));
-        }
-
-        // Target text
-        if (targetText != null)
-        {
-            if (CampaignManager.Instance.IsInBossFight)
-            {
-                targetText.text = $"Defeat the boss!";
-            }
-            else
-            {
-                int threshold = CampaignManager.Instance.GetCurrentThreshold();
-                if (threshold > 0)
-                {
-                    targetText.text = $"Target: {threshold} BP";
-                }
-                else
-                {
-                    targetText.text = "Survive!";
-                }
-            }
-        }
-    }
-
-    private void UpdateRoundDisplay(int roundNumber)
-    {
-        // Update campaign display (stage/round text)
-        UpdateCampaignDisplay();
-
-        // Also refresh the progress bar max value for new round threshold
-        RefreshTargetScore();
-    }
 
     private void UpdateScoreDisplay(int score)
     {
@@ -545,27 +383,25 @@ public class UIManager : MonoBehaviour
             scoreText.text = score.ToString();
             StartCoroutine(AnimationUtilities.PunchScale(scoreText.transform, 1.2f, 0.15f));
         }
-        
+
         if (scoreProgressSlider != null)
             scoreProgressSlider.value = score;
-        
-        // Gradient color based on progress
-        if (scoreProgressFillImage != null && gameManager != null)
+
+        // Fixed color without gradient based on win score
+        if (scoreProgressFillImage != null)
         {
-            float progress = (float)score / gameManager.WinScore;
-            scoreProgressFillImage.color = GetGradientColor(progress, 
-                scoreProgressStartColor, scoreProgressMidColor, scoreProgressFullColor);
+            scoreProgressFillImage.color = scoreProgressFullColor;
         }
     }
-    
+
     private void UpdateTimerDisplay(float timeRemaining)
     {
         int seconds = Mathf.CeilToInt(timeRemaining);
-        
+
         // Determine state
         TimerState state = GetTimerState(timeRemaining);
         Color stateColor = GetTimerColor(state);
-        
+
         // Handle pulse and warning sounds
         if (state == TimerState.Danger)
         {
@@ -577,7 +413,7 @@ public class UIManager : MonoBehaviour
             StopPulse(ref timerPulseCoroutine, timerText?.transform);
             StopTimeWarningSound();
         }
-        
+
         // Update text
         if (timerText != null)
         {
@@ -585,14 +421,14 @@ public class UIManager : MonoBehaviour
             if (useTimerTextColorChange)
                 timerText.color = stateColor;
         }
-        
+
         if (timerShadowText != null)
             timerShadowText.text = seconds.ToString();
-        
+
         // Update slider
         if (timerSlider != null)
             timerSlider.value = timeRemaining;
-        
+
         // Update fill
         if (timerFillImage != null && gameManager != null)
         {
@@ -601,11 +437,11 @@ public class UIManager : MonoBehaviour
                 timerFillImage.color = stateColor;
         }
     }
-    
+
     private void UpdateMultiplierBar(bool active, float multiplier, float timer)
     {
         if (multiplierPanel == null) return;
-        
+
         if (active)
         {
             if (!multiplierPanel.activeSelf)
@@ -613,25 +449,25 @@ public class UIManager : MonoBehaviour
                 multiplierPanel.SetActive(true);
                 lastMultiplierValue = multiplier;
                 StartCoroutine(AnimationUtilities.PunchScale(multiplierPanel.transform, 1.15f, 0.2f));
-                
+
                 // Activate hot streak effect!
                 ActivateHotStreak(multiplier);
             }
-            
+
             if (multiplierSlider != null)
                 multiplierSlider.value = timer;
-            
+
             if (multiplierValueText != null)
             {
                 multiplierValueText.text = $"x{multiplier:F2}";
-                
+
                 // Scale text based on multiplier value (bigger multiplier = bigger text)
                 float scaleT = Mathf.InverseLerp(1f, multiplierScaleAtMax, multiplier);
                 float targetScale = Mathf.Lerp(multiplierMinScale, multiplierMaxScale, scaleT);
-                
+
                 // Color temperature: white (cool) at low multiplier, red (hot) at high
                 Color temperatureColor = Color.Lerp(multiplierTextCoolColor, multiplierTextHotColor, scaleT);
-                
+
                 // If multiplier increased, do a glow + punch animation
                 if (multiplier > lastMultiplierValue + 0.01f)
                 {
@@ -644,13 +480,13 @@ public class UIManager : MonoBehaviour
                     multiplierValueText.transform.localScale = Vector3.one * targetScale;
                     multiplierValueText.color = temperatureColor;
                 }
-                
+
                 lastMultiplierValue = multiplier;
             }
-            
+
             if (multiplierTimerText != null)
                 multiplierTimerText.text = $"{timer:F1}s";
-            
+
             // Color based on timer (only if hot streak not overriding)
             if (multiplierFillImage != null && !enableHotStreak)
             {
@@ -658,7 +494,7 @@ public class UIManager : MonoBehaviour
                     ? Color.Lerp(multiplierLowColor, multiplierFullColor, timer / multiplierLowThreshold)
                     : multiplierFullColor;
             }
-            
+
             // Update hot streak intensity as multiplier grows
             UpdateHotStreakIntensity(multiplier);
         }
@@ -679,17 +515,17 @@ public class UIManager : MonoBehaviour
             lastMultiplierValue = 1f;
         }
     }
-    
+
     private void TriggerMultiplierGlow(float targetScale, Color targetColor)
     {
         if (multiplierValueText == null) return;
-        
+
         // Stop any existing glow
         StopMultiplierGlow();
-        
+
         multiplierGlowCoroutine = StartCoroutine(MultiplierGlowAnimation(targetScale, targetColor));
     }
-    
+
     private void StopMultiplierGlow()
     {
         if (multiplierGlowCoroutine != null)
@@ -698,91 +534,91 @@ public class UIManager : MonoBehaviour
             multiplierGlowCoroutine = null;
         }
     }
-    
+
     private IEnumerator MultiplierGlowAnimation(float targetScale, Color targetColor)
     {
         if (multiplierValueText == null) yield break;
-        
+
         Transform textTransform = multiplierValueText.transform;
         float startScale = textTransform.localScale.x;
         float punchScale = targetScale * 1.3f; // Overshoot
         Color startColor = multiplierValueText.color;
-        
+
         // Phase 1: Punch up with bright glow flash
         float elapsed = 0f;
         float punchDuration = 0.15f;
-        
+
         while (elapsed < punchDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / punchDuration;
-            
+
             // Scale punch
             float scale = Mathf.Lerp(startScale, punchScale, t);
             textTransform.localScale = Vector3.one * scale;
-            
+
             // Color flash to bright glow
             multiplierValueText.color = Color.Lerp(startColor, multiplierGlowColor, t);
-            
+
             yield return null;
         }
-        
+
         // Phase 2: Settle back to temperature color
         elapsed = 0f;
         float settleDuration = 0.25f;
-        
+
         while (elapsed < settleDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / settleDuration;
             float smoothT = 1f - Mathf.Pow(1f - t, 3f); // Ease out
-            
+
             // Scale settle
             float scale = Mathf.Lerp(punchScale, targetScale, smoothT);
             textTransform.localScale = Vector3.one * scale;
-            
+
             // Color fade from glow to temperature color
             multiplierValueText.color = Color.Lerp(multiplierGlowColor, targetColor, smoothT);
-            
+
             yield return null;
         }
-        
+
         // Final state
         textTransform.localScale = Vector3.one * targetScale;
         multiplierValueText.color = targetColor;
         multiplierGlowCoroutine = null;
     }
-    
+
     #endregion
-    
+
     #region Hot Streak Mode
-    
+
     private IEnumerator HotStreakIntroSequence()
     {
         Debug.Log("<color=orange>UIManager: Hot Streak intro starting!</color>");
-        
+
         isInHotStreakMode = true;
-        
+
         // Stop game music, play hot streak music
         AudioManager.Instance?.StopMusic();
         AudioManager.Instance?.PlayHotStreakMusic();
-        
+
         // Enable hot streak background
         if (hotStreakBackground != null)
             hotStreakBackground.SetActive(true);
-        
+
         // Show HOT-STREAK text with slide-in animation
         if (hotStreakTextObject != null)
         {
             hotStreakTextObject.SetActive(true);
             RectTransform rt = hotStreakTextObject.GetComponent<RectTransform>();
-            
+
             // Slide in from right
             float slideDuration = 0.4f;
             float elapsed = 0f;
             Vector2 startPos = new Vector2(800f, 0f);
             Vector2 endPos = Vector2.zero;
-            
+
             while (elapsed < slideDuration)
             {
                 elapsed += Time.deltaTime;
@@ -792,18 +628,18 @@ public class UIManager : MonoBehaviour
                 yield return null;
             }
             rt.anchoredPosition = endPos;
-            
+
             // Punch scale
             yield return AnimationUtilities.PunchScale(rt, 1.2f, 0.2f);
-            
+
             // Hold for a moment
             yield return new WaitForSeconds(0.8f);
-            
+
             // Slide out to left
             elapsed = 0f;
             startPos = Vector2.zero;
             endPos = new Vector2(-800f, 0f);
-            
+
             while (elapsed < slideDuration)
             {
                 elapsed += Time.deltaTime;
@@ -812,556 +648,122 @@ public class UIManager : MonoBehaviour
                 rt.anchoredPosition = Vector2.Lerp(startPos, endPos, smoothT);
                 yield return null;
             }
-            
+
             hotStreakTextObject.SetActive(false);
             rt.anchoredPosition = new Vector2(800f, 0f); // Reset for next time
         }
-        
+
         // Start fire pulse effect on multiplier text
         StartHotStreakTextPulse();
     }
-    
+
     private void StartHotStreakTextPulse()
     {
         if (hotStreakTextPulseCoroutine != null)
             StopCoroutine(hotStreakTextPulseCoroutine);
-        
+
         hotStreakTextPulseCoroutine = StartCoroutine(HotStreakTextPulseLoop());
     }
-    
+
     private IEnumerator HotStreakTextPulseLoop()
     {
         while (isInHotStreakMode && multiplierValueText != null)
         {
             float t = (Mathf.Sin(Time.time * hotStreakPulseSpeed) + 1f) / 2f;
             multiplierValueText.color = Color.Lerp(hotStreakFireColor1, hotStreakFireColor2, t);
-            
+
             // Also pulse the scale slightly
             float scale = Mathf.Lerp(multiplierMaxScale, multiplierMaxScale * 1.1f, t);
             multiplierValueText.transform.localScale = Vector3.one * scale;
-            
+
             yield return null;
         }
     }
-    
+
     private void CleanupHotStreakMode()
     {
         Debug.Log("<color=gray>UIManager: Cleaning up Hot Streak mode</color>");
-        
+
         isInHotStreakMode = false;
-        
+
         // Stop fire pulse
         if (hotStreakTextPulseCoroutine != null)
         {
             StopCoroutine(hotStreakTextPulseCoroutine);
             hotStreakTextPulseCoroutine = null;
         }
-        
+
         // Reset multiplier text color
         if (multiplierValueText != null)
         {
             multiplierValueText.color = multiplierTextCoolColor;
             multiplierValueText.transform.localScale = Vector3.one;
         }
-        
+
         // Hide hot streak background
         if (hotStreakBackground != null)
             hotStreakBackground.SetActive(false);
-        
+
         // Hide hot streak text (in case it's still showing)
         if (hotStreakTextObject != null)
             hotStreakTextObject.SetActive(false);
-        
+
         // Resume normal game music
         AudioManager.Instance?.PlayGameMusic();
     }
-    
-    #endregion
-    
-    #region Boss UI
-
-    /// <summary>
-    /// Show the boss HP bar and configure it.
-    /// </summary>
-    private void ShowBossUI()
-    {
-        // Create boss HP panel if it doesn't exist
-        EnsureBossHPPanelExists();
-
-        if (bossHPPanel != null)
-        {
-            bossHPPanel.SetActive(true);
-
-            // Set boss name
-            if (bossNameText != null)
-            {
-                string stageName = CampaignManager.Instance?.GetCurrentStageName() ?? "Boss";
-                bossNameText.text = $"🎓 THE PROFESSOR - {stageName}";
-            }
-
-            // Initialize HP
-            int maxHP = CampaignManager.Instance?.MaxBossHP ?? 1000;
-            UpdateBossHP(maxHP, maxHP);
-
-            Debug.Log("[UIManager] Boss UI shown");
-        }
-
-        // Update campaign display to show BOSS FIGHT
-        UpdateCampaignDisplay();
-    }
-
-    /// <summary>
-    /// Hide the boss HP bar.
-    /// </summary>
-    private void HideBossUI()
-    {
-        if (bossHPPanel != null)
-        {
-            bossHPPanel.SetActive(false);
-        }
-        Debug.Log("[UIManager] Boss UI hidden");
-    }
-
-    /// <summary>
-    /// Update the boss HP bar.
-    /// </summary>
-    private void UpdateBossHP(int currentHP, int maxHP)
-    {
-        if (bossHPSlider != null)
-        {
-            bossHPSlider.maxValue = maxHP;
-            bossHPSlider.value = currentHP;
-        }
-
-        if (bossHPText != null)
-        {
-            float percent = maxHP > 0 ? (float)currentHP / maxHP * 100f : 0f;
-            bossHPText.text = $"{percent:F0}%";
-        }
-
-        if (bossHPFill != null)
-        {
-            float percent = maxHP > 0 ? (float)currentHP / maxHP : 0f;
-            bossHPFill.color = Color.Lerp(bossHPLowColor, bossHPFullColor, percent);
-        }
-
-        // Punch animation when damaged
-        if (bossHPSlider != null && currentHP < maxHP)
-        {
-            StartCoroutine(AnimationUtilities.PunchScale(bossHPSlider.transform, 1.05f, 0.1f));
-        }
-    }
-
-    /// <summary>
-    /// Create boss HP panel if not assigned in inspector.
-    /// </summary>
-    private void EnsureBossHPPanelExists()
-    {
-        if (bossHPPanel != null) return;
-
-        // Find the score panel to position relative to
-        Transform parent = transform;
-
-        // Create panel
-        GameObject panelObj = new GameObject("BossHPPanel");
-        panelObj.transform.SetParent(parent, false);
-
-        bossHPPanel = panelObj;
-
-        RectTransform panelRT = panelObj.AddComponent<RectTransform>();
-        // Position above avatar area (top portion of screen)
-        panelRT.anchorMin = new Vector2(0.1f, 0.75f);
-        panelRT.anchorMax = new Vector2(0.9f, 0.85f);
-        panelRT.offsetMin = Vector2.zero;
-        panelRT.offsetMax = Vector2.zero;
-
-        // Background
-        Image panelBg = panelObj.AddComponent<Image>();
-        panelBg.color = new Color(0.1f, 0.05f, 0.05f, 0.9f);
-
-        // Boss name text
-        GameObject nameObj = new GameObject("BossName");
-        nameObj.transform.SetParent(panelObj.transform, false);
-
-        RectTransform nameRT = nameObj.AddComponent<RectTransform>();
-        nameRT.anchorMin = new Vector2(0f, 0.5f);
-        nameRT.anchorMax = new Vector2(1f, 1f);
-        nameRT.offsetMin = new Vector2(20f, 0f);
-        nameRT.offsetMax = new Vector2(-20f, -5f);
-
-        bossNameText = nameObj.AddComponent<TextMeshProUGUI>();
-        bossNameText.text = "🎓 THE PROFESSOR";
-        bossNameText.fontSize = 28f;
-        bossNameText.fontStyle = FontStyles.Bold;
-        bossNameText.color = new Color(1f, 0.85f, 0.3f);
-        bossNameText.alignment = TextAlignmentOptions.Left;
-
-        // HP Percentage text (right side)
-        GameObject percentObj = new GameObject("HPPercent");
-        percentObj.transform.SetParent(panelObj.transform, false);
-
-        RectTransform percentRT = percentObj.AddComponent<RectTransform>();
-        percentRT.anchorMin = new Vector2(0.8f, 0.5f);
-        percentRT.anchorMax = new Vector2(1f, 1f);
-        percentRT.offsetMin = new Vector2(0f, 0f);
-        percentRT.offsetMax = new Vector2(-20f, -5f);
-
-        bossHPText = percentObj.AddComponent<TextMeshProUGUI>();
-        bossHPText.text = "100%";
-        bossHPText.fontSize = 24f;
-        bossHPText.color = Color.white;
-        bossHPText.alignment = TextAlignmentOptions.Right;
-
-        // HP Bar slider
-        GameObject sliderObj = new GameObject("HPSlider");
-        sliderObj.transform.SetParent(panelObj.transform, false);
-
-        RectTransform sliderRT = sliderObj.AddComponent<RectTransform>();
-        sliderRT.anchorMin = new Vector2(0f, 0f);
-        sliderRT.anchorMax = new Vector2(1f, 0.5f);
-        sliderRT.offsetMin = new Vector2(20f, 8f);
-        sliderRT.offsetMax = new Vector2(-20f, -5f);
-
-        bossHPSlider = sliderObj.AddComponent<Slider>();
-        bossHPSlider.minValue = 0;
-        bossHPSlider.maxValue = 1000;
-        bossHPSlider.value = 1000;
-        bossHPSlider.interactable = false;
-
-        // Background
-        GameObject bgObj = new GameObject("Background");
-        bgObj.transform.SetParent(sliderObj.transform, false);
-
-        RectTransform bgRT = bgObj.AddComponent<RectTransform>();
-        bgRT.anchorMin = Vector2.zero;
-        bgRT.anchorMax = Vector2.one;
-        bgRT.offsetMin = Vector2.zero;
-        bgRT.offsetMax = Vector2.zero;
-
-        Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.color = new Color(0.2f, 0.1f, 0.1f);
-
-        // Fill area
-        GameObject fillAreaObj = new GameObject("Fill Area");
-        fillAreaObj.transform.SetParent(sliderObj.transform, false);
-
-        RectTransform fillAreaRT = fillAreaObj.AddComponent<RectTransform>();
-        fillAreaRT.anchorMin = Vector2.zero;
-        fillAreaRT.anchorMax = Vector2.one;
-        fillAreaRT.offsetMin = Vector2.zero;
-        fillAreaRT.offsetMax = Vector2.zero;
-
-        // Fill
-        GameObject fillObj = new GameObject("Fill");
-        fillObj.transform.SetParent(fillAreaObj.transform, false);
-
-        RectTransform fillRT = fillObj.AddComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero;
-        fillRT.anchorMax = Vector2.one;
-        fillRT.offsetMin = Vector2.zero;
-        fillRT.offsetMax = Vector2.zero;
-
-        bossHPFill = fillObj.AddComponent<Image>();
-        bossHPFill.color = bossHPFullColor;
-
-        bossHPSlider.fillRect = fillRT;
-
-        panelObj.SetActive(false);
-        Debug.Log("[UIManager] Boss HP panel created");
-    }
 
     #endregion
 
-    #region Campaign Complete Screen
-
-    /// <summary>
-    /// Show the campaign complete celebration screen.
-    /// </summary>
-    private IEnumerator ShowCampaignCompleteScreen()
-    {
-        Debug.Log("[UIManager] Showing Campaign Complete screen!");
-
-        // Wait for any ongoing animations
-        yield return new WaitForSeconds(1f);
-
-        // Create the screen if needed
-        EnsureCampaignCompleteScreenExists();
-
-        // Stop all game music, play victory fanfare
-        AudioManager.Instance?.StopMusic();
-        AudioManager.Instance?.PlayWinMusic();
-
-        // Populate with stats
-        if (graduationStarsText != null && RunManager.Instance != null)
-        {
-            int stars = RunManager.Instance.GoldStars;
-            string starDisplay = "";
-            for (int i = 0; i < stars && i < 10; i++)
-                starDisplay += "⭐";
-            graduationStarsText.text = $"Gold Stars: {starDisplay} ({stars})";
-        }
-
-        if (graduationScoreText != null && RunManager.Instance != null)
-        {
-            graduationScoreText.text = $"Final Score: {RunManager.Instance.CurrentBP:N0} BP";
-        }
-
-        // Show screen with animation
-        if (campaignCompleteScreen != null)
-        {
-            campaignCompleteScreen.SetActive(true);
-            yield return AnimationUtilities.PopIn(campaignCompleteScreen.transform, 1.15f, 0.3f, 0.1f);
-        }
-    }
-
-    /// <summary>
-    /// Create the campaign complete screen if not assigned.
-    /// </summary>
-    private void EnsureCampaignCompleteScreenExists()
-    {
-        if (campaignCompleteScreen != null) return;
-
-        // Create fullscreen overlay
-        campaignCompleteScreen = new GameObject("CampaignCompleteScreen");
-        campaignCompleteScreen.transform.SetParent(transform, false);
-
-        RectTransform screenRT = campaignCompleteScreen.AddComponent<RectTransform>();
-        screenRT.anchorMin = Vector2.zero;
-        screenRT.anchorMax = Vector2.one;
-        screenRT.offsetMin = Vector2.zero;
-        screenRT.offsetMax = Vector2.zero;
-
-        // Background
-        Image bg = campaignCompleteScreen.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.08f, 0.15f, 0.98f);
-        bg.raycastTarget = true;
-
-        // Content container
-        GameObject content = new GameObject("Content");
-        content.transform.SetParent(campaignCompleteScreen.transform, false);
-
-        RectTransform contentRT = content.AddComponent<RectTransform>();
-        contentRT.anchorMin = new Vector2(0.1f, 0.1f);
-        contentRT.anchorMax = new Vector2(0.9f, 0.9f);
-        contentRT.offsetMin = Vector2.zero;
-        contentRT.offsetMax = Vector2.zero;
-
-        // Title: 🎓 GRADUATION DAY! 🎓
-        GameObject titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(content.transform, false);
-
-        RectTransform titleRT = titleObj.AddComponent<RectTransform>();
-        titleRT.anchorMin = new Vector2(0f, 0.75f);
-        titleRT.anchorMax = new Vector2(1f, 0.95f);
-        titleRT.offsetMin = Vector2.zero;
-        titleRT.offsetMax = Vector2.zero;
-
-        graduationTitleText = titleObj.AddComponent<TextMeshProUGUI>();
-        graduationTitleText.text = "🎓 GRADUATION DAY! 🎓";
-        graduationTitleText.fontSize = 72f;
-        graduationTitleText.fontStyle = FontStyles.Bold;
-        graduationTitleText.color = new Color(1f, 0.9f, 0.3f);
-        graduationTitleText.alignment = TextAlignmentOptions.Center;
-
-        // Message
-        GameObject messageObj = new GameObject("Message");
-        messageObj.transform.SetParent(content.transform, false);
-
-        RectTransform messageRT = messageObj.AddComponent<RectTransform>();
-        messageRT.anchorMin = new Vector2(0f, 0.55f);
-        messageRT.anchorMax = new Vector2(1f, 0.72f);
-        messageRT.offsetMin = Vector2.zero;
-        messageRT.offsetMax = Vector2.zero;
-
-        graduationMessageText = messageObj.AddComponent<TextMeshProUGUI>();
-        graduationMessageText.text = "You've mastered Make 10!\nCongratulations, Professor!";
-        graduationMessageText.fontSize = 42f;
-        graduationMessageText.color = Color.white;
-        graduationMessageText.alignment = TextAlignmentOptions.Center;
-
-        // Gold Stars
-        GameObject starsObj = new GameObject("Stars");
-        starsObj.transform.SetParent(content.transform, false);
-
-        RectTransform starsRT = starsObj.AddComponent<RectTransform>();
-        starsRT.anchorMin = new Vector2(0f, 0.38f);
-        starsRT.anchorMax = new Vector2(1f, 0.52f);
-        starsRT.offsetMin = Vector2.zero;
-        starsRT.offsetMax = Vector2.zero;
-
-        graduationStarsText = starsObj.AddComponent<TextMeshProUGUI>();
-        graduationStarsText.text = "Gold Stars: ⭐⭐⭐⭐⭐";
-        graduationStarsText.fontSize = 48f;
-        graduationStarsText.color = new Color(1f, 0.85f, 0.2f);
-        graduationStarsText.alignment = TextAlignmentOptions.Center;
-
-        // Final Score
-        GameObject scoreObj = new GameObject("Score");
-        scoreObj.transform.SetParent(content.transform, false);
-
-        RectTransform scoreRT = scoreObj.AddComponent<RectTransform>();
-        scoreRT.anchorMin = new Vector2(0f, 0.25f);
-        scoreRT.anchorMax = new Vector2(1f, 0.38f);
-        scoreRT.offsetMin = Vector2.zero;
-        scoreRT.offsetMax = Vector2.zero;
-
-        graduationScoreText = scoreObj.AddComponent<TextMeshProUGUI>();
-        graduationScoreText.text = "Final Score: 15,000 BP";
-        graduationScoreText.fontSize = 36f;
-        graduationScoreText.color = new Color(0.7f, 0.9f, 0.7f);
-        graduationScoreText.alignment = TextAlignmentOptions.Center;
-
-        // Main Menu Button
-        GameObject buttonObj = new GameObject("MainMenuButton");
-        buttonObj.transform.SetParent(content.transform, false);
-
-        RectTransform buttonRT = buttonObj.AddComponent<RectTransform>();
-        buttonRT.anchorMin = new Vector2(0.3f, 0.08f);
-        buttonRT.anchorMax = new Vector2(0.7f, 0.2f);
-        buttonRT.offsetMin = Vector2.zero;
-        buttonRT.offsetMax = Vector2.zero;
-
-        Image buttonImg = buttonObj.AddComponent<Image>();
-        buttonImg.color = new Color(0.2f, 0.5f, 0.8f);
-
-        graduationMainMenuButton = buttonObj.AddComponent<Button>();
-        graduationMainMenuButton.targetGraphic = buttonImg;
-        graduationMainMenuButton.onClick.AddListener(OnGraduationMainMenuClicked);
-
-        // Button text
-        GameObject btnTextObj = new GameObject("Text");
-        btnTextObj.transform.SetParent(buttonObj.transform, false);
-
-        RectTransform btnTextRT = btnTextObj.AddComponent<RectTransform>();
-        btnTextRT.anchorMin = Vector2.zero;
-        btnTextRT.anchorMax = Vector2.one;
-        btnTextRT.offsetMin = Vector2.zero;
-        btnTextRT.offsetMax = Vector2.zero;
-
-        TMP_Text btnText = btnTextObj.AddComponent<TextMeshProUGUI>();
-        btnText.text = "MAIN MENU";
-        btnText.fontSize = 36f;
-        btnText.fontStyle = FontStyles.Bold;
-        btnText.color = Color.white;
-        btnText.alignment = TextAlignmentOptions.Center;
-
-        campaignCompleteScreen.SetActive(false);
-        Debug.Log("[UIManager] Campaign Complete screen created");
-    }
-
-    /// <summary>
-    /// Main menu button on graduation screen.
-    /// </summary>
-    private void OnGraduationMainMenuClicked()
-    {
-        AudioManager.Instance?.PlayButtonClick();
-
-        // Hide the screen
-        if (campaignCompleteScreen != null)
-            campaignCompleteScreen.SetActive(false);
-
-        // End the run
-        RunManager.Instance?.EndRun();
-
-        // Go back to main menu
-        SceneFlowManager.Instance?.GoBack();
-    }
-
-    #endregion
-
-    #region Hot Streak Effect (Fire Particles)
-    
-    private void ActivateHotStreak(float multiplier)
-    {
-        if (!enableHotStreak || hotStreakEffect == null) return;
-        
-        hotStreakEffect.Activate(multiplier);
-        hotStreakActive = true;
-        
-        Debug.Log($"<color=orange>🔥 HOT STREAK ACTIVATED!</color> x{multiplier:F2}");
-    }
-    
-    private void UpdateHotStreakIntensity(float multiplier)
-    {
-        if (!enableHotStreak || hotStreakEffect == null || !hotStreakActive) return;
-        
-        hotStreakEffect.UpdateIntensity(multiplier);
-    }
-    
-    private void DeactivateHotStreak()
-    {
-        if (hotStreakEffect == null || !hotStreakActive) return;
-        
-        hotStreakEffect.Deactivate();
-        hotStreakActive = false;
-        
-        Debug.Log("<color=gray>Hot streak ended.</color>");
-    }
-    
-    #endregion
-    
     #region Animations
-    
+
     private void SpawnScorePopup(int points)
     {
         if (scorePopupPrefab == null || scorePopupParent == null) return;
-        
+
         GameObject popup = Instantiate(scorePopupPrefab, scorePopupParent);
         TMP_Text popupText = popup.GetComponent<TMP_Text>();
-        
+
         if (popupText != null)
             popupText.text = $"+{points}";
-        
+
         StartCoroutine(AnimateAndDestroyPopup(popup));
     }
-    
+
     private IEnumerator AnimateAndDestroyPopup(GameObject popup)
     {
         RectTransform rt = popup.GetComponent<RectTransform>();
         TMP_Text text = popup.GetComponent<TMP_Text>();
-        
+
         yield return AnimationUtilities.FloatAndFade(rt, text, 50f, 0.8f);
         Destroy(popup);
     }
-    
+
     private IEnumerator ShowFinishThenResult(bool isWin)
     {
         // STOP game music immediately when FINISH appears
         AudioManager.Instance?.StopMusic();
-        
+
         // Play finish sound
         AudioManager.Instance?.PlayFinishSound();
-        
+
         // Show FINISH with pop animation
         if (finishTextObject != null)
         {
             finishTextObject.SetActive(true);
             yield return AnimationUtilities.PopIn(finishTextObject.transform, 1.2f, 0.2f, 0.1f);
         }
-        
+
         yield return new WaitForSeconds(finishTextDuration);
-        
+
         SetActiveIfNotNull(finishTextObject, false);
-        
+
         // Show result screen and play appropriate music
-        if (isWin)
-        {
-            AudioManager.Instance?.PlayWinMusic();
-            SetActiveIfNotNull(winScreen, true);
-            // Start the animated score breakdown
-            StartCoroutine(ShowWinScreenBreakdown());
-        }
-        else
-        {
-            AudioManager.Instance?.PlayLoseMusic();
-            SetActiveIfNotNull(loseScreen, true);
-            if (loseScoreText != null && gameManager != null)
-            {
-                loseScoreText.text = $"Score: {gameManager.Score} / {gameManager.WinScore}\nSo close!";
-            }
-        }
+        AudioManager.Instance?.PlayWinMusic();
+        SetActiveIfNotNull(winScreen, true);
+        // Start the animated score breakdown
+        StartCoroutine(ShowWinScreenBreakdown());
     }
-    
+
     private IEnumerator ShowPopupBriefly(GameObject popup, float duration)
     {
         popup.SetActive(true);
@@ -1587,15 +989,15 @@ public class UIManager : MonoBehaviour
     }
 
     #endregion
-    
+
     #region Pulse Management
-    
+
     private void StartPulse(ref Coroutine coroutine, Transform target, float min, float max, float speed)
     {
         if (coroutine == null && target != null)
             coroutine = StartCoroutine(AnimationUtilities.PulseLoop(target, min, max, speed));
     }
-    
+
     private void StopPulse(ref Coroutine coroutine, Transform target)
     {
         if (coroutine != null)
@@ -1606,11 +1008,11 @@ public class UIManager : MonoBehaviour
                 target.localScale = Vector3.one;
         }
     }
-    
+
     #endregion
-    
+
     #region Audio Helpers
-    
+
     private void StartTimeWarningSound()
     {
         if (!isTimeWarningPlaying)
@@ -1619,7 +1021,7 @@ public class UIManager : MonoBehaviour
             isTimeWarningPlaying = true;
         }
     }
-    
+
     private void StopTimeWarningSound()
     {
         if (isTimeWarningPlaying)
@@ -1628,20 +1030,20 @@ public class UIManager : MonoBehaviour
             isTimeWarningPlaying = false;
         }
     }
-    
+
     #endregion
-    
+
     #region Utility Helpers
-    
+
     private enum TimerState { Healthy, Warning, Danger }
-    
+
     private TimerState GetTimerState(float timeRemaining)
     {
         if (timeRemaining <= timerDangerThreshold) return TimerState.Danger;
         if (timeRemaining <= timerWarningThreshold) return TimerState.Warning;
         return TimerState.Healthy;
     }
-    
+
     private Color GetTimerColor(TimerState state)
     {
         return state switch
@@ -1651,9 +1053,9 @@ public class UIManager : MonoBehaviour
             _ => timerHealthyColor
         };
     }
-    
+
     /// <summary>
-    /// Get a color from a 3-point gradient (0→mid at 50%, mid→end at 100%).
+    /// Get a color from a 3-point gradient (0->mid at 50%, mid->end at 100%).
     /// </summary>
     private Color GetGradientColor(float progress, Color start, Color mid, Color end)
     {
@@ -1662,16 +1064,16 @@ public class UIManager : MonoBehaviour
         else
             return Color.Lerp(mid, end, (progress - 0.5f) / 0.5f);
     }
-    
+
     private void SetActiveIfNotNull(GameObject obj, bool active)
     {
         if (obj != null) obj.SetActive(active);
     }
-    
+
     #endregion
-    
+
     #region Public Methods
-    
+
     /// <summary>
     /// Continue button clicked on win screen - proceeds to shop.
     /// </summary>
@@ -1705,32 +1107,7 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Restart button clicked on lose screen.
-    /// </summary>
-    public void OnRestartButtonClicked()
-    {
-        AudioManager.Instance?.PlayButtonClick();
-
-        // Clean up and restart
-        CleanupGameOverState();
-
-        // Use SceneFlowManager to restart with countdown
-        if (SceneFlowManager.Instance != null)
-        {
-            SceneFlowManager.Instance.RestartWithCountdown();
-        }
-        else
-        {
-            // Fallback if no SceneFlowManager (for testing)
-            Debug.LogWarning("No SceneFlowManager found - starting game directly");
-            gameManager?.StartNewGame();
-            GridManager grid = gridManager ?? FindFirstObjectByType<GridManager>();
-            grid?.ResetGame();
-        }
-    }
-
-    /// <summary>
-    /// Main Menu button clicked on lose screen.
+    /// Main Menu button clicked on win screen.
     /// </summary>
     public void OnMainMenuButtonClicked()
     {
@@ -1745,42 +1122,19 @@ public class UIManager : MonoBehaviour
         // Use SceneFlowManager's universal GoBack()
         SceneFlowManager.Instance?.GoBack();
     }
-    
+
     /// <summary>
     /// Hide all game over screens (called by SceneFlowManager when returning to menu).
     /// </summary>
     public void HideAllGameOverScreens()
     {
         SetActiveIfNotNull(winScreen, false);
-        SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
-        
+
         // Also clean up effects
         CleanupGameOverState();
     }
-    
-    /// <summary>
-    /// Refresh the target score display based on current campaign threshold.
-    /// Call this when round changes or game starts.
-    /// </summary>
-    public void RefreshTargetScore()
-    {
-        if (gameManager == null) return;
 
-        int targetScore = gameManager.CurrentRoundThreshold;
-
-        if (targetScoreText != null)
-            targetScoreText.text = $"/ {targetScore}";
-
-        if (scoreProgressSlider != null)
-        {
-            scoreProgressSlider.maxValue = targetScore;
-            scoreProgressSlider.value = gameManager.Score;
-        }
-
-        Debug.Log($"<color=cyan>Target score updated to {targetScore}</color>");
-    }
-    
     /// <summary>
     /// Clean up all game over related state (effects, sounds, panels).
     /// </summary>
@@ -1788,7 +1142,6 @@ public class UIManager : MonoBehaviour
     {
         // Hide game over screens
         SetActiveIfNotNull(winScreen, false);
-        SetActiveIfNotNull(loseScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
 
         // Hide breakdown elements
@@ -1908,12 +1261,10 @@ public class UIManager : MonoBehaviour
         if (scoreProgressSlider != null)
             scoreProgressSlider.value = displayedScore;
 
-        // Update progress bar color
-        if (scoreProgressFillImage != null && gameManager != null)
+        // Update progress bar color - just use the full color
+        if (scoreProgressFillImage != null)
         {
-            float progress = (float)displayedScore / gameManager.WinScore;
-            scoreProgressFillImage.color = GetGradientColor(progress,
-                scoreProgressStartColor, scoreProgressMidColor, scoreProgressFullColor);
+            scoreProgressFillImage.color = scoreProgressFullColor;
         }
 
         // Flash the glow
@@ -1971,6 +1322,37 @@ public class UIManager : MonoBehaviour
             pendingScoreToAdd = 0;
             UpdateScoreDisplay(displayedScore);
         }
+    }
+
+    #endregion
+
+    #region Hot Streak Effect (Fire Particles)
+
+    private void ActivateHotStreak(float multiplier)
+    {
+        if (!enableHotStreak || hotStreakEffect == null) return;
+
+        hotStreakEffect.Activate(multiplier);
+        hotStreakActive = true;
+
+        Debug.Log($"<color=orange>Hot Streak Activated!</color> x{multiplier:F2}");
+    }
+
+    private void UpdateHotStreakIntensity(float multiplier)
+    {
+        if (!enableHotStreak || hotStreakEffect == null || !hotStreakActive) return;
+
+        hotStreakEffect.UpdateIntensity(multiplier);
+    }
+
+    private void DeactivateHotStreak()
+    {
+        if (hotStreakEffect == null || !hotStreakActive) return;
+
+        hotStreakEffect.Deactivate();
+        hotStreakActive = false;
+
+        Debug.Log("<color=gray>Hot streak ended.</color>");
     }
 
     #endregion

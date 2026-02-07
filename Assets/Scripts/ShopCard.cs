@@ -106,7 +106,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
         CardId = upgrade.id;
         CardTitle = upgrade.displayName;
-        Cost = upgrade.GetEffectiveCost(PlayerInventory.Instance?.GetPriceModifier() ?? 1f);
+        Cost = upgrade.GetEffectiveCost(1f);
         floatOffset = floatPhaseOffset;
 
         if (titleText != null)
@@ -142,7 +142,7 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
 
         CardId = snack.id;
         CardTitle = snack.displayName;
-        Cost = snack.GetEffectiveCost(PlayerInventory.Instance?.GetPriceModifier() ?? 1f);
+        Cost = snack.GetEffectiveCost(1f);
         floatOffset = floatPhaseOffset;
 
         if (titleText != null)
@@ -371,8 +371,8 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
         // Don't mark as selected yet - wait for confirmation
         AudioManager.Instance?.PlayButtonClick();
 
-        // Notify ShopManager to show confirmation popup
-        ShopManager.Instance?.OnCardSelected(this);
+        // Shop purchasing is currently disabled
+        // ShopManager.Instance?.OnCardSelected(this);
     }
 
     /// <summary>

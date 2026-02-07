@@ -65,7 +65,15 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float weight4 = 0.13f;
     [SerializeField] private float weight5 = 0.01f;
     [SerializeField] private float weight6 = 0.01f;
-    
+
+    [Header("Progressive Difficulty")]
+    [SerializeField] private int startingMaxNumber = 4;  // Start with tiles 0-4
+    [SerializeField] private float introduce5AtTime = 20f;  // Seconds into round to start spawning 5s
+    [SerializeField] private float introduce6AtTime = 40f;  // Seconds into round to start spawning 6s
+    [SerializeField] private float introduce7AtTime = 60f;  // Seconds into round to start spawning 7s (if weight7 added)
+    [SerializeField] private float newNumberInitialWeight = 0.05f; // Starting weight for newly introduced numbers
+    [SerializeField] private float weightRampSpeed = 0.02f; // How fast new numbers ramp up per second after introduction
+
     [Header("Hint System")]
     [SerializeField] private bool enableHints = true;
     [SerializeField] private float hintDelay = 10f;
@@ -80,15 +88,27 @@ public class GridManager : MonoBehaviour
     private Tile selectedTile;
     private float[] weights;
     private bool isProcessing = false;
-    
+
     // Hint system state
     private float timeSinceLastMove = 0f;
     private float timeSinceLastHint = 0f;
     private bool hintActive = false;
     private HintMove currentHint = null;
     private List<GameObject> activeHintParticles = new List<GameObject>();
+
+    // Progressive difficulty state
+    private float roundStartTime = 0f;
     
     public event System.Action OnGridUnsolvable;
+
+    /// <summary>
+    /// Called when a round starts to reset progressive tile weight tracking.
+    /// </summary>
+    public void OnRoundStarted()
+    {
+        roundStartTime = Time.time;
+        Debug.Log("[GridManager] Round started - progressive weights reset");
+    }
 
     /// <summary>
     /// Immediately halt all grid processing and tile interaction.
@@ -417,24 +437,13 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Update grid size based on campaign stage settings.
+    /// Update grid size based on difficulty settings.
+    /// Uses GameManager fallback, defaults to 5x5 serialized values.
     /// </summary>
     private void UpdateGridSizeFromDifficulty()
     {
-        // First check CampaignManager for stage-based grid size
-        if (CampaignManager.Instance != null)
-        {
-            int newSize = CampaignManager.Instance.GetCurrentGridSize();
-            if (newSize != gridWidth || newSize != gridHeight)
-            {
-                gridWidth = newSize;
-                gridHeight = newSize;
-                grid = new Tile[gridWidth, gridHeight];
-                Debug.Log($"<color=cyan>Grid size from campaign: {gridWidth}x{gridHeight}</color>");
-            }
-        }
-        // Fallback to GameManager if no campaign
-        else if (GameManager.Instance != null)
+        // Try GameManager for difficulty-based grid size
+        if (GameManager.Instance != null)
         {
             int newSize = GameManager.Instance.GetCurrentGridSize();
             if (newSize != gridWidth || newSize != gridHeight)
@@ -444,6 +453,7 @@ public class GridManager : MonoBehaviour
                 grid = new Tile[gridWidth, gridHeight];
             }
         }
+        // Otherwise use serialized defaults (5x5)
 
         // Always recalculate sizes from container (handles both difficulty change and container resize)
         CalculateSizesFromContainer();
@@ -471,35 +481,59 @@ public class GridManager : MonoBehaviour
     
     private int GetWeightedRandomValue()
     {
-        // Get max number from CampaignManager (stage-based) or default to 6
-        int maxNumber = 6;
-        if (CampaignManager.Instance != null)
-        {
-            maxNumber = CampaignManager.Instance.GetCurrentMaxNumber();
-        }
+        float elapsed = Time.time - roundStartTime;
 
-        // Get weights from GameManager (difficulty-based) or use fallback
+        // Determine current max number based on time elapsed
+        int maxNumber = startingMaxNumber;
+        if (elapsed >= introduce5AtTime && startingMaxNumber < 5) maxNumber = Mathf.Max(maxNumber, 5);
+        if (elapsed >= introduce6AtTime && startingMaxNumber < 6) maxNumber = Mathf.Max(maxNumber, 6);
+        // Note: weight array only goes to index 6, so 7 would need extending
+
+        // Get base weights from GameManager or fallback
         float[] currentWeights = GetCurrentWeights();
 
-        // Normalize weights to only include values 0 to maxNumber
-        float totalWeight = 0f;
-        for (int i = 0; i <= maxNumber && i < currentWeights.Length; i++)
+        // Apply progressive weight adjustments for newly introduced numbers
+        float[] adjustedWeights = new float[currentWeights.Length];
+        System.Array.Copy(currentWeights, adjustedWeights, currentWeights.Length);
+
+        // For numbers above startingMaxNumber, use ramping weights
+        for (int i = startingMaxNumber + 1; i <= maxNumber && i < adjustedWeights.Length; i++)
         {
-            totalWeight += currentWeights[i];
+            float introTime = i == 5 ? introduce5AtTime : (i == 6 ? introduce6AtTime : introduce7AtTime);
+            float timeSinceIntro = elapsed - introTime;
+            if (timeSinceIntro > 0)
+            {
+                adjustedWeights[i] = newNumberInitialWeight + (timeSinceIntro * weightRampSpeed);
+            }
+            else
+            {
+                adjustedWeights[i] = 0f;
+            }
+        }
+
+        // For numbers above maxNumber, zero out
+        for (int i = maxNumber + 1; i < adjustedWeights.Length; i++)
+        {
+            adjustedWeights[i] = 0f;
+        }
+
+        // Weighted random selection
+        float totalWeight = 0f;
+        for (int i = 0; i <= maxNumber && i < adjustedWeights.Length; i++)
+        {
+            totalWeight += adjustedWeights[i];
         }
 
         // If no valid weights, return random value in range
         if (totalWeight <= 0f)
-        {
             return Random.Range(0, maxNumber + 1);
-        }
 
         float roll = Random.value * totalWeight;
         float cumulative = 0f;
 
-        for (int i = 0; i <= maxNumber && i < currentWeights.Length; i++)
+        for (int i = 0; i <= maxNumber && i < adjustedWeights.Length; i++)
         {
-            cumulative += currentWeights[i];
+            cumulative += adjustedWeights[i];
             if (roll <= cumulative)
                 return i;
         }

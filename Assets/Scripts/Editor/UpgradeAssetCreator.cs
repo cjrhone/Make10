@@ -532,29 +532,6 @@ public class UpgradeAssetCreator : Editor
     [MenuItem("Make10/Debug/Add Test Upgrades to Inventory")]
     public static void AddTestUpgradesToInventory()
     {
-        if (PlayerInventory.Instance == null)
-        {
-            Debug.LogError("PlayerInventory not found in scene!");
-            return;
-        }
-
-        // Load some test upgrades
-        UpgradeData enhanced1 = AssetDatabase.LoadAssetAtPath<UpgradeData>(UPGRADES_PATH + "Enhanced1.asset");
-        UpgradeData quickStart = AssetDatabase.LoadAssetAtPath<UpgradeData>(UPGRADES_PATH + "QuickStart.asset");
-        UpgradeData extraCredit = AssetDatabase.LoadAssetAtPath<UpgradeData>(UPGRADES_PATH + "ExtraCredit.asset");
-
-        if (enhanced1 != null) PlayerInventory.Instance.AddUpgrade(enhanced1);
-        if (quickStart != null) PlayerInventory.Instance.AddUpgrade(quickStart);
-        if (extraCredit != null) PlayerInventory.Instance.AddUpgrade(extraCredit);
-
-        // Load some test snacks
-        SnackData stopwatch = AssetDatabase.LoadAssetAtPath<SnackData>(SNACKS_PATH + "Stopwatch.asset");
-        SnackData brainFood = AssetDatabase.LoadAssetAtPath<SnackData>(SNACKS_PATH + "BrainFood.asset");
-
-        if (stopwatch != null) PlayerInventory.Instance.AddSnack(stopwatch);
-        if (brainFood != null) PlayerInventory.Instance.AddSnack(brainFood);
-
-        PlayerInventory.Instance.DebugPrintInventory();
-        Debug.Log("[UpgradeAssetCreator] Test upgrades added to inventory!");
+        Debug.Log("[UpgradeAssetCreator] Inventory testing disabled in arcade mode — no upgrades/snacks to add.");
     }
 }

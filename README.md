@@ -1,6 +1,6 @@
 # Make10
 
-A fast-paced tile-matching puzzle game where you swap numbered tiles to create rows and columns that sum to exactly **10**.
+A fast-paced arcade tile-matching puzzle game where you swap numbered tiles to create rows and columns that sum to exactly **10**.
 
 **Created by:** CJ Rhone / [Wizard Bodega](https://wizardbodega.gg)
 
@@ -11,9 +11,9 @@ A fast-paced tile-matching puzzle game where you swap numbered tiles to create r
 ## How to Play
 
 1. **Swap tiles** by clicking two adjacent tiles or swiping from one tile to a neighbor
-2. **Make 10** - Create a row or column where all numbers sum to exactly 10
-3. **Build streaks** - Chain consecutive matches to increase your multiplier
-4. **Progress through milestones** - Reach score thresholds to unlock upgrades
+2. **Make 10** — Create a row or column where all numbers sum to exactly 10
+3. **Build streaks** — Chain consecutive matches to increase your multiplier
+4. **Beat the clock** — Score as much BP as possible before the timer runs out
 
 ### Controls
 
@@ -25,51 +25,25 @@ A fast-paced tile-matching puzzle game where you swap numbered tiles to create r
 
 ---
 
-## V2 Redesign (In Progress)
-
-Make10 is being redesigned with a **roguelike-style progression system**:
-
-### New Direction
-- **No difficulty select** - Game starts and scales dynamically
-- **Score threshold progression** - Reach milestones to unlock upgrades
-- **Endless gameplay** - Play continues with increasing challenge
-- **Upgrade system** - Choose enhancements as you progress
-- **Dynamic difficulty scaling** - Challenge increases based on your performance
-
-### New Game View Layout
+## Game Flow
 
 ```
-┌─────────────────────────┐
-│                         │
-│    CHARACTER AVATAR     │  ← Top: Character portrait
-│    (scenic background)  │     with reactive animations
-│                         │
-├─────────────────────────┤
-│  SCORE │ TIMER │  x2    │  ← Middle: Stats bar
-│      [████ 250/300]     │     (score, timer, multiplier, XP)
-├─────────────────────────┤
-│                         │
-│   ┌──┬──┬──┬──┐        │
-│   ├──┼──┼──┼──┤        │  ← Bottom: Gameplay grid
-│   ├──┼──┼──┼──┤        │     (thumb-accessible)
-│   ├──┼──┼──┼──┤        │
-│   └──┴──┴──┴──┘        │
-│                         │
-└─────────────────────────┘
+Main Menu → Tutorial → Countdown → Game → Time's Up → Results → Shop → Next Round → ...
 ```
+
+Every round is timer-based — no win or lose, just score as high as you can. The results screen shows your BP breakdown (Balatro-style count-up animation), then you move to the shop (currently an empty shell) and on to the next round.
 
 ---
 
 ## Scoring System
 
 ### Base Scoring
-- Each matched line (row or column) = **10 points × current multiplier**
+- Each matched line (row or column) = **10 BP × current multiplier**
 
 ### Multiplier System
 - **2 consecutive matches** activates a 1.25x multiplier
 - Each additional match increases multiplier by **0.25x**
 - Multiplier caps at **3.0x** before triggering Hot Streak
-- Bonus seconds added based on remaining multiplier timer
 
 ### Hot Streak Mode
 When your multiplier exceeds 3.0x, Hot Streak activates:
@@ -80,37 +54,39 @@ When your multiplier exceeds 3.0x, Hot Streak activates:
 
 ---
 
+## Progressive Difficulty
+
+Each round starts with tiles 0–4 only. As the round progresses:
+- **~20 seconds in**: 5s start appearing (low weight, ramping up)
+- **~40 seconds in**: 6s start appearing (low weight, ramping up)
+
+This creates a natural difficulty curve within every round.
+
+---
+
 ## Features
 
 ### Gameplay
-- Weighted random tile generation
-- Cascading matches - tiles fall after clears, creating chain reactions
+- Weighted random tile generation with progressive difficulty
+- Cascading matches — tiles fall after clears, creating chain reactions
 - Automatic grid reset when no valid moves remain
 - Hint system shows valid moves after 10 seconds of inactivity
 
 ### Visual Polish
-- Color-coded tiles (each number 0-6 has a unique color)
-- **Enhanced tile effects** - Soft glow, pulsing numbers, drop shadows for upgraded numbers
-- Smooth swap and fall animations
-- "10" effect with glow, sparkles, and expanding rings
-- **Soft glow particles** - Procedural radial glow textures for polished VFX
-- Particle explosion → collection to progress bar (multiplier scales particle count)
-- Convergence animation - matched tiles spiral to center
-- Score popups floating upward
+- Color-coded tiles (each number 0–6 has a unique color)
+- Smooth swap and fall animations with landing bounce
+- "10" convergence animation with sparkles, rings, and text popup
+- Line sweep beam effects on row/column matches
+- Particle explosion → collection VFX (multiplier scales effects)
 - Hot Streak fire particles and color pulse effects
+- Screen shake on consecutive matches
 - Parallax scrolling background
-- Animated avatar character with state changes
+- Animated avatar character with reactive states
 
 ### Audio
-- Context-sensitive music (menu, gameplay, win, lose, hot streak)
+- Context-sensitive music (menu, gameplay, win, hot streak)
 - Sound effects for all interactions
 - Separate volume controls for music, SFX, and voice
-
-### Accessibility
-- Color-coded values (not relying on numbers alone)
-- Clear visual feedback for all interactions
-- Multiple input methods (click and swipe)
-- Responsive design for various screen sizes
 
 ---
 
@@ -142,115 +118,20 @@ Make10/
 
 | Script | Purpose |
 |--------|---------|
-| `GameManager.cs` | Game state, scoring, multiplier, win/lose conditions |
-| `GridManager.cs` | Grid spawning, tile swapping, cascades, hints |
+| `GameManager.cs` | Game state, scoring, multiplier, hot streak, timer-only rounds |
+| `GridManager.cs` | Grid spawning, tile swapping, cascades, progressive weights, hints |
 | `Tile.cs` | Individual tile behavior and input handling |
 | `MatchChecker.cs` | Detects rows/columns summing to 10 |
 | `SceneFlowManager.cs` | UI panel transitions and game flow |
-| `UIManager.cs` | Score display, timer, multiplier bar, popups |
-| `AvatarManager.cs` | Animated character with reactive states |
-| `HotStreakEffect.cs` | Fire particle effects during hot streak |
+| `UIManager.cs` | Score display, timer, multiplier bar, results screen |
+| `RunManager.cs` | Per-run BP currency and round tracking |
+| `CampaignManager.cs` | Lightweight round counter |
+| `ShopManager.cs` | Empty shop shell (BP display + Next Round) |
 | `AudioManager.cs` | Music and SFX management |
-| `PlayerInventory.cs` | Tracks owned upgrades, snacks, and artifacts |
-| `CampaignManager.cs` | Stage/round progression tracking |
-| `RunManager.cs` | Per-run BP currency and Gold Stars |
-
-### Upgrade System Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `UpgradeData.cs` | ScriptableObject for permanent upgrades |
-| `SnackData.cs` | ScriptableObject for consumable items |
-| `ArtifactData.cs` | ScriptableObject for passive bonuses |
-| `DebugUpgradePanel.cs` | Runtime debug panel for testing upgrades (F1) |
-
-### UI & Visual Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `PopupWindow.cs` | Reusable popup with scrollbar/auto-size |
-| `UpgradeConfirmWindow.cs` | Upgrade purchase confirmation popup |
-| `GlowTextureGenerator.cs` | Procedural glow texture utility |
-| `UIStyleGuide.cs` | Centralized UI constants |
-
----
-
-## Upgrade System
-
-Make10 features a roguelike-style upgrade system with three item types:
-
-### Upgrades (Permanent)
-Persistent enhancements that last the entire run. Color-coded by type:
-
-| Type | Color | Examples |
-|------|-------|----------|
-| Enhanced Number | Gold | Bonus BP for specific tile values |
-| Multiplier | Purple | Starting multiplier, drain reduction |
-| Time | Cyan | Bonus seconds, time bonuses |
-| Tile Weight | Green | Increase spawn rates for numbers |
-| Combo | Orange | Cascade bonuses, chain rewards |
-| Risk/Reward | Red | Double/half point chances |
-| Special | Pink | Free Space tiles, unique effects |
-| Boss Fight | Crimson | Boss damage, attack reduction |
-
-### Snacks (Consumables)
-One-time use items (Teal/Mint colored):
-- **Stopwatch** - Freeze timer for a few seconds
-- **Calculator** - Reveal optimal move
-- **Energy Drink** - Instant multiplier boost
-
-### Artifacts (Passive)
-Rare items with powerful ongoing effects:
-- **Golden Pencil** - All matches worth +2 BP
-- **Teacher's Pet** - Bonus BP at round end
-- **Overachiever** - Multiplier decays slower
-
-### Shop Layout
-The shop displays upgrades in an **inverted pyramid**:
-- **Top Row**: 2 premium/rare upgrades
-- **Middle Row**: 2 standard upgrades
-- **Bottom Row**: 2 snacks (consumables)
-
-### Debug Panel (Development)
-Press **F1** during gameplay to open the debug panel:
-- Add any upgrade/snack/artifact instantly
-- Test scoring bonuses without playing through
-- Print inventory contents to console
-
-### Data Flow
-```
-ScriptableObject Assets (Assets/Data/Upgrades, Snacks, Artifacts)
-        ↓
-DebugUpgradePanel or ShopManager (adds to inventory)
-        ↓
-PlayerInventory.ownedUpgrades / ownedSnacks / ownedArtifacts
-        ↓
-GameManager queries PlayerInventory during scoring
-        ↓
-Bonuses applied (enhanced numbers, multiplier boosts, etc.)
-```
-
----
-
-## Game Flow (V2)
-
-```
-Loading Screen
-      ↓
-Main Menu
-      ↓
-Gameplay (Endless with milestones)
-      ↓
-    [Milestone reached → Choose upgrade]
-      ↓
-    [Continue playing...]
-      ↓
-Game Over
-      ↓
-Results / Stats
-      ↓
-Return to Main Menu
-```
+| `AvatarManager.cs` | Animated character with reactive states |
+| `GridVFX.cs` | Line sweeps, ambient particles, screen shake |
+| `HotStreakEffect.cs` | Fire particle effects during hot streak |
+| `TenExplosionVFX.cs` | Particle explosion on match |
 
 ---
 

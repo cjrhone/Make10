@@ -305,14 +305,14 @@ public class GridVFX : MonoBehaviour
             float glowThick = Mathf.Max(thicknessScale, 0.5f); // Glow never fully collapses
             glowRT.sizeDelta = new Vector2(size.x * glowThick * 2.5f, size.y * 2.5f);
 
-            // --- Core beam (layer 2) — the main light, shader handles gold gradient ---
-            beamImg.color = new Color(1f, 1f, 1f, alpha);
+            // --- Core beam (layer 2) — gold-tinted, shader adds gradient + scroll ---
+            beamImg.color = new Color(goldEdgeColor.r, goldEdgeColor.g, goldEdgeColor.b, alpha);
             RectTransform beamRT = beamImg.GetComponent<RectTransform>();
             beamRT.sizeDelta = new Vector2(size.x * thicknessScale, size.y);
 
-            // --- Hot core (layer 3) — pure white, stays bright slightly longer ---
+            // --- Hot core (layer 3) — bright white-gold, stays bright slightly longer ---
             float coreAlpha = Mathf.Min(alpha * 1.4f, 1f);
-            coreImg.color = new Color(1f, 1f, 1f, coreAlpha);
+            coreImg.color = new Color(1f, 0.95f, 0.7f, coreAlpha);
             RectTransform coreRT = coreImg.GetComponent<RectTransform>();
             coreRT.sizeDelta = new Vector2(size.x * thicknessScale * 0.35f, size.y);
 
