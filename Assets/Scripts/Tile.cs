@@ -83,7 +83,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     // Number text colors - Color math philosophy:
     // Primaries: 1 (Gold/Yellow), 2 (Blue), 4 (Red)
     // Secondaries: 3 (Green = 1+2), 5 (Orange = 1+4), 6 (Purple = 2+4)
-    private static readonly Color[] NumberColors = new Color[7]
+    // Tertiaries: 7 (Teal = 2+3), 8 (Pink = 4+1+mix), 9 (Crimson = deep red)
+    private static readonly Color[] NumberColors = new Color[10]
     {
         new Color(0.6f, 0.6f, 0.6f),     // 0 - Grey (neutral wildcard)
         new Color(0.85f, 0.65f, 0.1f),   // 1 - Gold (primary)
@@ -91,7 +92,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         new Color(0.2f, 0.7f, 0.3f),     // 3 - Green (1+2: Gold+Blue)
         new Color(0.9f, 0.2f, 0.2f),     // 4 - Red (primary)
         new Color(0.95f, 0.5f, 0.1f),    // 5 - Orange (1+4: Gold+Red)
-        new Color(0.6f, 0.2f, 0.75f)     // 6 - Purple (2+4: Blue+Red)
+        new Color(0.6f, 0.2f, 0.75f),    // 6 - Purple (2+4: Blue+Red)
+        new Color(0.1f, 0.7f, 0.7f),     // 7 - Teal
+        new Color(0.9f, 0.35f, 0.6f),    // 8 - Pink
+        new Color(0.75f, 0.1f, 0.15f)    // 9 - Crimson
     };
 
     private void Awake()
@@ -239,11 +243,11 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     }
     
     /// <summary>
-    /// Set the tile's numeric value (0-6).
+    /// Set the tile's numeric value (0-9).
     /// </summary>
     public void SetValue(int value)
     {
-        Value = Mathf.Clamp(value, 0, 6);
+        Value = Mathf.Clamp(value, 0, 9);
         UpdateNumberDisplay();
     }
     

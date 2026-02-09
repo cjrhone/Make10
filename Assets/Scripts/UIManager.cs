@@ -80,6 +80,8 @@ public class UIManager : MonoBehaviour
     [Header("Win Screen Breakdown")]
     [SerializeField] private TMP_Text scoreLabelText;
     [SerializeField] private TMP_Text scoreValueText;
+    [SerializeField] private TMP_Text sessionTimeLabelText;
+    [SerializeField] private TMP_Text sessionTimeValueText;
     [SerializeField] private TMP_Text timeBonusLabelText;
     [SerializeField] private TMP_Text timeBonusValueText;
     [SerializeField] private TMP_Text hotStreakLabelText;
@@ -787,11 +789,17 @@ public class UIManager : MonoBehaviour
         int baseScore = gameManager.Score;
         float timeRemaining = gameManager.TimeRemaining;
         float maxMultiplier = gameManager.MaxMultiplierReached;
+        float sessionDuration = gameManager.SessionDuration;
 
         // Calculate breakdown (1 BP per second remaining)
         int timeBonus = Mathf.RoundToInt(timeRemaining * timeBonusPerSecond);
         int subtotal = baseScore + timeBonus;
         int total = Mathf.RoundToInt(subtotal * maxMultiplier);
+
+        // Format session time as MM:SS
+        int sessionMinutes = (int)sessionDuration / 60;
+        int sessionSeconds = (int)sessionDuration % 60;
+        string sessionTimeStr = $"{sessionMinutes:D2}:{sessionSeconds:D2}";
 
         // Hide all breakdown elements initially
         HideBreakdownElements();
@@ -802,7 +810,6 @@ public class UIManager : MonoBehaviour
         // Line 1: Score - appears and counts up
         if (scoreLabelText != null && scoreValueText != null)
         {
-            // Activate the row (parent of both label and value)
             scoreLabelText.transform.parent.gameObject.SetActive(true);
             scoreLabelText.text = "Score";
             AudioManager.Instance?.PlayButtonClick();
@@ -811,7 +818,18 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 2: Time Bonus - appears and counts up
+        // Line 2: Session Time - appears instantly
+        if (sessionTimeLabelText != null && sessionTimeValueText != null)
+        {
+            sessionTimeLabelText.transform.parent.gameObject.SetActive(true);
+            sessionTimeLabelText.text = "Session Time";
+            sessionTimeValueText.text = sessionTimeStr;
+            AudioManager.Instance?.PlayButtonClick();
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+
+        // Line 3: Time Bonus - appears and counts up
         if (timeBonusLabelText != null && timeBonusValueText != null)
         {
             timeBonusLabelText.transform.parent.gameObject.SetActive(true);
@@ -822,7 +840,7 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 3: Hot Streak multiplier - appears instantly
+        // Line 4: Hot Streak multiplier - appears instantly
         if (hotStreakLabelText != null && hotStreakValueText != null)
         {
             hotStreakLabelText.transform.parent.gameObject.SetActive(true);
@@ -833,7 +851,7 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Divider line - appears instantly
+        // Divider line
         if (breakdownDivider != null)
         {
             breakdownDivider.gameObject.SetActive(true);
@@ -841,7 +859,7 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 4: TOTAL - appears and counts up
+        // Line 5: TOTAL - appears and counts up
         if (totalLabelText != null && totalValueText != null)
         {
             totalLabelText.transform.parent.gameObject.SetActive(true);
@@ -864,6 +882,7 @@ public class UIManager : MonoBehaviour
     {
         // Hide entire rows (parent of label/value pairs)
         if (scoreLabelText != null) scoreLabelText.transform.parent.gameObject.SetActive(false);
+        if (sessionTimeLabelText != null) sessionTimeLabelText.transform.parent.gameObject.SetActive(false);
         if (timeBonusLabelText != null) timeBonusLabelText.transform.parent.gameObject.SetActive(false);
         if (hotStreakLabelText != null) hotStreakLabelText.transform.parent.gameObject.SetActive(false);
         if (breakdownDivider != null) breakdownDivider.gameObject.SetActive(false);
@@ -907,6 +926,9 @@ public class UIManager : MonoBehaviour
         // Create breakdown rows with two-column layout (label left, value right)
         if (scoreLabelText == null || scoreValueText == null)
             (scoreLabelText, scoreValueText) = CreateBreakdownRow(breakdownContainer, "ScoreRow", "Score", "0 BP");
+
+        if (sessionTimeLabelText == null || sessionTimeValueText == null)
+            (sessionTimeLabelText, sessionTimeValueText) = CreateBreakdownRow(breakdownContainer, "SessionTimeRow", "Session Time", "00:00");
 
         if (timeBonusLabelText == null || timeBonusValueText == null)
             (timeBonusLabelText, timeBonusValueText) = CreateBreakdownRow(breakdownContainer, "TimeBonusRow", "Time Bonus", "+ 0 BP");

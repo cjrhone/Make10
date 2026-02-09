@@ -21,7 +21,7 @@ public class TutorialDemoWidget : MonoBehaviour
     
     [Header("Colors (matching game)")]
     [SerializeField] private Color backgroundColor = new Color(0.85f, 0.85f, 0.85f);
-    [SerializeField] private Color[] numberColors = new Color[7]
+    [SerializeField] private Color[] numberColors = new Color[10]
     {
         new Color(0.6f, 0.6f, 0.6f),     // 0 - Grey
         new Color(0.85f, 0.65f, 0.1f),   // 1 - Gold
@@ -29,7 +29,10 @@ public class TutorialDemoWidget : MonoBehaviour
         new Color(0.2f, 0.7f, 0.3f),     // 3 - Green
         new Color(0.9f, 0.2f, 0.2f),     // 4 - Red
         new Color(0.95f, 0.5f, 0.1f),    // 5 - Orange
-        new Color(0.6f, 0.2f, 0.75f)     // 6 - Purple
+        new Color(0.6f, 0.2f, 0.75f),    // 6 - Purple
+        new Color(0.1f, 0.7f, 0.7f),     // 7 - Teal
+        new Color(0.9f, 0.35f, 0.6f),    // 8 - Pink
+        new Color(0.75f, 0.1f, 0.15f)    // 9 - Crimson
     };
     
     [Header("References")]

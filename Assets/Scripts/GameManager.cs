@@ -22,7 +22,7 @@ public class GameManager : MonoBehaviour
         [Header("Win Condition")]
         public int winScore = 100;
 
-        [Header("Tile Weights (must sum to 1.0)")]
+        [Header("Tile Weights (base weights for tiles 0-9)")]
         [Range(0, 1)] public float weight0 = 0.12f;
         [Range(0, 1)] public float weight1 = 0.24f;
         [Range(0, 1)] public float weight2 = 0.26f;
@@ -30,10 +30,13 @@ public class GameManager : MonoBehaviour
         [Range(0, 1)] public float weight4 = 0.12f;
         [Range(0, 1)] public float weight5 = 0.05f;
         [Range(0, 1)] public float weight6 = 0.01f;
+        [Range(0, 1)] public float weight7 = 0f;
+        [Range(0, 1)] public float weight8 = 0f;
+        [Range(0, 1)] public float weight9 = 0f;
 
         public float[] GetWeights()
         {
-            return new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
+            return new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, weight7, weight8, weight9 };
         }
     }
 
@@ -91,6 +94,10 @@ public class GameManager : MonoBehaviour
     private bool hotStreakActive = false;
     private float hotStreakTimer = 0f;
 
+    // Session time tracking (wall-clock, independent of countdown timer)
+    private float sessionStartTime;
+    private float lastSessionDuration;
+
     // Cached effective values (from upgrades)
     private float effectiveMaxMultiplier;
     private float effectiveHotStreakThreshold;
@@ -107,6 +114,7 @@ public class GameManager : MonoBehaviour
     public float HotStreakTimer => hotStreakTimer;
     public float HotStreakDuration => hotStreakDuration;
     public float MaxMultiplierReached => maxMultiplierReached;
+    public float SessionDuration => IsGameActive ? Time.time - sessionStartTime : lastSessionDuration;
 
     // Events for UI updates
     public event Action<int, int> OnScoreChanged;
@@ -229,6 +237,8 @@ public class GameManager : MonoBehaviour
         hotStreakActive = false;
         hotStreakTimer = 0f;
         maxMultiplierReached = 1f;
+        sessionStartTime = Time.time;
+        lastSessionDuration = 0f;
 
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
@@ -561,13 +571,15 @@ public class GameManager : MonoBehaviour
     
     private void TimeUp()
     {
+        // Freeze session duration before deactivating
+        lastSessionDuration = Time.time - sessionStartTime;
         IsGameActive = false;
 
         // Freeze the grid immediately to stop any in-progress cascades
         GridManager gm = FindFirstObjectByType<GridManager>();
         gm?.FreezeGrid();
 
-        Debug.Log($"<color=cyan>*** TIME'S UP! ***</color> Score: {Score}");
+        Debug.Log($"<color=cyan>*** TIME'S UP! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s");
         SceneFlowManager.Instance?.OnGameEnded();
         OnGameWon?.Invoke();
     }

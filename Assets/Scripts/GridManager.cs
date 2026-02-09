@@ -68,9 +68,11 @@ public class GridManager : MonoBehaviour
 
     [Header("Progressive Difficulty")]
     [SerializeField] private int startingMaxNumber = 4;  // Start with tiles 0-4
-    [SerializeField] private float introduce5AtTime = 20f;  // Seconds into round to start spawning 5s
-    [SerializeField] private float introduce6AtTime = 40f;  // Seconds into round to start spawning 6s
-    [SerializeField] private float introduce7AtTime = 60f;  // Seconds into round to start spawning 7s (if weight7 added)
+    [SerializeField] private float introduce5AtTime = 60f;   // 1 min: start spawning 5s
+    [SerializeField] private float introduce6AtTime = 120f;  // 2 min: start spawning 6s
+    [SerializeField] private float introduce7AtTime = 180f;  // 3 min: start spawning 7s
+    [SerializeField] private float introduce8AtTime = 240f;  // 4 min: start spawning 8s
+    [SerializeField] private float introduce9AtTime = 300f;  // 5 min: start spawning 9s
     [SerializeField] private float newNumberInitialWeight = 0.05f; // Starting weight for newly introduced numbers
     [SerializeField] private float weightRampSpeed = 0.02f; // How fast new numbers ramp up per second after introduction
 
@@ -123,7 +125,7 @@ public class GridManager : MonoBehaviour
 
     private void Awake()
     {
-        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6 };
+        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, 0f, 0f, 0f };
         grid = new Tile[gridWidth, gridHeight];
         CalculateSizesFromContainer();
     }
@@ -483,24 +485,36 @@ public class GridManager : MonoBehaviour
     {
         float elapsed = Time.time - roundStartTime;
 
-        // Determine current max number based on time elapsed
+        // Determine current max number based on elapsed gameplay time
         int maxNumber = startingMaxNumber;
-        if (elapsed >= introduce5AtTime && startingMaxNumber < 5) maxNumber = Mathf.Max(maxNumber, 5);
-        if (elapsed >= introduce6AtTime && startingMaxNumber < 6) maxNumber = Mathf.Max(maxNumber, 6);
-        // Note: weight array only goes to index 6, so 7 would need extending
+        if (elapsed >= introduce5AtTime) maxNumber = Mathf.Max(maxNumber, 5);
+        if (elapsed >= introduce6AtTime) maxNumber = Mathf.Max(maxNumber, 6);
+        if (elapsed >= introduce7AtTime) maxNumber = Mathf.Max(maxNumber, 7);
+        if (elapsed >= introduce8AtTime) maxNumber = Mathf.Max(maxNumber, 8);
+        if (elapsed >= introduce9AtTime) maxNumber = Mathf.Max(maxNumber, 9);
 
         // Get base weights from GameManager or fallback
         float[] currentWeights = GetCurrentWeights();
 
-        // Apply progressive weight adjustments for newly introduced numbers
-        float[] adjustedWeights = new float[currentWeights.Length];
-        System.Array.Copy(currentWeights, adjustedWeights, currentWeights.Length);
+        // Build adjusted weight array (always 10 elements for tiles 0-9)
+        float[] adjustedWeights = new float[10];
+        for (int i = 0; i < adjustedWeights.Length && i < currentWeights.Length; i++)
+        {
+            adjustedWeights[i] = currentWeights[i];
+        }
 
-        // For numbers above startingMaxNumber, use ramping weights
+        // Apply difficulty curve — reduce base weights (0-4) over time
+        float difficultyMultiplier = CalculateDifficultyMultiplier(elapsed);
+        for (int i = 0; i <= startingMaxNumber && i < adjustedWeights.Length; i++)
+        {
+            adjustedWeights[i] *= difficultyMultiplier;
+        }
+
+        // Apply ramping weights for newly introduced numbers (5-9)
+        float[] introTimes = { 0f, 0f, 0f, 0f, 0f, introduce5AtTime, introduce6AtTime, introduce7AtTime, introduce8AtTime, introduce9AtTime };
         for (int i = startingMaxNumber + 1; i <= maxNumber && i < adjustedWeights.Length; i++)
         {
-            float introTime = i == 5 ? introduce5AtTime : (i == 6 ? introduce6AtTime : introduce7AtTime);
-            float timeSinceIntro = elapsed - introTime;
+            float timeSinceIntro = elapsed - introTimes[i];
             if (timeSinceIntro > 0)
             {
                 adjustedWeights[i] = newNumberInitialWeight + (timeSinceIntro * weightRampSpeed);
@@ -511,20 +525,19 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        // For numbers above maxNumber, zero out
+        // Zero out numbers above current max
         for (int i = maxNumber + 1; i < adjustedWeights.Length; i++)
         {
             adjustedWeights[i] = 0f;
         }
 
-        // Weighted random selection
+        // Weighted random selection (normalized)
         float totalWeight = 0f;
         for (int i = 0; i <= maxNumber && i < adjustedWeights.Length; i++)
         {
             totalWeight += adjustedWeights[i];
         }
 
-        // If no valid weights, return random value in range
         if (totalWeight <= 0f)
             return Random.Range(0, maxNumber + 1);
 
@@ -539,6 +552,25 @@ public class GridManager : MonoBehaviour
         }
 
         return Random.Range(0, maxNumber + 1);
+    }
+
+    /// <summary>
+    /// Progressive difficulty curve — reduces base tile weights (0-4) over time.
+    /// At 5+ minutes, base weights are halved so higher numbers dominate.
+    /// </summary>
+    private float CalculateDifficultyMultiplier(float elapsedSeconds)
+    {
+        if (elapsedSeconds < 60f) return 1.0f;
+        if (elapsedSeconds < 120f)
+            return 1.0f - 0.15f * (elapsedSeconds - 60f) / 60f;   // 1.0 → 0.85
+        if (elapsedSeconds < 180f)
+            return 0.85f - 0.15f * (elapsedSeconds - 120f) / 60f;  // 0.85 → 0.70
+        if (elapsedSeconds < 240f)
+            return 0.70f - 0.10f * (elapsedSeconds - 180f) / 60f;  // 0.70 → 0.60
+        if (elapsedSeconds < 300f)
+            return 0.60f - 0.10f * (elapsedSeconds - 240f) / 60f;  // 0.60 → 0.50
+
+        return 0.50f; // Cap at 50% for 5+ minutes
     }
     
     /// <summary>
