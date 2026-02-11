@@ -74,6 +74,11 @@ public class GameManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private UIManager uiManager;
 
+    // High Score persistence keys
+    private const string HIGH_SCORE_KEY = "Make10_HighScore";
+    private const string HIGH_SCORE_BP_KEY = "Make10_HighScoreBP";
+    private const string TOTAL_GAMES_KEY = "Make10_TotalGames";
+
     // Current state
     public int Score { get; private set; }
     public float TimeRemaining { get; private set; }
@@ -81,6 +86,12 @@ public class GameManager : MonoBehaviour
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
     public bool IsSolveAnimationPlaying { get; set; }
+
+    // High score tracking
+    public int HighScore => PlayerPrefs.GetInt(HIGH_SCORE_KEY, 0);
+    public int HighScoreBP => PlayerPrefs.GetInt(HIGH_SCORE_BP_KEY, 0);
+    public int TotalGamesPlayed => PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0);
+    public bool IsNewHighScore { get; private set; }
 
     // Multiplier state
     private int solveCount = 0;
@@ -579,9 +590,37 @@ public class GameManager : MonoBehaviour
         GridManager gm = FindFirstObjectByType<GridManager>();
         gm?.FreezeGrid();
 
-        Debug.Log($"<color=cyan>*** TIME'S UP! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s");
+        // Track total games played
+        int gamesPlayed = PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0) + 1;
+        PlayerPrefs.SetInt(TOTAL_GAMES_KEY, gamesPlayed);
+
+        // Check for new high score (raw score)
+        IsNewHighScore = Score > HighScore;
+        if (IsNewHighScore)
+        {
+            PlayerPrefs.SetInt(HIGH_SCORE_KEY, Score);
+            Debug.Log($"<color=yellow>*** NEW HIGH SCORE: {Score}! ***</color>");
+        }
+
+        PlayerPrefs.Save();
+
+        Debug.Log($"<color=cyan>*** TIME'S UP! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s | Games: {gamesPlayed}");
         SceneFlowManager.Instance?.OnGameEnded();
         OnGameWon?.Invoke();
+    }
+
+    /// <summary>
+    /// Save the total BP earned this round as high score if it's a new record.
+    /// Called from UIManager after BP calculation.
+    /// </summary>
+    public void CheckAndSaveBPHighScore(int totalBP)
+    {
+        if (totalBP > HighScoreBP)
+        {
+            PlayerPrefs.SetInt(HIGH_SCORE_BP_KEY, totalBP);
+            PlayerPrefs.Save();
+            Debug.Log($"<color=yellow>*** NEW BP HIGH SCORE: {totalBP}! ***</color>");
+        }
     }
     
     

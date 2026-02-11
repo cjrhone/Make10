@@ -26,10 +26,13 @@ public class MainMenuUI : MonoBehaviour
     [SerializeField] private Button playButton;
     [SerializeField] private Button optionsButton;
     [SerializeField] private Button quitButton;
-    
+
+    [Header("High Score Display")]
+    [SerializeField] private TMP_Text highScoreDisplayText;
+
     private Vector2 titleStartPos;
     private float titleStartRotation;
-    
+
     private void Start()
     {
         // Store initial title position
@@ -38,12 +41,42 @@ public class MainMenuUI : MonoBehaviour
             titleStartPos = titleCard.anchoredPosition;
             titleStartRotation = titleCard.localEulerAngles.z;
         }
-        
+
         // Setup button listeners
         SetupButtons();
-        
+
+        // Show high score on menu
+        UpdateHighScoreDisplay();
+
         // Start animations
         StartCoroutine(AnimateTitle());
+    }
+
+    private void OnEnable()
+    {
+        // Refresh high score every time menu becomes visible
+        UpdateHighScoreDisplay();
+    }
+
+    /// <summary>
+    /// Update the high score display on the main menu.
+    /// </summary>
+    private void UpdateHighScoreDisplay()
+    {
+        if (highScoreDisplayText == null) return;
+
+        int highScore = PlayerPrefs.GetInt("Make10_HighScore", 0);
+        int totalGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
+
+        if (totalGames > 0)
+        {
+            highScoreDisplayText.text = $"Best: {highScore} pts";
+            highScoreDisplayText.gameObject.SetActive(true);
+        }
+        else
+        {
+            highScoreDisplayText.gameObject.SetActive(false);
+        }
     }
     
     private void Update()

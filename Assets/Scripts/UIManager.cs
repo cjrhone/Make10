@@ -93,6 +93,11 @@ public class UIManager : MonoBehaviour
     [SerializeField] private float countUpDuration = 0.5f;
     [SerializeField] private float timeBonusPerSecond = 1f;
 
+    [Header("High Score")]
+    [SerializeField] private TMP_Text highScoreText;
+    [SerializeField] private GameObject newHighScoreBanner;
+    [SerializeField] private Color newHighScoreColor = new Color(1f, 0.85f, 0.1f);
+
     [Header("Unsolvable Grid Popup")]
     [SerializeField] private GameObject unsolvablePopup;
     [SerializeField] private float unsolvablePopupDuration = 1f;
@@ -868,11 +873,58 @@ public class UIManager : MonoBehaviour
             yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, total, countUpDuration * 1.2f, "{0} BP"));
         }
 
+        // Save BP high score
+        gameManager?.CheckAndSaveBPHighScore(total);
+
+        // Show NEW HIGH SCORE banner if applicable
+        if (gameManager != null && gameManager.IsNewHighScore)
+        {
+            yield return new WaitForSeconds(0.2f);
+            ShowNewHighScoreBanner();
+        }
+
         // Hide the legacy winScoreText since we're using breakdown
         if (winScoreText != null)
         {
             winScoreText.text = "";
         }
+    }
+
+    /// <summary>
+    /// Show the NEW HIGH SCORE banner with animation.
+    /// </summary>
+    private void ShowNewHighScoreBanner()
+    {
+        if (newHighScoreBanner == null)
+        {
+            // Create it dynamically if not assigned in inspector
+            if (winScreen == null) return;
+
+            Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
+            if (breakdownContainer == null) return;
+
+            GameObject bannerObj = new GameObject("NewHighScoreBanner");
+            bannerObj.transform.SetParent(breakdownContainer, false);
+
+            RectTransform bannerRT = bannerObj.AddComponent<RectTransform>();
+            bannerRT.sizeDelta = new Vector2(0, 50f);
+
+            TMP_Text bannerText = bannerObj.AddComponent<TextMeshProUGUI>();
+            bannerText.text = "NEW HIGH SCORE!";
+            bannerText.fontSize = 42f;
+            bannerText.fontStyle = FontStyles.Bold;
+            bannerText.alignment = TextAlignmentOptions.Center;
+            bannerText.color = newHighScoreColor;
+
+            if (winScoreText != null)
+                bannerText.font = winScoreText.font;
+
+            newHighScoreBanner = bannerObj;
+        }
+
+        newHighScoreBanner.SetActive(true);
+        StartCoroutine(AnimationUtilities.PunchScale(newHighScoreBanner.transform, 1.3f, 0.3f));
+        AudioManager.Instance?.PlayButtonClick(); // Celebratory sound
     }
 
     /// <summary>
@@ -887,6 +939,7 @@ public class UIManager : MonoBehaviour
         if (hotStreakLabelText != null) hotStreakLabelText.transform.parent.gameObject.SetActive(false);
         if (breakdownDivider != null) breakdownDivider.gameObject.SetActive(false);
         if (totalLabelText != null) totalLabelText.transform.parent.gameObject.SetActive(false);
+        if (newHighScoreBanner != null) newHighScoreBanner.SetActive(false);
     }
 
     /// <summary>
