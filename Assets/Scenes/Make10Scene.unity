@@ -9036,11 +9036,11 @@ MonoBehaviour:
   matchChecker: {fileID: 22128014}
   tileFallSpeed: 1400
   tileFallDelay: 0.01
-  postClearDelay: 0.1
+  postClearDelay: 0.05
   tileSwapDuration: 0.15
   unsolvableResetDelay: 1
-  solveConvergeDuration: 0.4
-  solveShowTenDuration: 0.5
+  solveConvergeDuration: 0.3
+  solveShowTenDuration: 0.4
   convergeShrinkAmount: 0.7
   tenTextPrefab: {fileID: 0}
   sparkleCount: 12
@@ -9051,13 +9051,14 @@ MonoBehaviour:
   tenScaleIncrement: 0.15
   maxTenScale: 2
   consecutiveResetTime: 2
-  weight0: 0.15
+  weight0: 0.10
   weight1: 0.22
-  weight2: 0.2
-  weight3: 0.15
-  weight4: 0.12
-  weight5: 0.08
-  weight6: 0.08
+  weight2: 0.24
+  weight3: 0.18
+  weight4: 0.14
+  weight5: 0.04
+  weight6: 0.025
+  weight7: 0.01
   enableHints: 1
   hintDelay: 10
   hintRepeatInterval: 3
@@ -11689,13 +11690,14 @@ MonoBehaviour:
   gameSettings:
     gridSize: 5
     winScore: 100
-    weight0: 0.12
-    weight1: 0.24
-    weight2: 0.26
-    weight3: 0.2
-    weight4: 0.12
-    weight5: 0.05
-    weight6: 0.01
+    weight0: 0.10
+    weight1: 0.22
+    weight2: 0.24
+    weight3: 0.18
+    weight4: 0.14
+    weight5: 0.04
+    weight6: 0.025
+    weight7: 0.01
   gameDuration: 60
   postWinDelay: 0.5
   baseMatchScore: 10

@@ -792,19 +792,11 @@ public class UIManager : MonoBehaviour
 
         // Get values from GameManager
         int baseScore = gameManager.Score;
-        float timeRemaining = gameManager.TimeRemaining;
-        float maxMultiplier = gameManager.MaxMultiplierReached;
         float sessionDuration = gameManager.SessionDuration;
 
-        // Calculate breakdown (1 BP per second remaining)
-        int timeBonus = Mathf.RoundToInt(timeRemaining * timeBonusPerSecond);
-        int subtotal = baseScore + timeBonus;
-        int total = Mathf.RoundToInt(subtotal * maxMultiplier);
-
-        // Format session time as MM:SS
-        int sessionMinutes = (int)sessionDuration / 60;
-        int sessionSeconds = (int)sessionDuration % 60;
-        string sessionTimeStr = $"{sessionMinutes:D2}:{sessionSeconds:D2}";
+        // Calculate breakdown
+        int sessionTimeBonus = Mathf.RoundToInt(sessionDuration); // 1 BP per second survived
+        int total = baseScore + sessionTimeBonus;
 
         // Hide all breakdown elements initially
         HideBreakdownElements();
@@ -823,35 +815,13 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 2: Session Time - appears instantly
+        // Line 2: Session Time - counts up as BP
         if (sessionTimeLabelText != null && sessionTimeValueText != null)
         {
             sessionTimeLabelText.transform.parent.gameObject.SetActive(true);
             sessionTimeLabelText.text = "Session Time";
-            sessionTimeValueText.text = sessionTimeStr;
             AudioManager.Instance?.PlayButtonClick();
-        }
-
-        yield return new WaitForSeconds(breakdownLineDelay);
-
-        // Line 3: Time Bonus - appears and counts up
-        if (timeBonusLabelText != null && timeBonusValueText != null)
-        {
-            timeBonusLabelText.transform.parent.gameObject.SetActive(true);
-            timeBonusLabelText.text = "Time Bonus";
-            AudioManager.Instance?.PlayButtonClick();
-            yield return StartCoroutine(AnimationUtilities.CountUp(timeBonusValueText, 0, timeBonus, countUpDuration, "+ {0} BP"));
-        }
-
-        yield return new WaitForSeconds(breakdownLineDelay);
-
-        // Line 4: Hot Streak multiplier - appears instantly
-        if (hotStreakLabelText != null && hotStreakValueText != null)
-        {
-            hotStreakLabelText.transform.parent.gameObject.SetActive(true);
-            hotStreakLabelText.text = "Hot Streak";
-            hotStreakValueText.text = $"x{maxMultiplier:F1}";
-            AudioManager.Instance?.PlayButtonClick();
+            yield return StartCoroutine(AnimationUtilities.CountUp(sessionTimeValueText, 0, sessionTimeBonus, countUpDuration, "+ {0} BP"));
         }
 
         yield return new WaitForSeconds(breakdownLineDelay);
@@ -1160,12 +1130,10 @@ public class UIManager : MonoBehaviour
         if (gameManager != null)
         {
             int baseScore = gameManager.Score;
-            float timeRemaining = gameManager.TimeRemaining;
-            float maxMultiplier = gameManager.MaxMultiplierReached;
+            float sessionDuration = gameManager.SessionDuration;
 
-            int timeBonus = Mathf.RoundToInt(timeRemaining * timeBonusPerSecond);
-            int subtotal = baseScore + timeBonus;
-            int totalBP = Mathf.RoundToInt(subtotal * maxMultiplier);
+            int sessionTimeBonus = Mathf.RoundToInt(sessionDuration);
+            int totalBP = baseScore + sessionTimeBonus;
 
             // Add BP to RunManager
             RunManager.Instance?.AddBP(totalBP);

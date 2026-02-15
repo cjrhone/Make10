@@ -206,7 +206,10 @@ public class AudioManager : MonoBehaviour
     private void PlaySFX(AudioClip clip)
     {
         if (sfxSource != null && clip != null)
+        {
+            sfxSource.pitch = 1f; // Reset pitch so normal SFX aren't affected by chain pitch shifts
             sfxSource.PlayOneShot(clip, sfxVolume);
+        }
     }
     
     // One-liner SFX methods

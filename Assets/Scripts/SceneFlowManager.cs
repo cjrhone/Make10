@@ -72,6 +72,16 @@ public class SceneFlowManager : MonoBehaviour
     
     private void InitializePanels()
     {
+        // Force all sliding panels to stretch-fill their parent canvas.
+        // This prevents the thin gap/sliver at screen edges caused by panels
+        // with center-based anchors and fixed widths that don't perfectly match
+        // the canvas size after CanvasScaler adjustments.
+        RectTransform[] slidingPanels = { loadingPanel, mainMenuPanel, gamePanel,
+            shopPanel, quitPanel, countdownPanel, tutorialPanel1, tutorialPanel2 };
+
+        foreach (var panel in slidingPanels)
+            EnsurePanelFillsScreen(panel);
+
         // Position all panels off-screen except loading
         RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, shopPanel, optionsPanel,
             tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
@@ -97,6 +107,20 @@ public class SceneFlowManager : MonoBehaviour
     
     #region Panel Helpers
     
+    /// <summary>
+    /// Force a panel to use stretch anchors so it always matches the canvas size exactly.
+    /// Prevents sub-pixel gaps at screen edges from CanvasScaler aspect ratio adjustments.
+    /// anchoredPosition.x = 0 still means "fill the screen" with stretch anchors.
+    /// </summary>
+    private void EnsurePanelFillsScreen(RectTransform panel)
+    {
+        if (panel == null) return;
+        panel.anchorMin = Vector2.zero;
+        panel.anchorMax = Vector2.one;
+        panel.pivot = new Vector2(0.5f, 0.5f);
+        panel.sizeDelta = Vector2.zero;
+    }
+
     private void SetPanelPosition(RectTransform panel, float xPos)
     {
         if (panel == null) return;
@@ -320,6 +344,10 @@ public class SceneFlowManager : MonoBehaviour
     {
         CurrentState = GameState.Loading;
         Debug.Log("LoadingSequence started - tracking actual initialization");
+
+        // Recalculate canvas width after layout pass for accurate slide positioning
+        yield return null;
+        screenWidth = GetCanvasWidth();
 
         loadingDisplayProgress = 0f;
         float startTime = Time.time;

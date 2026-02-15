@@ -23,14 +23,14 @@ public class GameManager : MonoBehaviour
         public int winScore = 100;
 
         [Header("Tile Weights (base weights for tiles 0-9)")]
-        [Range(0, 1)] public float weight0 = 0.12f;
-        [Range(0, 1)] public float weight1 = 0.24f;
-        [Range(0, 1)] public float weight2 = 0.26f;
-        [Range(0, 1)] public float weight3 = 0.20f;
-        [Range(0, 1)] public float weight4 = 0.12f;
-        [Range(0, 1)] public float weight5 = 0.05f;
-        [Range(0, 1)] public float weight6 = 0.01f;
-        [Range(0, 1)] public float weight7 = 0f;
+        [Range(0, 1)] public float weight0 = 0.10f;
+        [Range(0, 1)] public float weight1 = 0.22f;
+        [Range(0, 1)] public float weight2 = 0.24f;
+        [Range(0, 1)] public float weight3 = 0.18f;
+        [Range(0, 1)] public float weight4 = 0.14f;
+        [Range(0, 1)] public float weight5 = 0.04f;
+        [Range(0, 1)] public float weight6 = 0.025f;
+        [Range(0, 1)] public float weight7 = 0.01f;
         [Range(0, 1)] public float weight8 = 0f;
         [Range(0, 1)] public float weight9 = 0f;
 
@@ -61,7 +61,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float streakTimeout = 10f;
 
     [Header("Time Bonus")]
-    [SerializeField] private float timeBonusPerMatch = 3f;
+    [SerializeField] private float timeBonusPerMatch = 1.5f;
 
     [Header("Hot Streak Mode")]
     [SerializeField] private float hotStreakDuration = 10f;

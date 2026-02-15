@@ -33,13 +33,13 @@ public class GridManager : MonoBehaviour
     [Header("Animation Settings")]
     [SerializeField] private float tileFallSpeed = 800f;
     [SerializeField] private float tileFallDelay = 0.05f;
-    [SerializeField] private float postClearDelay = 0.1f;
+    [SerializeField] private float postClearDelay = 0.05f;
     [SerializeField] private float tileSwapDuration = 0.15f;
     [SerializeField] private float unsolvableResetDelay = 1f;
     
     [Header("Solve Animation Settings")]
-    [SerializeField] private float solveConvergeDuration = 0.25f;
-    [SerializeField] private float solveShowTenDuration = 0.5f;
+    [SerializeField] private float solveConvergeDuration = 0.3f;
+    [SerializeField] private float solveShowTenDuration = 0.4f;
     [SerializeField] private float convergeShrinkAmount = 0.7f;
     [SerializeField] private GameObject tenTextPrefab;
     
@@ -58,23 +58,21 @@ public class GridManager : MonoBehaviour
     private float lastTenTime = 0f;
     
     [Header("Tile Value Weights (fallback if no GameManager)")]
-    [SerializeField] private float weight0 = 0.15f;
-    [SerializeField] private float weight1 = 0.27f;
-    [SerializeField] private float weight2 = 0.26f;
-    [SerializeField] private float weight3 = 0.17f;
-    [SerializeField] private float weight4 = 0.13f;
-    [SerializeField] private float weight5 = 0.01f;
-    [SerializeField] private float weight6 = 0.01f;
+    [SerializeField] private float weight0 = 0.10f;
+    [SerializeField] private float weight1 = 0.22f;
+    [SerializeField] private float weight2 = 0.24f;
+    [SerializeField] private float weight3 = 0.18f;
+    [SerializeField] private float weight4 = 0.14f;
+    [SerializeField] private float weight5 = 0.04f;
+    [SerializeField] private float weight6 = 0.025f;
+    [SerializeField] private float weight7 = 0.01f;
 
-    [Header("Progressive Difficulty")]
-    [SerializeField] private int startingMaxNumber = 4;  // Start with tiles 0-4
-    [SerializeField] private float introduce5AtTime = 60f;   // 1 min: start spawning 5s
-    [SerializeField] private float introduce6AtTime = 120f;  // 2 min: start spawning 6s
-    [SerializeField] private float introduce7AtTime = 180f;  // 3 min: start spawning 7s
-    [SerializeField] private float introduce8AtTime = 240f;  // 4 min: start spawning 8s
-    [SerializeField] private float introduce9AtTime = 300f;  // 5 min: start spawning 9s
-    [SerializeField] private float newNumberInitialWeight = 0.05f; // Starting weight for newly introduced numbers
-    [SerializeField] private float weightRampSpeed = 0.02f; // How fast new numbers ramp up per second after introduction
+    [Header("Progressive Difficulty - Smooth Boost")]
+    [SerializeField] private float boostIntervalSeconds = 60f;  // Every 60s, boost increases
+    [SerializeField] private float boostPerInterval = 0.3f;     // +30% boost per interval
+    [SerializeField] private float maxBoostMultiplier = 3.0f;   // Hard cap: 3x base weight for high tiles
+    [SerializeField] private float baseTileReduction = 0.85f;   // Low tiles reduce to 85% at max difficulty
+    [SerializeField] private int highTileThreshold = 5;         // Tiles >= this get boosted over time
 
     [Header("Hint System")]
     [SerializeField] private bool enableHints = true;
@@ -125,7 +123,7 @@ public class GridManager : MonoBehaviour
 
     private void Awake()
     {
-        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, 0f, 0f, 0f };
+        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, weight7, 0f, 0f };
         grid = new Tile[gridWidth, gridHeight];
         CalculateSizesFromContainer();
     }
@@ -391,12 +389,16 @@ public class GridManager : MonoBehaviour
     public void SpawnGrid()
     {
         Debug.Log("GridManager.SpawnGrid() called");
-        
+
         if (tilePrefab == null)
         {
             Debug.LogError("GridManager: tilePrefab is not assigned!");
             return;
         }
+
+        // Reset round timer so GetWeightedRandomValue() doesn't use stale elapsed time
+        // (prevents 3x boost on initial spawn when editor has been running)
+        roundStartTime = Time.time;
         
         // Get grid size from GameManager (difficulty-based)
         UpdateGridSizeFromDifficulty();
@@ -420,6 +422,9 @@ public class GridManager : MonoBehaviour
             }
         }
         
+        // Ensure no rows/columns already sum to 10 — first match must come from the player
+        EnsureNoInitialMatches();
+
         Debug.Log($"Grid spawned: {gridWidth}x{gridHeight} (tile size: {tileSize:F0})");
 
         // Initialize VFX system with grid container (delayed one frame so Canvas layout is calculated)
@@ -485,14 +490,6 @@ public class GridManager : MonoBehaviour
     {
         float elapsed = Time.time - roundStartTime;
 
-        // Determine current max number based on elapsed gameplay time
-        int maxNumber = startingMaxNumber;
-        if (elapsed >= introduce5AtTime) maxNumber = Mathf.Max(maxNumber, 5);
-        if (elapsed >= introduce6AtTime) maxNumber = Mathf.Max(maxNumber, 6);
-        if (elapsed >= introduce7AtTime) maxNumber = Mathf.Max(maxNumber, 7);
-        if (elapsed >= introduce8AtTime) maxNumber = Mathf.Max(maxNumber, 8);
-        if (elapsed >= introduce9AtTime) maxNumber = Mathf.Max(maxNumber, 9);
-
         // Get base weights from GameManager or fallback
         float[] currentWeights = GetCurrentWeights();
 
@@ -503,76 +500,203 @@ public class GridManager : MonoBehaviour
             adjustedWeights[i] = currentWeights[i];
         }
 
-        // Apply difficulty curve — reduce base weights (0-4) over time
-        float difficultyMultiplier = CalculateDifficultyMultiplier(elapsed);
-        for (int i = 0; i <= startingMaxNumber && i < adjustedWeights.Length; i++)
-        {
-            adjustedWeights[i] *= difficultyMultiplier;
-        }
+        // Calculate smooth boost for high tiles (5-7) based on elapsed time
+        float intervals = elapsed / boostIntervalSeconds;
+        float boostMultiplier = Mathf.Min(1.0f + (intervals * boostPerInterval), maxBoostMultiplier);
 
-        // Apply ramping weights for newly introduced numbers (5-9)
-        float[] introTimes = { 0f, 0f, 0f, 0f, 0f, introduce5AtTime, introduce6AtTime, introduce7AtTime, introduce8AtTime, introduce9AtTime };
-        for (int i = startingMaxNumber + 1; i <= maxNumber && i < adjustedWeights.Length; i++)
+        // Calculate max intervals for reduction lerp (based on when boost would cap)
+        float maxIntervals = (maxBoostMultiplier - 1.0f) / boostPerInterval;
+        float reductionT = Mathf.Clamp01(intervals / maxIntervals);
+
+        // Apply boost to high tiles (5+) and gentle reduction to base tiles (0-4)
+        for (int i = 0; i < adjustedWeights.Length; i++)
         {
-            float timeSinceIntro = elapsed - introTimes[i];
-            if (timeSinceIntro > 0)
+            if (adjustedWeights[i] <= 0f) continue; // Skip zero-weight tiles (8, 9)
+
+            if (i >= highTileThreshold)
             {
-                adjustedWeights[i] = newNumberInitialWeight + (timeSinceIntro * weightRampSpeed);
+                // High tiles get boosted over time
+                adjustedWeights[i] *= boostMultiplier;
             }
             else
             {
-                adjustedWeights[i] = 0f;
+                // Base tiles gently reduce over time (never below baseTileReduction of original)
+                float reduction = Mathf.Lerp(1.0f, baseTileReduction, reductionT);
+                adjustedWeights[i] *= reduction;
             }
-        }
-
-        // Zero out numbers above current max
-        for (int i = maxNumber + 1; i < adjustedWeights.Length; i++)
-        {
-            adjustedWeights[i] = 0f;
         }
 
         // Weighted random selection (normalized)
         float totalWeight = 0f;
-        for (int i = 0; i <= maxNumber && i < adjustedWeights.Length; i++)
+        for (int i = 0; i < adjustedWeights.Length; i++)
         {
             totalWeight += adjustedWeights[i];
         }
 
         if (totalWeight <= 0f)
-            return Random.Range(0, maxNumber + 1);
+            return Random.Range(0, 8); // Fallback: tiles 0-7
 
         float roll = Random.value * totalWeight;
         float cumulative = 0f;
 
-        for (int i = 0; i <= maxNumber && i < adjustedWeights.Length; i++)
+        for (int i = 0; i < adjustedWeights.Length; i++)
         {
             cumulative += adjustedWeights[i];
             if (roll <= cumulative)
                 return i;
         }
 
-        return Random.Range(0, maxNumber + 1);
+        return Random.Range(0, 8); // Fallback: tiles 0-7
+    }
+    
+    #region Initial Match Prevention
+
+    /// <summary>
+    /// Ensures no row or column sums to 10 when the grid first spawns.
+    /// The first match must come from the player's own swap.
+    /// Re-rolls individual tiles to break any pre-existing matches.
+    /// </summary>
+    private void EnsureNoInitialMatches()
+    {
+        int maxIterations = 50;
+        int iteration = 0;
+
+        while (iteration < maxIterations)
+        {
+            List<(int index, bool isRow)> matchingLines = FindMatchingLines();
+
+            if (matchingLines.Count == 0)
+            {
+                if (iteration > 0)
+                    Debug.Log($"[GridManager] Cleared initial matches in {iteration} iteration(s)");
+                return;
+            }
+
+            // Pick a random matching line and re-roll one tile to break it
+            var line = matchingLines[Random.Range(0, matchingLines.Count)];
+            ReRollTileToBreakMatch(line.index, line.isRow);
+            iteration++;
+        }
+
+        Debug.LogWarning($"[GridManager] EnsureNoInitialMatches hit max iterations ({maxIterations}). Some matches may remain.");
     }
 
     /// <summary>
-    /// Progressive difficulty curve — reduces base tile weights (0-4) over time.
-    /// At 5+ minutes, base weights are halved so higher numbers dominate.
+    /// Scans all rows and columns, returns any where the sum equals exactly 10.
     /// </summary>
-    private float CalculateDifficultyMultiplier(float elapsedSeconds)
+    private List<(int index, bool isRow)> FindMatchingLines()
     {
-        if (elapsedSeconds < 60f) return 1.0f;
-        if (elapsedSeconds < 120f)
-            return 1.0f - 0.15f * (elapsedSeconds - 60f) / 60f;   // 1.0 → 0.85
-        if (elapsedSeconds < 180f)
-            return 0.85f - 0.15f * (elapsedSeconds - 120f) / 60f;  // 0.85 → 0.70
-        if (elapsedSeconds < 240f)
-            return 0.70f - 0.10f * (elapsedSeconds - 180f) / 60f;  // 0.70 → 0.60
-        if (elapsedSeconds < 300f)
-            return 0.60f - 0.10f * (elapsedSeconds - 240f) / 60f;  // 0.60 → 0.50
+        List<(int index, bool isRow)> matches = new List<(int, bool)>();
 
-        return 0.50f; // Cap at 50% for 5+ minutes
+        // Check rows
+        for (int y = 0; y < gridHeight; y++)
+        {
+            int sum = 0;
+            bool valid = true;
+            for (int x = 0; x < gridWidth; x++)
+            {
+                if (grid[x, y] == null) { valid = false; break; }
+                sum += grid[x, y].Value;
+            }
+            if (valid && sum == 10)
+                matches.Add((y, true));
+        }
+
+        // Check columns
+        for (int x = 0; x < gridWidth; x++)
+        {
+            int sum = 0;
+            bool valid = true;
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (grid[x, y] == null) { valid = false; break; }
+                sum += grid[x, y].Value;
+            }
+            if (valid && sum == 10)
+                matches.Add((x, false));
+        }
+
+        return matches;
     }
-    
+
+    /// <summary>
+    /// Picks a random tile in the given matching line and re-rolls its value
+    /// until the line no longer sums to 10, also avoiding creating a new match
+    /// in the perpendicular direction through that tile.
+    /// </summary>
+    private void ReRollTileToBreakMatch(int lineIndex, bool isRow)
+    {
+        // Pick a random position in the line to re-roll
+        int lineLength = isRow ? gridWidth : gridHeight;
+        int pos = Random.Range(0, lineLength);
+
+        int tileX = isRow ? pos : lineIndex;
+        int tileY = isRow ? lineIndex : pos;
+        Tile tile = grid[tileX, tileY];
+
+        if (tile == null) return;
+
+        int originalValue = tile.Value;
+        int bestValue = originalValue;
+        int bestBadness = 2; // Start with worst case (both lines match)
+
+        // Try up to 15 random values to find one that breaks the match
+        // without creating a new match in the perpendicular direction
+        for (int attempt = 0; attempt < 15; attempt++)
+        {
+            int newValue = GetWeightedRandomValue();
+            if (newValue == originalValue) continue;
+
+            tile.SetValue(newValue);
+
+            // Check if the original line still sums to 10
+            bool originalLineMatches = CheckLineSum(lineIndex, isRow);
+
+            // Check if the perpendicular line through this tile now sums to 10
+            bool perpLineMatches = isRow
+                ? CheckLineSum(tileX, false)   // Check column through this tile
+                : CheckLineSum(tileY, true);   // Check row through this tile
+
+            int badness = (originalLineMatches ? 1 : 0) + (perpLineMatches ? 1 : 0);
+
+            if (badness == 0)
+            {
+                // Perfect: neither line matches
+                return;
+            }
+
+            if (badness < bestBadness)
+            {
+                bestBadness = badness;
+                bestValue = newValue;
+            }
+        }
+
+        // Use the best value we found (even if not perfect, it reduces matches)
+        tile.SetValue(bestValue);
+    }
+
+    /// <summary>
+    /// Check if a single row or column sums to exactly 10.
+    /// </summary>
+    private bool CheckLineSum(int lineIndex, bool isRow)
+    {
+        int sum = 0;
+        int length = isRow ? gridWidth : gridHeight;
+
+        for (int i = 0; i < length; i++)
+        {
+            int x = isRow ? i : lineIndex;
+            int y = isRow ? lineIndex : i;
+            if (grid[x, y] == null) return false;
+            sum += grid[x, y].Value;
+        }
+
+        return sum == 10;
+    }
+
+    #endregion
+
     /// <summary>
     /// Get tile spawn weights from GameManager (difficulty-based) or use fallback.
     /// </summary>
@@ -773,7 +897,7 @@ public class GridManager : MonoBehaviour
             yield return new WaitForSeconds(postClearDelay);
             yield return StartCoroutine(DropTilesCoroutine());
             yield return StartCoroutine(SpawnNewTilesCoroutine());
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.05f);
         }
         
         GameManager.Instance?.OnCascadeEnd();
@@ -1318,9 +1442,9 @@ public class GridManager : MonoBehaviour
         // Sparkle on land — spread across tile width
         GridVFX.Instance?.SpawnLandSparkle(tile.GetRectTransform().anchoredPosition, tileSize);
 
-        yield return new WaitForSeconds(0.05f);
+        yield return new WaitForSeconds(0.03f);
         t.localScale = new Vector3(0.95f, 1.05f, 1f);
-        yield return new WaitForSeconds(0.05f);
+        yield return new WaitForSeconds(0.03f);
         t.localScale = Vector3.one;
     }
     
@@ -1368,7 +1492,7 @@ public class GridManager : MonoBehaviour
             yield return new WaitForSeconds(tileFallDelay);
         }
         
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.05f);
         Debug.Log("New tiles spawned");
     }
     
