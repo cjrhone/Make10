@@ -64,6 +64,9 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     // Events
     public static event Action<Tile> OnTileClicked;
     public static event Action<Tile, SwipeDirection> OnTileSwiped;
+    public static event Action<Tile> OnTileDragStarted;
+    public static event Action<Tile, Vector2> OnTileDragMoved;
+    public static event Action<Tile> OnTileDragEnded;
     
     private RectTransform rectTransform;
     private Coroutine pulseCoroutine;
@@ -76,6 +79,11 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     // Swipe tracking
     private Vector2 swipeStartPos;
     private bool isSwiping = false;
+
+    // Drag-swap tracking
+    private bool isDragSwapping = false;
+    private bool dragStartFired = false;
+    private static readonly float dragActivationThreshold = 15f; // px movement before drag activates
     
     // Tile background - uniform grey for all tiles
     private static readonly Color TileBackgroundColor = new Color(0.85f, 0.85f, 0.85f); // Light grey
@@ -519,36 +527,73 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     {
         swipeStartPos = eventData.position;
         isSwiping = false;
+        isDragSwapping = false;
+        dragStartFired = false;
     }
     
     /// <summary>
-    /// During drag - required for end drag to fire.
+    /// During drag - track movement and fire drag events once activation threshold is met.
     /// </summary>
     public void OnDrag(PointerEventData eventData)
     {
-        // Required for OnEndDrag to work, but we don't need to do anything here
+        Vector2 currentDelta = eventData.position - swipeStartPos;
+
+        // Check if we've crossed the activation threshold to start drag-swapping
+        if (!isDragSwapping)
+        {
+            if (currentDelta.magnitude >= dragActivationThreshold)
+            {
+                isDragSwapping = true;
+            }
+            else
+            {
+                return; // Still in dead zone, wait for more movement
+            }
+        }
+
+        // Fire drag started once
+        if (!dragStartFired)
+        {
+            dragStartFired = true;
+            OnTileDragStarted?.Invoke(this);
+        }
+
+        // Report continuous position to GridManager
+        OnTileDragMoved?.Invoke(this, eventData.position);
     }
     
     /// <summary>
-    /// End drag - calculate swipe direction and fire event.
+    /// End drag - either finish a drag-swap or fall through to swipe logic.
     /// </summary>
     public void OnEndDrag(PointerEventData eventData)
     {
+        // If we were drag-swapping, finish the drag and suppress click
+        if (isDragSwapping)
+        {
+            isDragSwapping = false;
+            dragStartFired = false;
+            isSwiping = true; // Suppress the OnPointerClick that follows
+            OnTileDragEnded?.Invoke(this);
+            StartCoroutine(ResetSwipingFlag());
+            return;
+        }
+
+        // Otherwise, fall through to existing swipe logic
         Vector2 swipeEndPos = eventData.position;
         Vector2 swipeDelta = swipeEndPos - swipeStartPos;
-        
+
         // Check if swipe distance meets threshold
         if (swipeDelta.magnitude < swipeThreshold)
         {
             isSwiping = false;
             return;
         }
-        
+
         isSwiping = true;
-        
+
         // Determine swipe direction based on which axis had more movement
         SwipeDirection direction;
-        
+
         if (Mathf.Abs(swipeDelta.x) > Mathf.Abs(swipeDelta.y))
         {
             // Horizontal swipe
@@ -559,10 +604,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             // Vertical swipe
             direction = swipeDelta.y > 0 ? SwipeDirection.Up : SwipeDirection.Down;
         }
-        
+
         Debug.Log($"Swipe detected on {this}: {direction}");
         OnTileSwiped?.Invoke(this, direction);
-        
+
         // Reset swiping flag after a frame (in case OnPointerClick doesn't fire)
         StartCoroutine(ResetSwipingFlag());
     }

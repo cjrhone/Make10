@@ -98,7 +98,12 @@ public class GridManager : MonoBehaviour
 
     // Progressive difficulty state
     private float roundStartTime = 0f;
-    
+
+    // Drag-swap state
+    private bool isDragging = false;
+    private Tile draggedTile = null;
+    private int dragCurrentGridX, dragCurrentGridY;
+
     public event System.Action OnGridUnsolvable;
 
     /// <summary>
@@ -220,12 +225,18 @@ public class GridManager : MonoBehaviour
     {
         Tile.OnTileClicked += HandleTileClicked;
         Tile.OnTileSwiped += HandleTileSwiped;
+        Tile.OnTileDragStarted += HandleDragStarted;
+        Tile.OnTileDragMoved += HandleDragMoved;
+        Tile.OnTileDragEnded += HandleDragEnded;
     }
-    
+
     private void OnDisable()
     {
         Tile.OnTileClicked -= HandleTileClicked;
         Tile.OnTileSwiped -= HandleTileSwiped;
+        Tile.OnTileDragStarted -= HandleDragStarted;
+        Tile.OnTileDragMoved -= HandleDragMoved;
+        Tile.OnTileDragEnded -= HandleDragEnded;
     }
     
     private void Start()
@@ -714,6 +725,7 @@ public class GridManager : MonoBehaviour
     private void HandleTileClicked(Tile tile)
     {
         if (isProcessing) return;
+        if (isDragging) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
         // Reset hint timer on any interaction
@@ -762,6 +774,7 @@ public class GridManager : MonoBehaviour
     private void HandleTileSwiped(Tile tile, SwipeDirection direction)
     {
         if (isProcessing) return;
+        if (isDragging) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
         
         // Reset hint timer on any interaction
@@ -836,7 +849,196 @@ public class GridManager : MonoBehaviour
         isProcessing = false;
         StartCoroutine(ProcessMatchesCoroutine());
     }
-    
+
+    // ==========================================
+    // DRAG-SWAP SYSTEM
+    // ==========================================
+
+    /// <summary>
+    /// Called when a tile drag begins (after activation threshold is met).
+    /// </summary>
+    private void HandleDragStarted(Tile tile)
+    {
+        if (isProcessing) return;
+        if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
+
+        // Clear any click-selection
+        if (selectedTile != null)
+        {
+            selectedTile.Deselect();
+            selectedTile = null;
+        }
+
+        isDragging = true;
+        draggedTile = tile;
+        dragCurrentGridX = tile.GridX;
+        dragCurrentGridY = tile.GridY;
+
+        // Bring dragged tile to front so it renders above others
+        tile.GetRectTransform().SetAsLastSibling();
+
+        AudioManager.Instance?.PlayTileSelect();
+        ResetHintTimer();
+
+        Debug.Log($"Drag started: {tile}");
+    }
+
+    /// <summary>
+    /// Called every frame during drag with the screen-space position.
+    /// Moves the dragged tile and triggers swaps on cell boundary crossings.
+    /// </summary>
+    private void HandleDragMoved(Tile tile, Vector2 screenPos)
+    {
+        if (!isDragging || tile != draggedTile) return;
+
+        // Convert screen position to canvas-local position
+        Camera cam = null; // null works for Screen Space - Overlay canvas
+        Canvas canvas = gridContainer.GetComponentInParent<Canvas>();
+        if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+        {
+            cam = canvas.worldCamera;
+        }
+
+        Vector2 localPos;
+        if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            gridContainer, screenPos, cam, out localPos))
+        {
+            return; // Conversion failed
+        }
+
+        // Move the dragged tile to follow the finger/cursor
+        tile.GetRectTransform().anchoredPosition = localPos;
+
+        // Determine which grid cell the tile center is now over
+        Vector2Int targetCell = GetGridCellAtPosition(localPos);
+        int targetX = targetCell.x;
+        int targetY = targetCell.y;
+
+        // Check if we've crossed into a different cell
+        if (targetX != dragCurrentGridX || targetY != dragCurrentGridY)
+        {
+            // Only swap with adjacent cells (cardinal directions)
+            int dx = targetX - dragCurrentGridX;
+            int dy = targetY - dragCurrentGridY;
+
+            // If the target is more than 1 step away, step toward it one cell at a time
+            if (Mathf.Abs(dx) + Mathf.Abs(dy) > 1)
+            {
+                // Prefer the axis with the larger delta
+                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+                {
+                    targetX = dragCurrentGridX + (dx > 0 ? 1 : -1);
+                    targetY = dragCurrentGridY;
+                }
+                else
+                {
+                    targetX = dragCurrentGridX;
+                    targetY = dragCurrentGridY + (dy > 0 ? 1 : -1);
+                }
+            }
+
+            // Validate bounds
+            if (targetX >= 0 && targetX < gridWidth && targetY >= 0 && targetY < gridHeight)
+            {
+                PerformDragSwap(targetX, targetY);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when the drag ends (finger/mouse released).
+    /// Snaps the tile to its grid position and triggers match processing.
+    /// </summary>
+    private void HandleDragEnded(Tile tile)
+    {
+        if (!isDragging || tile != draggedTile) return;
+
+        // Snap the dragged tile to its final grid cell
+        tile.SetPosition(GridToWorldPosition(dragCurrentGridX, dragCurrentGridY));
+
+        Debug.Log($"Drag ended: {tile} at [{dragCurrentGridX},{dragCurrentGridY}]");
+
+        isDragging = false;
+        draggedTile = null;
+
+        // Now process any matches created by the drag
+        StartCoroutine(ProcessMatchesCoroutine());
+    }
+
+    /// <summary>
+    /// Instantly swap the dragged tile's grid position with the tile at (targetX, targetY).
+    /// The displaced tile animates to the vacated cell; the dragged tile stays under the finger.
+    /// </summary>
+    private void PerformDragSwap(int targetX, int targetY)
+    {
+        Tile displacedTile = grid[targetX, targetY];
+        if (displacedTile == null) return;
+
+        // Update grid array
+        grid[dragCurrentGridX, dragCurrentGridY] = displacedTile;
+        grid[targetX, targetY] = draggedTile;
+
+        // Update GridX/GridY on both tiles
+        displacedTile.GridX = dragCurrentGridX;
+        displacedTile.GridY = dragCurrentGridY;
+        draggedTile.GridX = targetX;
+        draggedTile.GridY = targetY;
+
+        // Animate the displaced tile sliding to the vacated cell
+        Vector2 vacatedPos = GridToWorldPosition(dragCurrentGridX, dragCurrentGridY);
+        StartCoroutine(SnapTileCoroutine(displacedTile, vacatedPos, 0.08f));
+
+        // Update drag tracking position
+        dragCurrentGridX = targetX;
+        dragCurrentGridY = targetY;
+
+        AudioManager.Instance?.PlaySwapSound();
+        ResetHintTimer();
+    }
+
+    /// <summary>
+    /// Quick smooth animation sliding a tile to a target position.
+    /// Used for displaced tiles during drag-swap.
+    /// </summary>
+    private IEnumerator SnapTileCoroutine(Tile tile, Vector2 targetPos, float duration)
+    {
+        Vector2 startPos = tile.GetRectTransform().anchoredPosition;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / duration);
+            tile.GetRectTransform().anchoredPosition = Vector2.Lerp(startPos, targetPos, t);
+            yield return null;
+        }
+
+        tile.GetRectTransform().anchoredPosition = targetPos;
+    }
+
+    /// <summary>
+    /// Convert a canvas-local position to grid cell coordinates.
+    /// Reverse of GridToWorldPosition. Clamped to grid bounds.
+    /// </summary>
+    private Vector2Int GetGridCellAtPosition(Vector2 localPos)
+    {
+        float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
+        float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
+        float startX = -totalWidth / 2f + tileSize / 2f;
+        float startY = totalHeight / 2f - tileSize / 2f;
+
+        float cellStep = tileSize + tileSpacing;
+
+        int gridX = Mathf.RoundToInt((localPos.x - startX) / cellStep);
+        int gridY = Mathf.RoundToInt((startY - localPos.y) / cellStep);
+
+        // Clamp to grid bounds
+        gridX = Mathf.Clamp(gridX, 0, gridWidth - 1);
+        gridY = Mathf.Clamp(gridY, 0, gridHeight - 1);
+
+        return new Vector2Int(gridX, gridY);
+    }
+
     private IEnumerator ProcessMatchesCoroutine()
     {
         isProcessing = true;
