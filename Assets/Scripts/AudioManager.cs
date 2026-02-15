@@ -219,22 +219,11 @@ public class AudioManager : MonoBehaviour
     public void PlayMatchSound() => PlayTenPopSound(1); // Legacy alias for compatibility
 
     /// <summary>
-    /// Play the "10" pop sound with ascending pitch based on chain count.
-    /// Chain 1 = base pitch (1.0), each subsequent chain raises pitch.
+    /// Play the "10" pop sound. Chain count accepted for API compatibility but pitch is fixed at 1.0.
     /// </summary>
     public void PlayTenPopSound(int chainCount)
     {
-        float basePitch = 1.0f;
-        float pitchStep = 0.12f;   // Pitch increase per chain
-        float maxPitch = 2.0f;
-
-        float pitch = Mathf.Min(basePitch + (chainCount - 1) * pitchStep, maxPitch);
-
-        if (sfxSource != null && tenPopSFX != null)
-        {
-            sfxSource.pitch = pitch;
-            sfxSource.PlayOneShot(tenPopSFX, sfxVolume);
-        }
+        PlaySFX(tenPopSFX);
     }
     public void PlaySwapSound() => PlaySFX(swapSFX);
     public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);
@@ -243,22 +232,8 @@ public class AudioManager : MonoBehaviour
     public void PlayTileSelect() => PlaySFX(tileSelectSFX);
     public void PlayFinishSound() => PlaySFX(finishSFX);
     public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
-    public void PlayScoreTickSmall() => PlaySFXWithPitchVariation(scoreTickSmallSFX, 0.95f, 1.05f);
-    public void PlayScoreTickBig() => PlaySFXWithPitchVariation(scoreTickBigSFX, 0.9f, 1.0f);
-
-    /// <summary>
-    /// Play SFX with random pitch variation for variety.
-    /// Note: Pitch stays modified until next call - this is intentional since
-    /// PlayOneShot is async and resetting immediately would affect the playing sound.
-    /// </summary>
-    private void PlaySFXWithPitchVariation(AudioClip clip, float minPitch, float maxPitch)
-    {
-        if (sfxSource != null && clip != null)
-        {
-            sfxSource.pitch = Random.Range(minPitch, maxPitch);
-            sfxSource.PlayOneShot(clip, sfxVolume);
-        }
-    }
+    public void PlayScoreTickSmall() => PlaySFX(scoreTickSmallSFX);
+    public void PlayScoreTickBig() => PlaySFX(scoreTickBigSFX);
 
     #endregion
     
