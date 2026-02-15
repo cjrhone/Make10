@@ -439,6 +439,7 @@ public class SceneFlowManager : MonoBehaviour
 
         // Transition to main menu
         yield return SlideTransition(loadingPanel, mainMenuPanel, slideLeft: true);
+        SetPanelActive(loadingPanel, false);
         CurrentState = GameState.MainMenu;
         Debug.Log($"Now in MainMenu state");
     }

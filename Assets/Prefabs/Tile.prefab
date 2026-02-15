@@ -92,11 +92,24 @@ MonoBehaviour:
   numberText: {fileID: 4748301254681890994}
   backgroundImage: {fileID: 1686539348593039626}
   selectionHighlight: {fileID: 0}
+  enhancedGlowImage: {fileID: 0}
   pulseMinScale: 1.05
   pulseMaxScale: 1.12
   pulseSpeed: 4
   floatAmount: 8
   floatSpeed: 3
+  glowPulseSpeed: 2
+  glowMinAlpha: 0.3
+  glowMaxAlpha: 0.7
+  glowSize: 1.3
+  numberPulseSpeed: 3
+  numberPulseMinScale: 1
+  numberPulseMaxScale: 1.15
+  numberBrightenAmount: 0.3
+  numberScale: 1
+  shadowOffset: {x: 3, y: -3}
+  shadowColor: {r: 0, g: 0, b: 0, a: 0.5}
+  shadowSoftness: 0.5
   swipeThreshold: 30
 --- !u!1 &8138689117575658172
 GameObject:
@@ -201,7 +214,7 @@ MonoBehaviour:
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
-  m_textAlignment: 514
+  m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
   m_wordSpacing: 0

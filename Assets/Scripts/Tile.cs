@@ -47,6 +47,10 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private float numberPulseMaxScale = 1.15f;
     [SerializeField] private float numberBrightenAmount = 0.3f; // How much to brighten the number
 
+    [Header("Number Size")]
+    [SerializeField] [Range(0.5f, 2f)] [Tooltip("Scale multiplier for tile numbers. 1 = default, 1.3 = 30% bigger.")]
+    private float numberScale = 1f;
+
     [Header("Enhanced Number Shadow Settings")]
     [SerializeField] private Vector2 shadowOffset = new Vector2(3f, -3f);
     [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.5f);
@@ -168,6 +172,9 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         shadowText.fontStyle = numberText.fontStyle;
         shadowText.font = numberText.font;
         shadowText.alignment = numberText.alignment;
+        shadowText.enableAutoSizing = numberText.enableAutoSizing;
+        shadowText.fontSizeMin = numberText.fontSizeMin;
+        shadowText.fontSizeMax = numberText.fontSizeMax;
         shadowText.color = shadowColor;
         shadowText.raycastTarget = false;
 
@@ -270,6 +277,9 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             numberText.color = NumberColors[Value]; // Colored numbers
             numberText.enabled = true;
             numberText.gameObject.SetActive(true);
+
+            // Apply number scale (adjustable from Inspector on the Tile prefab)
+            numberText.transform.localScale = Vector3.one * numberScale;
         }
         else
         {
@@ -325,14 +335,14 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         // Reset number text scale and color
         if (numberText != null)
         {
-            numberText.transform.localScale = Vector3.one;
+            numberText.transform.localScale = Vector3.one * numberScale;
             numberText.color = NumberColors[Value];
         }
 
         // Reset shadow scale
         if (shadowText != null)
         {
-            shadowText.transform.localScale = Vector3.one;
+            shadowText.transform.localScale = Vector3.one * numberScale;
         }
     }
 
@@ -360,7 +370,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             // Scale the number text and shadow together
             if (numberText != null)
             {
-                float scale = Mathf.Lerp(numberPulseMinScale, numberPulseMaxScale, numberT);
+                float scale = Mathf.Lerp(numberPulseMinScale, numberPulseMaxScale, numberT) * numberScale;
                 numberText.transform.localScale = Vector3.one * scale;
 
                 // Brighten the number color
@@ -379,14 +389,14 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         // Reset number text when no longer enhanced
         if (numberText != null)
         {
-            numberText.transform.localScale = Vector3.one;
+            numberText.transform.localScale = Vector3.one * numberScale;
             numberText.color = NumberColors[Value];
         }
 
         // Reset shadow scale
         if (shadowText != null)
         {
-            shadowText.transform.localScale = Vector3.one;
+            shadowText.transform.localScale = Vector3.one * numberScale;
         }
     }
 

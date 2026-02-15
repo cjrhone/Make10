@@ -44,13 +44,13 @@ public class GridVFX : MonoBehaviour
 
     [Header("Ambient Particles")]
     [SerializeField] private bool enableAmbientParticles = true;
-    [SerializeField] private int ambientParticleCount = 18;
+    [SerializeField] private int ambientParticleCount = 8;
     [SerializeField] private float ambientSpeed = 18f;
-    [SerializeField] private float ambientSizeMin = 8f;
-    [SerializeField] private float ambientSizeMax = 16f;
-    [SerializeField] private float ambientAlpha = 0.4f;
-    [SerializeField] private Color ambientColorA = new Color(0.3f, 1f, 0.5f, 1f);  // Bright green
-    [SerializeField] private Color ambientColorB = new Color(0.1f, 0.85f, 0.35f, 1f); // Deeper green
+    [SerializeField] private float ambientSizeMin = 4f;
+    [SerializeField] private float ambientSizeMax = 10f;
+    [SerializeField] private float ambientAlpha = 0.06f;
+    [SerializeField] private Color ambientColorA = new Color(1f, 0.9f, 0.4f, 1f);
+    [SerializeField] private Color ambientColorB = new Color(0.5f, 0.7f, 1f, 1f);
 
     // State
     private RectTransform gridContainer;
