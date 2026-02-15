@@ -77,14 +77,14 @@ public class SceneFlowManager : MonoBehaviour
         // with center-based anchors and fixed widths that don't perfectly match
         // the canvas size after CanvasScaler adjustments.
         RectTransform[] slidingPanels = { loadingPanel, mainMenuPanel, gamePanel,
-            shopPanel, quitPanel, countdownPanel, tutorialPanel1, tutorialPanel2 };
+            shopPanel, quitPanel, countdownPanel };
 
         foreach (var panel in slidingPanels)
             EnsurePanelFillsScreen(panel);
 
         // Position all panels off-screen except loading
         RectTransform[] offScreenPanels = { mainMenuPanel, gamePanel, shopPanel, optionsPanel,
-            tutorialPanel1, tutorialPanel2, countdownPanel, quitPanel };
+            countdownPanel, quitPanel };
 
         foreach (var panel in offScreenPanels)
             SetPanelPosition(panel, screenWidth);
@@ -97,10 +97,43 @@ public class SceneFlowManager : MonoBehaviour
         SetPanelActive(gamePanel, true);
         SetPanelActive(shopPanel, true);
         SetPanelActive(optionsPanel, false); // Options is overlay
-        SetPanelActive(tutorialPanel1, true);
-        SetPanelActive(tutorialPanel2, true);
         SetPanelActive(countdownPanel, true);
         SetPanelActive(quitPanel, true);
+
+        // Hide old tutorial panels (replaced by TutorialBuilder popups)
+        SetPanelActive(tutorialPanel1, false);
+        SetPanelActive(tutorialPanel2, false);
+
+        // Initialize TutorialBuilder and wire callbacks
+        InitializeTutorialBuilder();
+    }
+
+    private void InitializeTutorialBuilder()
+    {
+        // Create TutorialBuilder singleton if it doesn't exist
+        if (TutorialBuilder.Instance == null)
+        {
+            GameObject builderObj = new GameObject("TutorialBuilder");
+            builderObj.AddComponent<TutorialBuilder>();
+        }
+
+        TutorialBuilder.Instance.OnTutorial1Complete += () =>
+        {
+            HandleButton(GameState.Tutorial1, () => StartCoroutine(Tutorial1To2()));
+        };
+
+        TutorialBuilder.Instance.OnTutorial2Complete += () =>
+        {
+            HandleButton(GameState.Tutorial2, () => StartCoroutine(Tutorial2ToCountdown()));
+        };
+
+        TutorialBuilder.Instance.OnTutorialCancelled += () =>
+        {
+            if (CurrentState == GameState.Tutorial1 || CurrentState == GameState.Tutorial2)
+            {
+                StartCoroutine(CancelTutorialToMainMenu());
+            }
+        };
     }
     
     #endregion
@@ -313,23 +346,24 @@ public class SceneFlowManager : MonoBehaviour
     private IEnumerator CancelTutorialToMainMenu()
     {
         Debug.Log("Canceling tutorial, returning to main menu...");
-        
-        // Hide current tutorial panel
-        RectTransform currentTutorial = CurrentState == GameState.Tutorial1 ? tutorialPanel1 : tutorialPanel2;
-        yield return HidePanel(currentTutorial);
-        
+
+        // Tutorial popup already closed by TutorialBuilder close button
+        TutorialBuilder.Instance?.HideCurrentTutorial();
+
+        yield return new WaitForSeconds(0.15f);
+
         // Clear the grid (it was spawned for tutorials)
         GridManager gridManager = FindFirstObjectByType<GridManager>();
         gridManager?.ClearGrid();
-        
+
         // Slide back to main menu
         yield return SlideTransition(gamePanel, mainMenuPanel, slideLeft: false);
         CurrentState = GameState.MainMenu;
         SetPanelPosition(gamePanel, screenWidth);
-        
+
         // Start menu music
         AudioManager.Instance?.PlayMenuMusic();
-        
+
         Debug.Log("Returned to MainMenu from Tutorial");
     }
     
@@ -450,9 +484,9 @@ public class SceneFlowManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.1f);
 
-        // Show tutorials
+        // Show tutorials (using PopupWindow-based TutorialBuilder)
         CurrentState = GameState.Tutorial1;
-        yield return ShowPanel(tutorialPanel1);
+        TutorialBuilder.Instance?.ShowTutorial1();
     }
     
     private IEnumerator CountdownSequence()
@@ -651,9 +685,10 @@ public class SceneFlowManager : MonoBehaviour
     
     private IEnumerator Tutorial1To2()
     {
-        yield return HidePanel(tutorialPanel1);
+        // Tutorial1 popup already closed by TutorialBuilder button callback
         CurrentState = GameState.Tutorial2;
-        yield return ShowPanel(tutorialPanel2);
+        yield return new WaitForSeconds(0.15f); // Brief pause between tutorials
+        TutorialBuilder.Instance?.ShowTutorial2();
     }
     
     public void OnTutorial2GotThisPressed()
@@ -663,8 +698,9 @@ public class SceneFlowManager : MonoBehaviour
     
     private IEnumerator Tutorial2ToCountdown()
     {
-        yield return HidePanel(tutorialPanel2);
+        // Tutorial2 popup already closed by TutorialBuilder button callback
         CurrentState = GameState.Countdown;
+        yield return new WaitForSeconds(0.15f); // Brief pause before countdown
         yield return CountdownSequence();
     }
     

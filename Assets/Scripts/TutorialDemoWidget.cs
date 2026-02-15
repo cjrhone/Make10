@@ -38,6 +38,14 @@ public class TutorialDemoWidget : MonoBehaviour
     [Header("References")]
     [SerializeField] private RectTransform container;
     [SerializeField] private GameObject tilePrefab; // Optional - will create if null
+
+    /// <summary>
+    /// Set the container at runtime (used when embedding in PopupWindow content).
+    /// </summary>
+    public void SetContainer(RectTransform newContainer)
+    {
+        container = newContainer;
+    }
     
     // Demo tiles
     private RectTransform[] demoTiles;
