@@ -54,6 +54,10 @@ public class SceneFlowManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Set up safe area container for notch/Dynamic Island iPhones
+        SetupSafeArea();
+
         screenWidth = GetCanvasWidth();
     }
     
@@ -63,6 +67,52 @@ public class SceneFlowManager : MonoBehaviour
         StartCoroutine(LoadingSequence());
     }
     
+    /// <summary>
+    /// Creates a SafeArea container under the Canvas and moves all children into it.
+    /// This ensures UI respects the safe area on notched/Dynamic Island iPhones.
+    /// Runs once in Awake before any panel logic.
+    /// </summary>
+    private void SetupSafeArea()
+    {
+        if (mainCanvas == null) return;
+
+        RectTransform canvasRect = mainCanvas.GetComponent<RectTransform>();
+        if (canvasRect == null) return;
+
+        // Create SafeArea container
+        GameObject safeAreaGO = new GameObject("SafeAreaContainer");
+        RectTransform safeAreaRect = safeAreaGO.AddComponent<RectTransform>();
+
+        // Parent to Canvas first
+        safeAreaGO.transform.SetParent(canvasRect, false);
+
+        // Full stretch to fill Canvas
+        safeAreaRect.anchorMin = Vector2.zero;
+        safeAreaRect.anchorMax = Vector2.one;
+        safeAreaRect.offsetMin = Vector2.zero;
+        safeAreaRect.offsetMax = Vector2.zero;
+
+        // Add SafeAreaHandler component to adjust anchors based on Screen.safeArea
+        safeAreaGO.AddComponent<SafeAreaHandler>();
+
+        // Collect current Canvas children (skip the SafeAreaContainer itself)
+        var childrenToMove = new System.Collections.Generic.List<Transform>();
+        for (int i = 0; i < canvasRect.childCount; i++)
+        {
+            Transform child = canvasRect.GetChild(i);
+            if (child == safeAreaGO.transform) continue;
+            childrenToMove.Add(child);
+        }
+
+        // Reparent all panels into SafeArea container (preserves sibling order)
+        foreach (Transform child in childrenToMove)
+        {
+            child.SetParent(safeAreaRect, false);
+        }
+
+        Debug.Log($"[Make10] SafeArea: Moved {childrenToMove.Count} panels into SafeAreaContainer.");
+    }
+
     private float GetCanvasWidth()
     {
         if (mainCanvas != null)

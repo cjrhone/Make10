@@ -146,6 +146,9 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Target 60fps on mobile for smooth gameplay
+        Application.targetFrameRate = 60;
     }
     
     private void Start()

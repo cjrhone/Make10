@@ -161,7 +161,8 @@ public class iOSBuildHelper : EditorWindow
         GUI.backgroundColor = new Color(0.3f, 0.8f, 0.3f);
         if (GUILayout.Button("BUILD iOS (Xcode Project)", GUILayout.Height(40)))
         {
-            BuildiOS();
+            // Defer build to after OnGUI completes to avoid layout errors
+            EditorApplication.delayCall += BuildiOS;
         }
         GUI.backgroundColor = Color.white;
 
