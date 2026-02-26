@@ -28,11 +28,6 @@ Make10 is an arcade-style number puzzle game where players swap tiles to create 
 | `MainMenuUI.cs` | Main menu button handlers |
 | `PopupWindow.cs` | Reusable popup system with scrollbar and auto-size modes |
 
-### Shop System
-| Script | Purpose |
-|--------|---------|
-| `ShopManager.cs` | Empty shop shell — BP display, "Next Round" button. No purchases. |
-
 ### Audio & VFX
 | Script | Purpose |
 |--------|---------|
@@ -64,7 +59,6 @@ UIManager.Instance          → UI updates, results screen
 AudioManager.Instance       → Audio playback, volume control
 RunManager.Instance         → BP currency, round progression
 CampaignManager.Instance    → Lightweight round counter
-ShopManager.Instance        → Empty shop shell, "Next Round" button
 AvatarManager.Instance      → Avatar state machine
 TenExplosionVFX.Instance    → Particle effects
 GridVFX.Instance            → Line sweeps, ambient particles, screen shake
@@ -75,10 +69,11 @@ GridVFX.Instance            → Line sweeps, ambient particles, screen shake
 ## Game Flow (Arcade Mode)
 
 ```
-Loading → MainMenu → (Tutorial?) → Countdown → Game → Time's Up → Results → Shop (empty) → Next Round → Countdown → ...
+Loading → MainMenu → (Tutorial?) → Countdown → Game → Time's Up → Results → [Continue] → Countdown → Next Round ...
+                                                                    Results → [Main Menu] → MainMenu
 ```
 
-No "win" or "lose" — every round ends when the timer hits zero. The results screen shows BP earned. The shop exists as a placeholder for future content.
+No "win" or "lose" — every round ends when the timer hits zero. The results screen shows BP earned with a Balatro-style breakdown, then players continue to the next round or return to the main menu.
 
 ### Game States (SceneFlowManager)
 - **Loading**: Initialization with progress bar (min 1.5s)
@@ -86,8 +81,7 @@ No "win" or "lose" — every round ends when the timer hits zero. The results sc
 - **Tutorial1/2**: 2-part onboarding
 - **Countdown**: "3...2...1...GO!"
 - **Game**: Active gameplay (timer-based rounds)
-- **Results**: Score breakdown screen (Balatro-style count-up)
-- **Shop**: Empty shell between rounds (BP display + Next Round button)
+- **Results**: Score breakdown screen (Balatro-style count-up) with Play Again + Main Menu buttons
 - **Options**: Settings overlay
 - **Quit**: Exit confirmation
 
@@ -113,7 +107,7 @@ No "win" or "lose" — every round ends when the timer hits zero. The results sc
 │   ──────────────────────────────    │
 │   TOTAL                    398 BP   │  ← Count-up animation
 │                                     │
-│         [Continue]                  │  ← Leads to shop
+│         [Continue]                  │  ← Restarts with countdown (next round)
 └─────────────────────────────────────┘
 ```
 
@@ -239,3 +233,164 @@ Available in `AnimationUtilities.cs`:
 - **PulseLoop**: Continuous pulse
 - **CountUp**: Number counter (Balatro-style)
 - **DropIn**: Drop with elastic bounce
+
+---
+
+## Polish Sprint (February 2026)
+
+### P0 — Shop Removal & Back Button ✓ COMPLETED
+
+**What was done:**
+- Deleted `ShopManager.cs` (363 lines) and its `.meta` file
+- Removed from `SceneFlowManager.cs`: `shopPanel` field, `GameState.Shop` enum value, `TransitionToShop()`, `TransitionToShopSequence()`, `TransitionFromShopToGame()`, `TransitionFromShopToGameSequence()`, `ReturnToMainMenuFromShop()`, shop case in `GoBack()`, all `shopPanel` references in `InitializePanels()`
+- Activated `ReturnMenuButton` on WinScreen in scene (was `m_IsActive: 0`), repositioned side-by-side with PlayAgainButton, updated text from "Menu" to "Main Menu", bumped font size from 24→36
+- Added `EnsureResultsButtonsActive()` safety method in `UIManager.cs` — called when winScreen shows, ensures both buttons are active even if scene state is wrong
+- Cleaned all shop references from CLAUDE.md (Script Inventory, Singletons, Game Flow, Game States)
+
+**Current results screen buttons (WinScreen):**
+- **PlayAgainButton** (left, x=-100) → `OnContinueButtonClicked()` → `RestartWithCountdown()`
+- **ReturnMenuButton** (right, x=150) → `OnMainMenuButtonClicked()` → `GoBack()` → MainMenu
+
+**Note:** `ShopCard.cs` and `DataLoader.cs` still contain shop references in comments only — no compile impact. The `shopPanel` GameObject in the Unity scene hierarchy should still be manually deleted in the editor (we can't remove scene GameObjects from outside Unity), but it won't be referenced by any code.
+
+---
+
+### P1 — Star Rating System & Scoring Overhaul
+
+**Star Rating — New Feature (does not exist yet)**
+
+Goal: Replace raw BP number with a 1-3 star rating that gives players a clear target each round. Stars should feel achievable but progressively harder.
+
+**Where to implement:**
+- **Star thresholds:** Define in `GameManager.cs` alongside existing scoring constants (lines ~49-68). Could be flat values or scale with round number via `RunManager.Instance.RoundNumber`
+- **Star calculation:** New method in `GameManager.cs`, called from `TimeUp()` (line ~586) after final score is known
+- **Star display on results screen:** `UIManager.cs` → `ShowWinScreenBreakdown()` (line ~789). Add star visuals after the total BP line. Use `AnimationUtilities.PopIn()` for each star reveal
+- **Star assets:** Need 2 sprites — filled star + empty star outline. Place in `Assets/Images/`
+- **Round-over summary:** Stars could display alongside the "YOU ARE A GENIUS!" title text (winScreen object)
+
+**Suggested star thresholds (tunable):**
+```
+★       = 50+ BP (easy — just keep matching)
+★★      = 150+ BP (requires consistent multiplier usage)
+★★★     = 300+ BP (requires hot streak activation)
+```
+
+**Scoring Improvements**
+
+Current formula (`GameManager.ProcessSingleSolve()`, lines ~368-422):
+```
+Solve #1: baseMatchScore (10) + enhanced bonus (always 0 in arcade)
+Solve #2: same + activates multiplier at ×1.25
+Solve #3+: (10 × multiplier) + floor(multiplierTimer) + enhanced bonus
+Hot Streak: ProcessHotStreakSolve() — fixed ×5.00 multiplier
+```
+
+Issues to review:
+- `floor(multiplierTimer)` as a time bonus is opaque to players — they don't see it
+- The jump from solve #2 to #3 introduces multiplier + time bonus simultaneously
+- `enhancedBonus` is always 0 in arcade mode (`CalculateEnhancedNumberBonus()` returns 0, line ~427)
+- Results breakdown (UIManager lines ~793-861) shows "Score" + "Session Time" + "TOTAL" but Session Time bonus is just `Mathf.RoundToInt(sessionDuration)` — 1 BP per second of game time, which will always be ~60 for a full round
+
+**Leaderboard — Local**
+
+Existing infrastructure:
+- `PlayerPrefs` keys: `Make10_HighScore`, `Make10_HighScoreBP`, `Make10_TotalGames` (GameManager lines ~78-80)
+- `HighScore` and `HighScoreBP` properties already exposed (line ~91-92)
+- `IsNewHighScore` flag set in `TimeUp()` (line ~601)
+- Main menu displays best score via `MainMenuUI.UpdateHighScoreDisplay()` (line ~64)
+- Results screen shows "NEW HIGH SCORE" banner via `UIManager.ShowNewHighScoreBanner()` (line ~866)
+
+To build a proper leaderboard:
+- Store top N scores in PlayerPrefs (JSON array or indexed keys like `Make10_Score_1` through `Make10_Score_10`)
+- New UI panel accessible from MainMenu (add button in `MainMenuUI.cs`)
+- Could reuse `PopupWindow.cs` for the leaderboard display (scrollbar mode)
+- Each entry: rank, score, star rating, date
+
+---
+
+### P2 — Match Animation & VFX Polish
+
+**Current match sequence** (`GridManager.AnimateSolveSequence()`, line ~1200):
+```
+1. GridVFX.PlayLineSweeps() — beam flash fires (non-blocking coroutine)
+2. 0.08s pause
+3. AvatarManager.OnSolve() — avatar animation
+4. AudioManager.PlayConvergenceSound()
+5. Tiles converge toward center (solveConvergeDuration)
+6. ShowTenEffectSpectacular() per match line — "10" text + TenExplosionVFX.TriggerExplosion()
+   (these fire simultaneously: "10" popup appears at same time as particle explosion)
+7. ClearMatchedTiles()
+8. GameManager.OnMatchCleared() — scoring
+```
+
+**Requested changes:**
+- **Reduce beam opacity:** `GridVFX.cs` → `FlashBeam()` (line ~205). The beam is a 4-layer system: glow → core → hot core → sparkles. Adjust alpha values in the BURST/HOLD/FADE phases. Key colors defined at lines ~24-28 (`goldEdgeColor`, etc.)
+- **Sequence beam AFTER "10" popup:** Currently beam fires first (step 1), then "10" appears later (step 6). Reverse this: show "10" popup first with a PunchScale, brief hold, THEN fire the beam sweep. This means restructuring `AnimateSolveSequence()` — move `PlayLineSweeps()` call to after `ShowTenEffectSpectacular()`
+- **Make "10" punchier:** In `GridManager.ShowTenEffectSpectacular()` (line ~1368), the "10" text uses `AnimationUtilities.PopIn()`. Could increase overshoot, add screen shake on pop, or add a brief hold before fade
+
+**Haptic feedback — New Feature:**
+- No haptics exist yet (zero `Vibrate` or `Haptic` references in codebase)
+- Add `Handheld.Vibrate()` call in `GridManager.ShowTenEffectSpectacular()` right when the "10" text appears
+- For finer control on iOS: use `UnityEngine.iOS.Device.RequestStoreReview` or a haptics plugin
+- For Android: `Handheld.Vibrate()` works but is coarse (single buzz). Consider Unity's Input System haptics for gamepad or a native plugin for precise haptic patterns
+- Best insertion point: `GridManager.ShowTenEffectSpectacular()` line ~1378, right before/after `TenExplosionVFX.Instance?.TriggerExplosion()`
+
+**Key VFX files for reference:**
+- `GridVFX.cs` — Beam flash (line ~205 `FlashBeam()`), screen shake (look for `ShakeScreen`), tile sparkles, ambient particles
+- `TenExplosionVFX.cs` — Particle explosion + collection to score slider. Timing: explosion 0.35s → pause 0.1s → collection 0.5s per particle. Colors: small=gold, big=purple
+- `HotStreakEffect.cs` — Fire/ember effects during hot streak
+- Particle sprites in `Assets/particles/` (30 files)
+
+---
+
+### P3 — Visual Polish
+
+**Tile Number Drop Shadows**
+
+A shadow system already exists in `Tile.cs` but it's built for "enhanced" numbers only:
+- `CreateShadowText()` (line ~152) creates a `TextMeshProUGUI` behind the main number
+- `shadowOffset` = `(3, -3)`, `shadowColor` = black at 50% alpha (line ~55-57)
+- `shadowSoftness` = 0.5 (dilation for soft edge)
+- The shadow text is created in `Awake()` (line ~143) but its visibility is tied to the `isEnhanced` flag
+
+**What to change:**
+- Make shadow always visible (not gated by enhanced mode)
+- Change `shadowColor` to derive from the tile's `NumberColors[Value]` array (line ~99-111) — use a darkened version: `Color.Lerp(NumberColors[value], Color.black, 0.6f)` or similar
+- Update `SetValue()` (line ~263) to set shadow color when the tile value changes
+- The `NumberColors` array for reference:
+  ```
+  0: (0.6, 0.6, 0.6)     Grey
+  1: (0.85, 0.65, 0.1)    Gold     → shadow: dark gold
+  2: (0.15, 0.4, 0.9)     Blue     → shadow: dark blue
+  3: (0.2, 0.7, 0.3)      Green    → shadow: dark green
+  4: (0.9, 0.2, 0.2)      Red      → shadow: dark red
+  5: (0.95, 0.5, 0.1)     Orange   → shadow: dark orange
+  6: (0.6, 0.2, 0.75)     Purple   → shadow: dark purple
+  ```
+
+**Tile Prefab Structure:**
+- `Assets/Prefabs/Tile.prefab` — the base tile prefab
+- Runtime hierarchy per tile: Background Image → NumberShadow (TMP) → NumberText (TMP) → SelectionHighlight → EnhancedGlow (Image)
+- Background is uniform light grey: `(0.85, 0.85, 0.85)` (Tile.cs line ~93)
+- Number text uses `numberScale` multiplier (default 1.0, configurable 0.5-2.0, line ~51)
+- Font: whatever TMP font is on the prefab (check prefab for font asset reference)
+
+**Credits/About Section**
+
+No credits UI currently exists in the scripts. The sprint note says "current formatting is broken, needs cleanup" — this likely refers to content in the Unity scene or a popup that's wired but not in the C# scripts. Check:
+- `PopupWindow.cs` — reusable popup system, could be used for credits
+- `MainMenuUI.cs` — look for any credits/about button handlers
+- The Unity scene hierarchy for any Credits or About GameObjects
+
+**To implement credits:**
+- Add a credits button to `MainMenuUI.cs`
+- Use `PopupWindow.cs` in scrollbar mode for the content
+- Content: "Make10 by CJ Rhone / Wizard Bodega, Brainless Game Jam 2026" etc.
+
+---
+
+### P4 — Future (Deferred)
+
+- **New avatar animations:** `AvatarManager.cs` handles state machine. Add new states/triggers
+- **Android back button:** Requires Unity Input System integration. `GameManager.cs` already imports `UnityEngine.InputSystem` (line 2). Deferred due to complexity
+- **Tutorial popup polish:** `TutorialDemoWidget.cs` exists. Known issue: click-outside-to-dismiss fires prematurely. Related to `PopupWindow.cs` click handling

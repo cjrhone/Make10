@@ -767,6 +767,7 @@ public class UIManager : MonoBehaviour
         // Show result screen and play appropriate music
         AudioManager.Instance?.PlayWinMusic();
         SetActiveIfNotNull(winScreen, true);
+        EnsureResultsButtonsActive();
         // Start the animated score breakdown
         StartCoroutine(ShowWinScreenBreakdown());
     }
@@ -1031,6 +1032,24 @@ public class UIManager : MonoBehaviour
 
         dividerObj.SetActive(false);
         return img;
+    }
+
+    /// <summary>
+    /// Ensure both "Play Again" and "Main Menu" buttons are active on the results screen.
+    /// Handles cases where buttons may have been left inactive in the scene.
+    /// </summary>
+    private void EnsureResultsButtonsActive()
+    {
+        if (winScreen == null) return;
+
+        // Find and activate the ReturnMenuButton and PlayAgainButton
+        Transform returnMenuBtn = winScreen.transform.Find("ReturnMenuButton");
+        if (returnMenuBtn != null)
+            returnMenuBtn.gameObject.SetActive(true);
+
+        Transform playAgainBtn = winScreen.transform.Find("PlayAgainButton");
+        if (playAgainBtn != null)
+            playAgainBtn.gameObject.SetActive(true);
     }
 
     #endregion
