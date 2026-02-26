@@ -67,6 +67,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float hotStreakDuration = 10f;
     [SerializeField] private float hotStreakMultiplier = 5f;
 
+    [Header("Speed Bonus")]
+    [SerializeField] private float speedBonusThreshold = 4f;  // Seconds to qualify
+    [SerializeField] private int speedBonusAmount = 5;          // Bonus BP
+
     [Header("Star Rating Thresholds (BP)")]
     [SerializeField] private int star1Threshold = 300;
     [SerializeField] private int star2Threshold = 600;
@@ -125,6 +129,9 @@ public class GameManager : MonoBehaviour
     // Hot Streak state
     private bool hotStreakActive = false;
     private float hotStreakTimer = 0f;
+
+    // Speed bonus tracking
+    private float lastPlayerSolveTime = -999f;
 
     // Session time tracking (wall-clock, independent of countdown timer)
     private float sessionStartTime;
@@ -208,7 +215,7 @@ public class GameManager : MonoBehaviour
             DrainTime(Time.deltaTime);
         }
 
-        if (multiplierActive)
+        if (multiplierActive && !IsProcessing)
         {
             DrainMultiplierTimer(Time.deltaTime);
         }
@@ -272,6 +279,7 @@ public class GameManager : MonoBehaviour
         hotStreakActive = false;
         hotStreakTimer = 0f;
         maxMultiplierReached = 1f;
+        lastPlayerSolveTime = -999f;
         sessionStartTime = Time.time;
         lastSessionDuration = 0f;
 
@@ -349,32 +357,57 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Called when a match is cleared, with tile values for enhanced number bonuses.
+    /// cascadeCount: 1 = player swap match, 2+ = auto-cascade match.
     /// </summary>
-    public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched, List<int> tileValues, MatchResult matchResult = null)
+    public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched, List<int> tileValues, MatchResult matchResult = null, int cascadeCount = 1)
     {
         if (!IsGameActive) return;
 
         int linesCleared = rowsMatched + columnsMatched;
+        bool isPlayerMatch = (cascadeCount <= 1);
 
-        // Add time bonus for each line cleared
-        if (linesCleared > 0)
+        if (isPlayerMatch)
         {
-            AddTime(timeBonusPerMatch * linesCleared);
+            // PLAYER SWAP: full scoring with time bonus, multiplier, speed bonus
+            if (linesCleared > 0)
+            {
+                AddTime(timeBonusPerMatch * linesCleared);
+            }
+
+            for (int i = 0; i < linesCleared; i++)
+            {
+                int lineBaseScore = (matchResult != null) ? matchResult.GetLineSumByIndex(i) : baseMatchScore;
+                ProcessSingleSolve(tileValues, lineBaseScore);
+            }
+        }
+        else
+        {
+            // CASCADE: flat base BP only, no time bonus, no multiplier interaction
+            for (int i = 0; i < linesCleared; i++)
+            {
+                int lineBaseScore = (matchResult != null) ? matchResult.GetLineSumByIndex(i) : baseMatchScore;
+                ProcessCascadeSolve(lineBaseScore);
+            }
         }
 
-        for (int i = 0; i < linesCleared; i++)
-        {
-            // Determine the base score for this specific line (10, 20, 30, or 40)
-            int lineBaseScore = (matchResult != null) ? matchResult.GetLineSumByIndex(i) : baseMatchScore;
-            ProcessSingleSolve(tileValues, lineBaseScore);
-        }
-
-        // Ultra combo bonus: 5+ simultaneous lines awards a flat 1000 BP bonus
+        // Ultra combo bonus: 5+ simultaneous lines awards a flat 1000 BP bonus (regardless of cascade)
         if (linesCleared >= 5)
         {
             Debug.Log($"<color=red>★★★ ULTRA COMBO! {linesCleared} LINES! +1000 BONUS BP ★★★</color>");
             CommitScore(1000);
         }
+    }
+
+    /// <summary>
+    /// Process a cascade solve — flat base BP, no multiplier/time interaction.
+    /// Still increments SolveCount for progressive difficulty ramp.
+    /// </summary>
+    private void ProcessCascadeSolve(int lineBaseScore)
+    {
+        Debug.Log($"<color=grey>[CASCADE]</color> +{lineBaseScore} BP (flat, no multiplier)");
+        CommitScore(lineBaseScore);
+        // Note: does NOT increment solveCount, touch multiplier, or trigger hot streak
+        // SolveCount used for tile weight ramp still comes from solveCount (player solves only)
     }
 
     /// <summary>
@@ -450,7 +483,17 @@ public class GameManager : MonoBehaviour
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         }
 
-        int finalPoints = ApplyPostScoringBonuses(pointsAwarded, enhancedBonus, tileValues);
+        // Speed bonus: reward fast consecutive player solves
+        int speedBonus = 0;
+        float timeSinceLastPlayerSolve = Time.time - lastPlayerSolveTime;
+        if (lastPlayerSolveTime > 0f && timeSinceLastPlayerSolve <= speedBonusThreshold)
+        {
+            speedBonus = speedBonusAmount;
+            Debug.Log($"<color=magenta>⚡ SPEED BONUS! +{speedBonus} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
+        }
+        lastPlayerSolveTime = Time.time;
+
+        int finalPoints = ApplyPostScoringBonuses(pointsAwarded + speedBonus, enhancedBonus, tileValues);
         CommitScore(finalPoints);
     }
 

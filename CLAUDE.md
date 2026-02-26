@@ -123,15 +123,27 @@ Lines matching a multiple of 10 score their sum as base BP:
   Line sums to 30 → 30 BP base
   Line sums to 40 → 40 BP base (requires 8-tiles, future)
 
-First solve:  lineSum pts (no multiplier)
-Second solve: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
-Each solve:   lineSum × multiplier + increment
+PLAYER SWAP MATCHES (cascadeCount == 1):
+  First solve:  lineSum pts (no multiplier)
+  Second solve: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
+  Each solve:   lineSum × multiplier + increment + speedBonus
+  Also: adds time bonus (timeBonusPerMatch per line)
+
+CASCADE MATCHES (cascadeCount >= 2):
+  Flat lineSum BP only — no multiplier, no time bonus, no speed bonus.
+  Multiplier timer is frozen during cascades (!IsProcessing gate).
+  Cascade solves do NOT increment SolveCount or trigger hot streak.
+
+Speed Bonus (player swaps only):
+  If solved within 4s of last player solve → +5 BP
+  Fields: speedBonusThreshold (4s), speedBonusAmount (5)
 
 Multiplier Growth:
 - Start: ×1.25
 - Increment: +0.25 per solve
 - Max: ×3.00
 - Beyond max: TRIGGERS HOT STREAK (×5.00)
+- Timer freezes during cascade processing (IsProcessing)
 ```
 
 ### Combo Merge System
@@ -157,8 +169,10 @@ When 2+ lines match simultaneously, individual popups fly inward and merge:
 - **Size**: 5×5 grid (hardcoded in arcade mode)
 - **Tile Values**: 0-7 with weighted distribution
 - **Matching**: Rows/columns summing to any multiple of 10 (10, 20, 30, 40)
-- **Cascade**: Tiles fall after match, new tiles spawn
+- **Cascade**: Tiles fall after match, new tiles spawn (cascade matches score flat BP only)
 - **Match Detection**: `MatchChecker.IsValidMatch(sum)` → `sum > 0 && sum % 10 == 0`
+- **Anti-cascade spawning**: Single re-roll if new tile would complete a match (`WouldTileCompleteMatch()`)
+- **Tile bag system**: Tetris-style bag of 25 tiles, refilled from weighted distribution, Fisher-Yates shuffled
 
 ### Tile Weights (Base Distribution)
 Base weights defined in both `GameManager.cs` (GameSettings class) and `GridManager.cs` (fallback).
@@ -182,9 +196,22 @@ This means struggling players keep getting easy boards, while skilled players fa
 - **7s appear**: After 8 solves (start at weight 0.005, ramp to 0.02)
 - **Full ramp**: At 12 solves, all high tiles are at max weight
 - **Low tile reduction**: Tiles 0-4 gently reduce to 85% as high tiles ramp in
-- **Method**: `GetWeightedRandomValue()` in `GridManager.cs` reads `GameManager.Instance.SolveCount`
+- **Method**: `GetWeightedRandomValue()` draws from tile bag; bag refilled via `RefillTileBag()` using `GetAdjustedWeights()`
 - Configurable via `solvesFor5s`, `solvesFor6s`, `solvesFor7s`, `maxWeight5/6/7`, `solvesToFullRamp`, `baseTileReduction`
-- `SolveCount` resets each round via `GameManager.ProcessSingleSolve()`
+- `SolveCount` resets each round via `GameManager.ProcessSingleSolve()` (only player swaps increment)
+
+### Tile Bag System (Tetris-Style)
+- Bag of 25 tiles, distributed proportionally to current adjusted weights
+- Bag is shuffled (Fisher-Yates) so draw order is random within the bag
+- When bag empties, it refills based on current solve count (progressive ramp recalculated)
+- Bag cleared on round reset (`ResetGame()`, `SpawnGridOnly()`)
+- Guarantees consistent tile distribution over every 25 draws, reducing wild RNG variance
+
+### Anti-Cascade Tile Spawning
+- In `SpawnNewTilesCoroutine()`, each new tile gets one re-roll if it would complete a match
+- `WouldTileCompleteMatch(x, y, value)` checks if the tile's row or column would sum to a multiple of 10
+- Light touch: only one re-roll, accepts result either way (doesn't eliminate cascades, just reduces them slightly)
+- Approximation is fine since some tiles in the column may not have spawned yet
 
 ### Tile Colors
 ```
@@ -224,6 +251,9 @@ This means struggling players keep getting easy boards, while skilled players fa
 | Max Weight 7s | 0.02 | GridManager |
 | Full Ramp At | 12 solves | GridManager |
 | Base Tile Reduction | 0.85 | GridManager |
+| Tile Bag Size | 25 | GridManager |
+| Speed Bonus Threshold | 4s | GameManager |
+| Speed Bonus Amount | 5 BP | GameManager |
 
 ---
 

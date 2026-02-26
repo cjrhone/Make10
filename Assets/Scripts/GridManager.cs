@@ -99,6 +99,10 @@ public class GridManager : MonoBehaviour
     private HintMove currentHint = null;
     private List<GameObject> activeHintParticles = new List<GameObject>();
 
+    // Tile bag system (Tetris-style consistent distribution)
+    private List<int> tileBag = new List<int>();
+    private const int BAG_SIZE = 25;  // Refill after 25 draws
+
     // Progressive difficulty state (solve-based ramp reads GameManager.Instance.SolveCount)
 
     // Drag-swap state
@@ -499,6 +503,20 @@ public class GridManager : MonoBehaviour
     
     private int GetWeightedRandomValue()
     {
+        if (tileBag.Count == 0)
+            RefillTileBag();
+
+        int value = tileBag[tileBag.Count - 1];
+        tileBag.RemoveAt(tileBag.Count - 1);
+        return value;
+    }
+
+    /// <summary>
+    /// Calculate the current adjusted weights based on solve count and progressive ramp.
+    /// Used by both the tile bag system and any other weight-dependent logic.
+    /// </summary>
+    private float[] GetAdjustedWeights()
+    {
         int solves = GameManager.Instance != null ? GameManager.Instance.SolveCount : 0;
 
         // Get base weights from GameManager or fallback (0-4 have weight, 5-7 start at 0)
@@ -512,14 +530,13 @@ public class GridManager : MonoBehaviour
         }
 
         // Solve-based ramp: high tiles (5, 6, 7) gradually introduced as player clears matches
-        // Each tile type has a solve threshold (when it first appears) and ramps to max weight
         float rampProgress = Mathf.Clamp01((float)solves / solvesToFullRamp);
 
         // 5s: appear after solvesFor5s, ramp to maxWeight5
         if (solves >= solvesFor5s)
         {
             float t5 = Mathf.Clamp01((float)(solves - solvesFor5s) / (solvesToFullRamp - solvesFor5s));
-            adjustedWeights[5] = Mathf.Lerp(0.02f, maxWeight5, t5);  // Start tiny, grow to max
+            adjustedWeights[5] = Mathf.Lerp(0.02f, maxWeight5, t5);
         }
 
         // 6s: appear after solvesFor6s, ramp to maxWeight6
@@ -543,27 +560,66 @@ public class GridManager : MonoBehaviour
             adjustedWeights[i] *= reduction;
         }
 
-        // Weighted random selection (normalized)
+        return adjustedWeights;
+    }
+
+    /// <summary>
+    /// Refill the tile bag with BAG_SIZE tiles distributed according to current weights.
+    /// Tetris-style: guarantees consistent distribution over every 25 draws.
+    /// </summary>
+    private void RefillTileBag()
+    {
+        tileBag.Clear();
+
+        float[] adjustedWeights = GetAdjustedWeights();
+
         float totalWeight = 0f;
         for (int i = 0; i < adjustedWeights.Length; i++)
-        {
             totalWeight += adjustedWeights[i];
-        }
 
         if (totalWeight <= 0f)
-            return Random.Range(0, 5); // Fallback: easy tiles only
-
-        float roll = Random.value * totalWeight;
-        float cumulative = 0f;
-
-        for (int i = 0; i < adjustedWeights.Length; i++)
         {
-            cumulative += adjustedWeights[i];
-            if (roll <= cumulative)
-                return i;
+            // Fallback: fill bag with easy tiles only
+            for (int i = 0; i < BAG_SIZE; i++)
+                tileBag.Add(Random.Range(0, 5));
+        }
+        else
+        {
+            int placed = 0;
+            int highestWeightTile = 0;
+            float highestWeight = 0f;
+
+            for (int i = 0; i < adjustedWeights.Length; i++)
+            {
+                int count = Mathf.RoundToInt(adjustedWeights[i] / totalWeight * BAG_SIZE);
+                for (int j = 0; j < count && placed < BAG_SIZE; j++)
+                {
+                    tileBag.Add(i);
+                    placed++;
+                }
+                if (adjustedWeights[i] > highestWeight)
+                {
+                    highestWeight = adjustedWeights[i];
+                    highestWeightTile = i;
+                }
+            }
+
+            // Pad remaining slots with the highest-weight tile
+            while (placed < BAG_SIZE)
+            {
+                tileBag.Add(highestWeightTile);
+                placed++;
+            }
         }
 
-        return Random.Range(0, 5); // Fallback: easy tiles only
+        // Fisher-Yates shuffle
+        for (int i = tileBag.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            int temp = tileBag[i];
+            tileBag[i] = tileBag[j];
+            tileBag[j] = temp;
+        }
     }
     
     #region Initial Match Prevention
@@ -710,6 +766,57 @@ public class GridManager : MonoBehaviour
         }
 
         return sum > 0 && sum % 10 == 0;
+    }
+
+    /// <summary>
+    /// Checks if placing a tile with the given value at (x, y) would complete a row or column match.
+    /// Used for anti-cascade spawning — approximation is fine since some tiles may not have spawned yet.
+    /// </summary>
+    private bool WouldTileCompleteMatch(int x, int y, int value)
+    {
+        // Check row sum
+        int rowSum = 0;
+        bool rowComplete = true;
+        for (int cx = 0; cx < gridWidth; cx++)
+        {
+            if (cx == x)
+            {
+                rowSum += value;
+            }
+            else if (grid[cx, y] != null)
+            {
+                rowSum += grid[cx, y].Value;
+            }
+            else
+            {
+                rowComplete = false;
+            }
+        }
+        if (rowComplete && rowSum > 0 && rowSum % 10 == 0)
+            return true;
+
+        // Check column sum
+        int colSum = 0;
+        bool colComplete = true;
+        for (int cy = 0; cy < gridHeight; cy++)
+        {
+            if (cy == y)
+            {
+                colSum += value;
+            }
+            else if (grid[x, cy] != null)
+            {
+                colSum += grid[x, cy].Value;
+            }
+            else
+            {
+                colComplete = false;
+            }
+        }
+        if (colComplete && colSum > 0 && colSum % 10 == 0)
+            return true;
+
+        return false;
     }
 
     #endregion
@@ -1100,7 +1207,8 @@ public class GridManager : MonoBehaviour
                 result.matchedRows.Count,
                 result.matchedColumns.Count,
                 tileValues,
-                result
+                result,
+                cascadeCount    // 1 = player swap, 2+ = cascade
             );
             
             yield return StartCoroutine(DropTilesCoroutine());
@@ -1961,6 +2069,13 @@ public class GridManager : MonoBehaviour
             if (newTile != null)
             {
                 int value = GetWeightedRandomValue();
+
+                // Light anti-cascade: one re-roll if this tile would complete a match
+                if (WouldTileCompleteMatch(x, y, value))
+                {
+                    value = GetWeightedRandomValue();  // Single re-roll, keep result either way
+                }
+
                 newTile.Initialize(value, x, y);
                 newTile.SetPosition(spawnPos);
                 newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
@@ -2075,15 +2190,16 @@ public class GridManager : MonoBehaviour
             return;
         }
 
-        // Reset consecutive 10s tracking
+        // Reset consecutive 10s tracking and tile bag
         consecutive10Count = 0;
         lastTenTime = 0f;
+        tileBag.Clear();
 
         ClearGrid();
         SpawnGrid();
         StartCoroutine(ProcessMatchesCoroutine());
     }
-    
+
     public void SpawnGridOnly()
     {
         Debug.Log("GridManager.SpawnGridOnly() called - grid visible, no match processing yet");
@@ -2094,9 +2210,10 @@ public class GridManager : MonoBehaviour
             return;
         }
 
-        // Reset consecutive 10s tracking
+        // Reset consecutive 10s tracking and tile bag
         consecutive10Count = 0;
         lastTenTime = 0f;
+        tileBag.Clear();
 
         ClearGrid();
         SpawnGrid();
