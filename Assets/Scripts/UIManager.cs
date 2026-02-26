@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// Handles all UI updates: score display, timer, multiplier bar, game over screens.
@@ -97,6 +98,16 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TMP_Text highScoreText;
     [SerializeField] private GameObject newHighScoreBanner;
     [SerializeField] private Color newHighScoreColor = new Color(1f, 0.85f, 0.1f);
+
+    [Header("Star Rating")]
+    [SerializeField] private Color starFilledColor = new Color(1f, 0.85f, 0.1f);   // Gold
+    [SerializeField] private Color starEmptyColor = new Color(0.35f, 0.35f, 0.35f, 0.4f); // Dim grey
+    [SerializeField] private float starSize = 56f;
+    [SerializeField] private float starRevealDelay = 0.3f;
+    private GameObject starContainer;
+    private GameObject resultsTitleObj;
+    private GameObject performanceMessageObj;
+    private List<Image> starImages = new List<Image>();
 
     [Header("Unsolvable Grid Popup")]
     [SerializeField] private GameObject unsolvablePopup;
@@ -767,6 +778,15 @@ public class UIManager : MonoBehaviour
         // Show result screen and play appropriate music
         AudioManager.Instance?.PlayWinMusic();
         SetActiveIfNotNull(winScreen, true);
+
+        // Set win screen background to dark navy (matching PopupWindow/tutorial style)
+        if (winScreen != null)
+        {
+            Image winBg = winScreen.GetComponent<Image>();
+            if (winBg != null)
+                winBg.color = new Color(0.06f, 0.06f, 0.10f, 0.95f); // Dark navy, slight transparency
+        }
+
         EnsureResultsButtonsActive();
         // Start the animated score breakdown
         StartCoroutine(ShowWinScreenBreakdown());
@@ -802,8 +822,40 @@ public class UIManager : MonoBehaviour
         // Hide all breakdown elements initially
         HideBreakdownElements();
 
+        // Hide the legacy winScoreText since we're using breakdown
+        if (winScoreText != null)
+            winScoreText.text = "";
+
         // Small initial delay after win screen appears
         yield return new WaitForSeconds(0.3f);
+
+        // Title header — "ROUND COMPLETE"
+        Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
+        if (breakdownContainer != null && resultsTitleObj == null)
+        {
+            resultsTitleObj = new GameObject("ResultsTitle");
+            resultsTitleObj.transform.SetParent(breakdownContainer, false);
+            resultsTitleObj.transform.SetAsFirstSibling();
+
+            RectTransform titleRT = resultsTitleObj.AddComponent<RectTransform>();
+            titleRT.sizeDelta = new Vector2(0, 58f);
+
+            TMP_Text titleText = resultsTitleObj.AddComponent<TextMeshProUGUI>();
+            titleText.text = "ROUND COMPLETE";
+            titleText.fontSize = 52f;
+            titleText.fontStyle = FontStyles.Bold;
+            titleText.alignment = TextAlignmentOptions.Center;
+            titleText.color = new Color(0.95f, 0.95f, 0.95f); // Off-white
+            if (winScoreText != null) titleText.font = winScoreText.font;
+        }
+        if (resultsTitleObj != null)
+        {
+            resultsTitleObj.SetActive(true);
+            resultsTitleObj.transform.localScale = Vector3.zero;
+            yield return StartCoroutine(AnimationUtilities.PopIn(resultsTitleObj.transform, 1.1f, 0.25f, 0.05f));
+        }
+
+        yield return new WaitForSeconds(0.2f);
 
         // Line 1: Score - appears and counts up
         if (scoreLabelText != null && scoreValueText != null)
@@ -835,13 +887,29 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 5: TOTAL - appears and counts up
+        // TOTAL - appears and counts up
         if (totalLabelText != null && totalValueText != null)
         {
             totalLabelText.transform.parent.gameObject.SetActive(true);
             totalLabelText.text = "TOTAL";
             AudioManager.Instance?.PlayButtonClick();
             yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, total, countUpDuration * 1.2f, "{0} BP"));
+        }
+
+        // Star rating after total
+        yield return new WaitForSeconds(0.4f);
+        int starsEarned = gameManager.GetStarRating(total);
+        yield return StartCoroutine(ShowStarRating(starsEarned));
+
+        // Performance message based on stars
+        if (breakdownContainer != null)
+        {
+            string perfMsg = GetPerformanceMessage(starsEarned);
+            if (!string.IsNullOrEmpty(perfMsg))
+            {
+                yield return new WaitForSeconds(0.2f);
+                ShowPerformanceMessage(breakdownContainer, perfMsg, starsEarned);
+            }
         }
 
         // Save BP high score
@@ -853,12 +921,49 @@ public class UIManager : MonoBehaviour
             yield return new WaitForSeconds(0.2f);
             ShowNewHighScoreBanner();
         }
+    }
 
-        // Hide the legacy winScoreText since we're using breakdown
-        if (winScoreText != null)
+    /// <summary>
+    /// Get a fun performance message based on star count.
+    /// </summary>
+    private string GetPerformanceMessage(int stars)
+    {
+        switch (stars)
         {
-            winScoreText.text = "";
+            case 0: return "Keep practicing!";
+            case 1: return "Nice work!";
+            case 2: return "Impressive!";
+            case 3: return "GENIUS!";
+            default: return "";
         }
+    }
+
+    /// <summary>
+    /// Show a performance text message below the stars with pop animation.
+    /// </summary>
+    private void ShowPerformanceMessage(Transform parent, string message, int stars)
+    {
+        if (performanceMessageObj != null) Destroy(performanceMessageObj);
+
+        performanceMessageObj = new GameObject("PerformanceMessage");
+        performanceMessageObj.transform.SetParent(parent, false);
+
+        RectTransform msgRT = performanceMessageObj.AddComponent<RectTransform>();
+        msgRT.sizeDelta = new Vector2(0, 40f);
+
+        TMP_Text msgText = performanceMessageObj.AddComponent<TextMeshProUGUI>();
+        msgText.text = message;
+        msgText.fontSize = stars >= 3 ? 40f : 34f;
+        msgText.fontStyle = stars >= 2 ? FontStyles.Bold : FontStyles.Normal;
+        msgText.alignment = TextAlignmentOptions.Center;
+        // Color: gold for 3 stars, light for 1-2, muted for 0
+        msgText.color = stars >= 3 ? new Color(1f, 0.85f, 0.4f) :
+                        stars >= 1 ? new Color(0.9f, 0.9f, 0.9f) :
+                                     new Color(0.6f, 0.6f, 0.65f);
+        if (winScoreText != null) msgText.font = winScoreText.font;
+
+        performanceMessageObj.transform.localScale = Vector3.zero;
+        StartCoroutine(AnimationUtilities.PopIn(performanceMessageObj.transform, 1.2f, 0.25f, 0.05f));
     }
 
     /// <summary>
@@ -911,6 +1016,79 @@ public class UIManager : MonoBehaviour
         if (breakdownDivider != null) breakdownDivider.gameObject.SetActive(false);
         if (totalLabelText != null) totalLabelText.transform.parent.gameObject.SetActive(false);
         if (newHighScoreBanner != null) newHighScoreBanner.SetActive(false);
+        if (starContainer != null) { Destroy(starContainer); starImages.Clear(); }
+        if (resultsTitleObj != null) { Destroy(resultsTitleObj); resultsTitleObj = null; }
+        if (performanceMessageObj != null) { Destroy(performanceMessageObj); performanceMessageObj = null; }
+    }
+
+    /// <summary>
+    /// Create and animate the star rating display (3 diamond-glow stars, revealed one at a time).
+    /// Uses procedural diamond sprites from GlowTextureGenerator — no font/sprite assets needed.
+    /// </summary>
+    private IEnumerator ShowStarRating(int starsEarned)
+    {
+        if (winScreen == null) yield break;
+
+        Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
+        if (breakdownContainer == null) yield break;
+
+        // Clean up previous stars
+        if (starContainer != null) Destroy(starContainer);
+        starImages.Clear();
+
+        // Create star container with horizontal layout and top padding for spacing
+        starContainer = new GameObject("StarContainer");
+        starContainer.transform.SetParent(breakdownContainer, false);
+
+        RectTransform containerRT = starContainer.AddComponent<RectTransform>();
+        containerRT.sizeDelta = new Vector2(0, starSize + 12f);
+
+        HorizontalLayoutGroup hlg = starContainer.AddComponent<HorizontalLayoutGroup>();
+        hlg.spacing = 24f;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.childControlWidth = false;
+        hlg.childControlHeight = false;
+        hlg.childForceExpandWidth = false;
+        hlg.childForceExpandHeight = false;
+        hlg.padding = new RectOffset(0, 0, 6, 0); // Top padding for breathing room
+
+        // Create 3 star images using procedural diamond glow
+        for (int i = 0; i < 3; i++)
+        {
+            GameObject starObj = new GameObject($"Star_{i + 1}");
+            starObj.transform.SetParent(starContainer.transform, false);
+
+            RectTransform starRT = starObj.AddComponent<RectTransform>();
+            starRT.sizeDelta = new Vector2(starSize, starSize);
+
+            Image starImg = starObj.AddComponent<Image>();
+            GlowTextureGenerator.ApplyDiamondGlow(starImg, (int)starSize);
+            starImg.color = starEmptyColor;
+            starImg.raycastTarget = false;
+
+            // Start at scale 0 for pop-in animation
+            starObj.transform.localScale = Vector3.zero;
+
+            starImages.Add(starImg);
+        }
+
+        // Reveal each star one at a time with pop animation
+        for (int i = 0; i < 3; i++)
+        {
+            bool earned = (i < starsEarned);
+
+            // Pop-in animation (grey or gold)
+            if (earned)
+                starImages[i].color = starFilledColor;
+
+            yield return StartCoroutine(AnimationUtilities.PopIn(
+                starImages[i].transform, 1.4f, 0.2f, 0.05f));
+
+            if (earned)
+                AudioManager.Instance?.PlayButtonClick();
+
+            yield return new WaitForSeconds(starRevealDelay);
+        }
     }
 
     /// <summary>
@@ -929,14 +1107,14 @@ public class UIManager : MonoBehaviour
             GameObject containerObj = new GameObject("BreakdownContainer");
             containerObj.transform.SetParent(parent, false);
             RectTransform containerRT = containerObj.AddComponent<RectTransform>();
-            containerRT.anchorMin = new Vector2(0.1f, 0.25f);
-            containerRT.anchorMax = new Vector2(0.9f, 0.7f);
+            containerRT.anchorMin = new Vector2(0.08f, 0.18f);
+            containerRT.anchorMax = new Vector2(0.92f, 0.85f);
             containerRT.offsetMin = Vector2.zero;
             containerRT.offsetMax = Vector2.zero;
 
             // Add vertical layout group
             var vlg = containerObj.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 12f;
+            vlg.spacing = 8f;
             vlg.childAlignment = TextAnchor.UpperCenter;
             vlg.childControlWidth = true;
             vlg.childControlHeight = false;
@@ -974,7 +1152,7 @@ public class UIManager : MonoBehaviour
         rowObj.transform.SetParent(parent, false);
 
         RectTransform rowRT = rowObj.AddComponent<RectTransform>();
-        rowRT.sizeDelta = new Vector2(0, isTotal ? 55f : 40f);
+        rowRT.sizeDelta = new Vector2(0, isTotal ? 60f : 46f);
 
         var hlg = rowObj.AddComponent<HorizontalLayoutGroup>();
         hlg.childAlignment = TextAnchor.MiddleCenter;
@@ -991,7 +1169,7 @@ public class UIManager : MonoBehaviour
 
         TMP_Text label = labelObj.AddComponent<TextMeshProUGUI>();
         label.text = labelText;
-        label.fontSize = isTotal ? 40f : 32f;
+        label.fontSize = isTotal ? 48f : 38f;
         label.fontStyle = isTotal ? FontStyles.Bold : FontStyles.Normal;
         label.alignment = TextAlignmentOptions.Left;
         label.color = isTotal ? new Color(1f, 0.9f, 0.3f) : Color.white;
@@ -1003,7 +1181,7 @@ public class UIManager : MonoBehaviour
 
         TMP_Text value = valueObj.AddComponent<TextMeshProUGUI>();
         value.text = valueText;
-        value.fontSize = isTotal ? 40f : 32f;
+        value.fontSize = isTotal ? 48f : 38f;
         value.fontStyle = isTotal ? FontStyles.Bold : FontStyles.Normal;
         value.alignment = TextAlignmentOptions.Right;
         value.color = isTotal ? new Color(1f, 0.9f, 0.3f) : Color.white;

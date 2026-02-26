@@ -23,11 +23,11 @@ public class GameManager : MonoBehaviour
         public int winScore = 100;
 
         [Header("Tile Weights (base weights for tiles 0-9)")]
-        [Range(0, 1)] public float weight0 = 0.08f;   // Grey (wildcard) — helpful early
-        [Range(0, 1)] public float weight1 = 0.24f;    // Gold — dominant primary
+        [Range(0, 1)] public float weight0 = 0.12f;   // Grey (wildcard) — boosted for easy early 10s
+        [Range(0, 1)] public float weight1 = 0.28f;    // Gold — boosted primary, easiest combos
         [Range(0, 1)] public float weight2 = 0.26f;    // Blue — dominant (pairs well with 3s)
         [Range(0, 1)] public float weight3 = 0.22f;    // Green — strong mid-range
-        [Range(0, 1)] public float weight4 = 0.12f;    // Coral — reduced, was too dominant
+        [Range(0, 1)] public float weight4 = 0.08f;    // Coral — further reduced, less clutter
         [Range(0, 1)] public float weight5 = 0f;       // Orange — introduced by solve ramp
         [Range(0, 1)] public float weight6 = 0f;       // Purple — introduced by solve ramp
         [Range(0, 1)] public float weight7 = 0f;       // Teal — introduced by solve ramp
@@ -67,6 +67,11 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float hotStreakDuration = 10f;
     [SerializeField] private float hotStreakMultiplier = 5f;
 
+    [Header("Star Rating Thresholds (BP)")]
+    [SerializeField] private int star1Threshold = 300;
+    [SerializeField] private int star2Threshold = 600;
+    [SerializeField] private int star3Threshold = 1000;
+
     [Header("Debug Mode")]
     [SerializeField] private bool debugMode = false;
     [SerializeField] private int debugStartingBP = 500;
@@ -92,6 +97,21 @@ public class GameManager : MonoBehaviour
     public int HighScoreBP => PlayerPrefs.GetInt(HIGH_SCORE_BP_KEY, 0);
     public int TotalGamesPlayed => PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0);
     public bool IsNewHighScore { get; private set; }
+
+    /// <summary>
+    /// Calculate star rating (0-3) based on total BP earned this round.
+    /// </summary>
+    public int GetStarRating(int totalBP)
+    {
+        if (totalBP >= star3Threshold) return 3;
+        if (totalBP >= star2Threshold) return 2;
+        if (totalBP >= star1Threshold) return 1;
+        return 0;
+    }
+
+    public int Star1Threshold => star1Threshold;
+    public int Star2Threshold => star2Threshold;
+    public int Star3Threshold => star3Threshold;
 
     // Multiplier state (SolveCount exposed for performance-based tile weight ramp)
     private int solveCount = 0;

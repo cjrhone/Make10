@@ -58,11 +58,11 @@ public class GridManager : MonoBehaviour
     private float lastTenTime = 0f;
     
     [Header("Tile Value Weights (fallback if no GameManager)")]
-    [SerializeField] private float weight0 = 0.08f;    // Grey (wildcard) — helpful early
-    [SerializeField] private float weight1 = 0.24f;    // Gold — dominant primary
+    [SerializeField] private float weight0 = 0.12f;    // Grey (wildcard) — boosted for easy early 10s
+    [SerializeField] private float weight1 = 0.28f;    // Gold — boosted primary, easiest combos
     [SerializeField] private float weight2 = 0.26f;    // Blue — dominant
     [SerializeField] private float weight3 = 0.22f;    // Green — strong mid-range
-    [SerializeField] private float weight4 = 0.12f;    // Coral — reduced
+    [SerializeField] private float weight4 = 0.08f;    // Coral — further reduced
     [SerializeField] private float weight5 = 0f;       // Orange — introduced by solve ramp
     [SerializeField] private float weight6 = 0f;       // Purple — introduced by solve ramp
     [SerializeField] private float weight7 = 0f;       // Teal — introduced by solve ramp

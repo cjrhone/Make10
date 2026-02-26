@@ -148,11 +148,11 @@ Multiplier Growth:
 Base weights defined in both `GameManager.cs` (GameSettings class) and `GridManager.cs` (fallback).
 Only tiles 0-4 have base weight; tiles 5-7 start at 0 and are introduced by the solve-based ramp:
 ```
-0: 0.08  Grey   (wildcard) — helpful early for easy 10s
-1: 0.24  Gold   — dominant primary
+0: 0.12  Grey   (wildcard) — boosted for easy early 10s
+1: 0.28  Gold   — boosted primary, easiest combos
 2: 0.26  Blue   — dominant (pairs well with 3s)
 3: 0.22  Green  — strong mid-range
-4: 0.20  Red    — solid base
+4: 0.08  Coral  — further reduced, less clutter
 5: 0.00  Orange — introduced after 2 solves (ramps to 0.10)
 6: 0.00  Purple — introduced after 5 solves (ramps to 0.06)
 7: 0.00  Teal   — introduced after 8 solves (ramps to 0.02)
@@ -281,22 +281,24 @@ Available in `AnimationUtilities.cs`:
 
 ### P1 — Star Rating System & Scoring Overhaul
 
-**Star Rating — New Feature (does not exist yet)**
+**Star Rating — ✓ IMPLEMENTED**
 
-Goal: Replace raw BP number with a 1-3 star rating that gives players a clear target each round. Stars should feel achievable but progressively harder.
+1-3 star rating displayed on the results screen after the total BP count-up. Stars are created procedurally using TMP ★ characters (no sprite assets needed).
 
-**Where to implement:**
-- **Star thresholds:** Define in `GameManager.cs` alongside existing scoring constants (lines ~49-68). Could be flat values or scale with round number via `RunManager.Instance.RoundNumber`
-- **Star calculation:** New method in `GameManager.cs`, called from `TimeUp()` (line ~586) after final score is known
-- **Star display on results screen:** `UIManager.cs` → `ShowWinScreenBreakdown()` (line ~789). Add star visuals after the total BP line. Use `AnimationUtilities.PopIn()` for each star reveal
-- **Star assets:** Need 2 sprites — filled star + empty star outline. Place in `Assets/Images/`
-- **Round-over summary:** Stars could display alongside the "YOU ARE A GENIUS!" title text (winScreen object)
+**Implementation:**
+- **Thresholds:** `GameManager.cs` — `star1Threshold` (300 BP), `star2Threshold` (600 BP), `star3Threshold` (1000 BP). Serialized fields, tunable in Inspector
+- **Calculation:** `GameManager.GetStarRating(int totalBP)` returns 0-3 stars
+- **Threshold accessors:** `GameManager.Star1Threshold`, `Star2Threshold`, `Star3Threshold` (read-only)
+- **Display:** `UIManager.ShowStarRating(int starsEarned)` — creates 3 star objects in a HorizontalLayoutGroup inside BreakdownContainer. Each star pops in one at a time using `AnimationUtilities.PopIn()`. Earned stars are gold, unearned are dim grey
+- **Wired in:** `UIManager.ShowWinScreenBreakdown()` — stars appear after TOTAL count-up, before high score banner
+- **Cleanup:** Stars destroyed in `HideBreakdownElements()` when results screen resets
+- **Styling:** `starFilledColor` (gold), `starEmptyColor` (dim grey), `starSize` (64), `starRevealDelay` (0.25s) — all serialized
 
-**Suggested star thresholds (tunable):**
+**Star thresholds:**
 ```
-★       = 50+ BP (easy — just keep matching)
-★★      = 150+ BP (requires consistent multiplier usage)
-★★★     = 300+ BP (requires hot streak activation)
+★       = 300+ BP (steady matching)
+★★      = 600+ BP (requires consistent multiplier usage)
+★★★     = 1000+ BP (requires hot streak mastery)
 ```
 
 **Scoring Improvements**
