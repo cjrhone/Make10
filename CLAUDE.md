@@ -144,13 +144,31 @@ Multiplier Growth:
 - **Matching**: Rows/columns summing to exactly 10
 - **Cascade**: Tiles fall after match, new tiles spawn
 
-### Progressive Tile Weights (Arcade Difficulty)
-The key arcade mechanic — difficulty ramps within each round:
-- **Start of round**: Only tiles 0-4 spawn
-- **~20 seconds in**: 5s begin appearing (low initial weight, ramps up)
-- **~40 seconds in**: 6s begin appearing (low initial weight, ramps up)
-- Configurable via `startingMaxNumber`, `introduce5AtTime`, `introduce6AtTime`, `newNumberInitialWeight`, `weightRampSpeed`
-- `OnRoundStarted()` resets the timer each round
+### Tile Weights (Base Distribution)
+Base weights defined in both `GameManager.cs` (GameSettings class) and `GridManager.cs` (fallback).
+Only tiles 0-4 have base weight; tiles 5-7 start at 0 and are introduced by the solve-based ramp:
+```
+0: 0.08  Grey   (wildcard) — helpful early for easy 10s
+1: 0.24  Gold   — dominant primary
+2: 0.26  Blue   — dominant (pairs well with 3s)
+3: 0.22  Green  — strong mid-range
+4: 0.20  Red    — solid base
+5: 0.00  Orange — introduced after 2 solves (ramps to 0.10)
+6: 0.00  Purple — introduced after 5 solves (ramps to 0.06)
+7: 0.00  Teal   — introduced after 8 solves (ramps to 0.02)
+```
+
+### Progressive Difficulty Ramp (Solve-Based)
+High tiles (5, 6, 7) are introduced based on **player performance** (number of matches cleared), not elapsed time.
+This means struggling players keep getting easy boards, while skilled players face increasing challenge:
+- **5s appear**: After 2 solves (start at weight 0.02, ramp to 0.10)
+- **6s appear**: After 5 solves (start at weight 0.01, ramp to 0.06)
+- **7s appear**: After 8 solves (start at weight 0.005, ramp to 0.02)
+- **Full ramp**: At 12 solves, all high tiles are at max weight
+- **Low tile reduction**: Tiles 0-4 gently reduce to 85% as high tiles ramp in
+- **Method**: `GetWeightedRandomValue()` in `GridManager.cs` reads `GameManager.Instance.SolveCount`
+- Configurable via `solvesFor5s`, `solvesFor6s`, `solvesFor7s`, `maxWeight5/6/7`, `solvesToFullRamp`, `baseTileReduction`
+- `SolveCount` resets each round via `GameManager.ProcessSingleSolve()`
 
 ### Tile Colors
 ```
@@ -182,8 +200,14 @@ The key arcade mechanic — difficulty ramps within each round:
 | Hot Streak Duration | 10s | GameManager |
 | Grid Size | 5×5 | GridManager |
 | Canvas Resolution | 1080×1920 | Canvas |
-| Introduce 5s at | 20s | GridManager |
-| Introduce 6s at | 40s | GridManager |
+| 5s Appear After | 2 solves | GridManager |
+| 6s Appear After | 5 solves | GridManager |
+| 7s Appear After | 8 solves | GridManager |
+| Max Weight 5s | 0.10 | GridManager |
+| Max Weight 6s | 0.06 | GridManager |
+| Max Weight 7s | 0.02 | GridManager |
+| Full Ramp At | 12 solves | GridManager |
+| Base Tile Reduction | 0.85 | GridManager |
 
 ---
 

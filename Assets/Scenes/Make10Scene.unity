@@ -1540,8 +1540,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 42
-  m_fontSizeBase: 42
+  m_fontSize: 58
+  m_fontSizeBase: 58
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -2766,8 +2766,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 150}
-  m_SizeDelta: {x: 350, y: 90}
+  m_AnchoredPosition: {x: 1.2286, y: 185}
+  m_SizeDelta: {x: 566.23, y: 145.6025}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &288641638
 MonoBehaviour:
@@ -3410,8 +3410,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 42
-  m_fontSizeBase: 42
+  m_fontSize: 58
+  m_fontSizeBase: 58
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -5199,8 +5199,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 255}
-  m_SizeDelta: {x: 350, y: 90}
+  m_AnchoredPosition: {x: -0.21635, y: 371}
+  m_SizeDelta: {x: 563.34, y: 144.8595}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &512812419
 MonoBehaviour:
@@ -6787,7 +6787,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -48.3562}
+  m_AnchoredPosition: {x: 0, y: -48.356262}
   m_SizeDelta: {x: -184.9, y: -1053.688}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &695977313
@@ -11486,21 +11486,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7505bc91c1e2142318d8b3038c0236de, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ShopManager
-  shopPanel: {fileID: 1008238837}
-  titleText: {fileID: 0}
-  bpAmountText: {fileID: 0}
-  cardsContainer: {fileID: 0}
-  nextRoundButton: {fileID: 0}
-  bpBackdrop: {fileID: 0}
-  backgroundColor: {r: 0.1, g: 0.1, b: 0.15, a: 0.95}
-  titleColor: {r: 1, g: 0.9, b: 0.3, a: 1}
-  bpColor: {r: 0.3, g: 0.9, b: 0.5, a: 1}
-  bpBackdropColor: {r: 0, g: 0, b: 0, a: 0.7}
-  buttonColor: {r: 0.2, g: 0.6, b: 0.9, a: 1}
-  titleFontSize: 72
-  bpCountUpDuration: 0.8
-  bpCountUpDelay: 0.3
-  shopMusic: {fileID: 8300000, guid: ca9dc88cde06b472993c0ef7d394a529, type: 3}
 --- !u!21 &1230899398
 Material:
   serializedVersion: 8
@@ -15076,8 +15061,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 42
-  m_fontSizeBase: 42
+  m_fontSize: 58
+  m_fontSizeBase: 58
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -16642,7 +16627,6 @@ MonoBehaviour:
   mainMenuPanel: {fileID: 68437846}
   optionsPanel: {fileID: 1516882962}
   gamePanel: {fileID: 1694822198}
-  shopPanel: {fileID: 1008238837}
   tutorialPanel1: {fileID: 1862183837}
   tutorialPanel2: {fileID: 801159656}
   countdownPanel: {fileID: 158306165}
@@ -17805,8 +17789,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0}
   m_AnchorMax: {x: 0.5, y: 0}
-  m_AnchoredPosition: {x: 0, y: 360}
-  m_SizeDelta: {x: 350, y: 90}
+  m_AnchoredPosition: {x: 0, y: 546}
+  m_SizeDelta: {x: 563.7745, y: 144.9706}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1877129517
 MonoBehaviour:

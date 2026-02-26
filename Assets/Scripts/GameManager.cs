@@ -23,14 +23,14 @@ public class GameManager : MonoBehaviour
         public int winScore = 100;
 
         [Header("Tile Weights (base weights for tiles 0-9)")]
-        [Range(0, 1)] public float weight0 = 0.10f;
-        [Range(0, 1)] public float weight1 = 0.22f;
-        [Range(0, 1)] public float weight2 = 0.24f;
-        [Range(0, 1)] public float weight3 = 0.18f;
-        [Range(0, 1)] public float weight4 = 0.14f;
-        [Range(0, 1)] public float weight5 = 0.04f;
-        [Range(0, 1)] public float weight6 = 0.025f;
-        [Range(0, 1)] public float weight7 = 0.01f;
+        [Range(0, 1)] public float weight0 = 0.08f;   // Grey (wildcard) — helpful early
+        [Range(0, 1)] public float weight1 = 0.24f;    // Gold — dominant primary
+        [Range(0, 1)] public float weight2 = 0.26f;    // Blue — dominant (pairs well with 3s)
+        [Range(0, 1)] public float weight3 = 0.22f;    // Green — strong mid-range
+        [Range(0, 1)] public float weight4 = 0.20f;    // Red — solid base
+        [Range(0, 1)] public float weight5 = 0f;       // Orange — introduced by solve ramp
+        [Range(0, 1)] public float weight6 = 0f;       // Purple — introduced by solve ramp
+        [Range(0, 1)] public float weight7 = 0f;       // Teal — introduced by solve ramp
         [Range(0, 1)] public float weight8 = 0f;
         [Range(0, 1)] public float weight9 = 0f;
 
@@ -93,8 +93,9 @@ public class GameManager : MonoBehaviour
     public int TotalGamesPlayed => PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0);
     public bool IsNewHighScore { get; private set; }
 
-    // Multiplier state
+    // Multiplier state (SolveCount exposed for performance-based tile weight ramp)
     private int solveCount = 0;
+    public int SolveCount => solveCount;
     private float currentMultiplier = 1f;
     private float multiplierTimer = 0f;
     private bool multiplierActive = false;

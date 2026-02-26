@@ -31,8 +31,8 @@ public class GridManager : MonoBehaviour
     public MatchChecker matchChecker;
     
     [Header("Animation Settings")]
-    [SerializeField] private float tileFallSpeed = 800f;
-    [SerializeField] private float tileFallDelay = 0.05f;
+    [SerializeField] private float tileFallSpeed = 1600f;
+    [SerializeField] private float tileFallDelay = 0.02f;
     [SerializeField] private float postClearDelay = 0.05f;
     [SerializeField] private float tileSwapDuration = 0.15f;
     [SerializeField] private float unsolvableResetDelay = 1f;
@@ -58,21 +58,24 @@ public class GridManager : MonoBehaviour
     private float lastTenTime = 0f;
     
     [Header("Tile Value Weights (fallback if no GameManager)")]
-    [SerializeField] private float weight0 = 0.10f;
-    [SerializeField] private float weight1 = 0.22f;
-    [SerializeField] private float weight2 = 0.24f;
-    [SerializeField] private float weight3 = 0.18f;
-    [SerializeField] private float weight4 = 0.14f;
-    [SerializeField] private float weight5 = 0.04f;
-    [SerializeField] private float weight6 = 0.025f;
-    [SerializeField] private float weight7 = 0.01f;
+    [SerializeField] private float weight0 = 0.08f;    // Grey (wildcard) — helpful early
+    [SerializeField] private float weight1 = 0.24f;    // Gold — dominant primary
+    [SerializeField] private float weight2 = 0.26f;    // Blue — dominant
+    [SerializeField] private float weight3 = 0.22f;    // Green — strong mid-range
+    [SerializeField] private float weight4 = 0.20f;    // Red — solid base
+    [SerializeField] private float weight5 = 0f;       // Orange — introduced by solve ramp
+    [SerializeField] private float weight6 = 0f;       // Purple — introduced by solve ramp
+    [SerializeField] private float weight7 = 0f;       // Teal — introduced by solve ramp
 
-    [Header("Progressive Difficulty - Smooth Boost")]
-    [SerializeField] private float boostIntervalSeconds = 60f;  // Every 60s, boost increases
-    [SerializeField] private float boostPerInterval = 0.3f;     // +30% boost per interval
-    [SerializeField] private float maxBoostMultiplier = 3.0f;   // Hard cap: 3x base weight for high tiles
-    [SerializeField] private float baseTileReduction = 0.85f;   // Low tiles reduce to 85% at max difficulty
-    [SerializeField] private int highTileThreshold = 5;         // Tiles >= this get boosted over time
+    [Header("Progressive Difficulty - Solve-Based Ramp")]
+    [SerializeField] private int solvesFor5s = 2;               // 5s start appearing after this many solves
+    [SerializeField] private int solvesFor6s = 5;               // 6s start appearing after this many solves
+    [SerializeField] private int solvesFor7s = 8;               // 7s start appearing after this many solves
+    [SerializeField] private float maxWeight5 = 0.10f;          // Max weight for 5s at full ramp
+    [SerializeField] private float maxWeight6 = 0.06f;          // Max weight for 6s at full ramp
+    [SerializeField] private float maxWeight7 = 0.02f;          // Max weight for 7s at full ramp
+    [SerializeField] private int solvesToFullRamp = 12;          // Solves needed for all high tiles at max weight
+    [SerializeField] private float baseTileReduction = 0.85f;   // Low tiles reduce as high tiles ramp in
 
     [Header("Hint System")]
     [SerializeField] private bool enableHints = true;
@@ -96,8 +99,7 @@ public class GridManager : MonoBehaviour
     private HintMove currentHint = null;
     private List<GameObject> activeHintParticles = new List<GameObject>();
 
-    // Progressive difficulty state
-    private float roundStartTime = 0f;
+    // Progressive difficulty state (solve-based ramp reads GameManager.Instance.SolveCount)
 
     // Drag-swap state
     private bool isDragging = false;
@@ -108,11 +110,11 @@ public class GridManager : MonoBehaviour
 
     /// <summary>
     /// Called when a round starts to reset progressive tile weight tracking.
+    /// Solve-based ramp reads from GameManager.Instance.SolveCount (reset per round by GameManager).
     /// </summary>
     public void OnRoundStarted()
     {
-        roundStartTime = Time.time;
-        Debug.Log("[GridManager] Round started - progressive weights reset");
+        Debug.Log("[GridManager] Round started - solve-based weight ramp active");
     }
 
     /// <summary>
@@ -407,9 +409,7 @@ public class GridManager : MonoBehaviour
             return;
         }
 
-        // Reset round timer so GetWeightedRandomValue() doesn't use stale elapsed time
-        // (prevents 3x boost on initial spawn when editor has been running)
-        roundStartTime = Time.time;
+        // Solve-based ramp reads GameManager.Instance.SolveCount directly — no timer needed
         
         // Get grid size from GameManager (difficulty-based)
         UpdateGridSizeFromDifficulty();
@@ -499,9 +499,9 @@ public class GridManager : MonoBehaviour
     
     private int GetWeightedRandomValue()
     {
-        float elapsed = Time.time - roundStartTime;
+        int solves = GameManager.Instance != null ? GameManager.Instance.SolveCount : 0;
 
-        // Get base weights from GameManager or fallback
+        // Get base weights from GameManager or fallback (0-4 have weight, 5-7 start at 0)
         float[] currentWeights = GetCurrentWeights();
 
         // Build adjusted weight array (always 10 elements for tiles 0-9)
@@ -511,30 +511,36 @@ public class GridManager : MonoBehaviour
             adjustedWeights[i] = currentWeights[i];
         }
 
-        // Calculate smooth boost for high tiles (5-7) based on elapsed time
-        float intervals = elapsed / boostIntervalSeconds;
-        float boostMultiplier = Mathf.Min(1.0f + (intervals * boostPerInterval), maxBoostMultiplier);
+        // Solve-based ramp: high tiles (5, 6, 7) gradually introduced as player clears matches
+        // Each tile type has a solve threshold (when it first appears) and ramps to max weight
+        float rampProgress = Mathf.Clamp01((float)solves / solvesToFullRamp);
 
-        // Calculate max intervals for reduction lerp (based on when boost would cap)
-        float maxIntervals = (maxBoostMultiplier - 1.0f) / boostPerInterval;
-        float reductionT = Mathf.Clamp01(intervals / maxIntervals);
-
-        // Apply boost to high tiles (5+) and gentle reduction to base tiles (0-4)
-        for (int i = 0; i < adjustedWeights.Length; i++)
+        // 5s: appear after solvesFor5s, ramp to maxWeight5
+        if (solves >= solvesFor5s)
         {
-            if (adjustedWeights[i] <= 0f) continue; // Skip zero-weight tiles (8, 9)
+            float t5 = Mathf.Clamp01((float)(solves - solvesFor5s) / (solvesToFullRamp - solvesFor5s));
+            adjustedWeights[5] = Mathf.Lerp(0.02f, maxWeight5, t5);  // Start tiny, grow to max
+        }
 
-            if (i >= highTileThreshold)
-            {
-                // High tiles get boosted over time
-                adjustedWeights[i] *= boostMultiplier;
-            }
-            else
-            {
-                // Base tiles gently reduce over time (never below baseTileReduction of original)
-                float reduction = Mathf.Lerp(1.0f, baseTileReduction, reductionT);
-                adjustedWeights[i] *= reduction;
-            }
+        // 6s: appear after solvesFor6s, ramp to maxWeight6
+        if (solves >= solvesFor6s)
+        {
+            float t6 = Mathf.Clamp01((float)(solves - solvesFor6s) / (solvesToFullRamp - solvesFor6s));
+            adjustedWeights[6] = Mathf.Lerp(0.01f, maxWeight6, t6);
+        }
+
+        // 7s: appear after solvesFor7s, ramp to maxWeight7
+        if (solves >= solvesFor7s)
+        {
+            float t7 = Mathf.Clamp01((float)(solves - solvesFor7s) / (solvesToFullRamp - solvesFor7s));
+            adjustedWeights[7] = Mathf.Lerp(0.005f, maxWeight7, t7);
+        }
+
+        // Gently reduce base tiles (0-4) as high tiles ramp in, keeping board playable
+        float reduction = Mathf.Lerp(1.0f, baseTileReduction, rampProgress);
+        for (int i = 0; i <= 4; i++)
+        {
+            adjustedWeights[i] *= reduction;
         }
 
         // Weighted random selection (normalized)
@@ -545,7 +551,7 @@ public class GridManager : MonoBehaviour
         }
 
         if (totalWeight <= 0f)
-            return Random.Range(0, 8); // Fallback: tiles 0-7
+            return Random.Range(0, 5); // Fallback: easy tiles only
 
         float roll = Random.value * totalWeight;
         float cumulative = 0f;
@@ -557,7 +563,7 @@ public class GridManager : MonoBehaviour
                 return i;
         }
 
-        return Random.Range(0, 8); // Fallback: tiles 0-7
+        return Random.Range(0, 5); // Fallback: easy tiles only
     }
     
     #region Initial Match Prevention
@@ -1096,10 +1102,8 @@ public class GridManager : MonoBehaviour
                 tileValues
             );
             
-            yield return new WaitForSeconds(postClearDelay);
             yield return StartCoroutine(DropTilesCoroutine());
             yield return StartCoroutine(SpawnNewTilesCoroutine());
-            yield return new WaitForSeconds(0.05f);
         }
         
         GameManager.Instance?.OnCascadeEnd();
@@ -1572,68 +1576,79 @@ public class GridManager : MonoBehaviour
         Debug.Log($"Cleared {tiles.Count} tiles");
     }
     
+    /// <summary>
+    /// Single-pass drop: calculate ALL final positions at once, animate ALL in parallel.
+    /// No more multi-iteration waiting — every tile finds its final slot immediately.
+    /// </summary>
     private IEnumerator DropTilesCoroutine()
     {
-        bool anyTileDropped = true;
-        
-        while (anyTileDropped)
+        float longestDuration = 0f;
+
+        // For each column, compact all tiles downward in one pass
+        for (int x = 0; x < gridWidth; x++)
         {
-            anyTileDropped = false;
-            List<Coroutine> dropAnimations = new List<Coroutine>();
-            
-            for (int x = 0; x < gridWidth; x++)
+            int writeY = gridHeight - 1; // Bottom-most empty slot to fill
+
+            // Scan from bottom to top, packing tiles down
+            for (int readY = gridHeight - 1; readY >= 0; readY--)
             {
-                for (int y = gridHeight - 1; y >= 0; y--)
+                if (grid[x, readY] != null)
                 {
-                    if (grid[x, y] == null)
+                    if (readY != writeY)
                     {
-                        for (int above = y - 1; above >= 0; above--)
-                        {
-                            if (grid[x, above] != null)
-                            {
-                                Tile tileToMove = grid[x, above];
-                                grid[x, y] = tileToMove;
-                                grid[x, above] = null;
-                                tileToMove.GridY = y;
-                                
-                                Vector2 targetPos = GridToWorldPosition(x, y);
-                                dropAnimations.Add(StartCoroutine(AnimateTileFall(tileToMove, targetPos)));
-                                anyTileDropped = true;
-                                break;
-                            }
-                        }
+                        Tile tileToMove = grid[x, readY];
+                        grid[x, writeY] = tileToMove;
+                        grid[x, readY] = null;
+                        tileToMove.GridY = writeY;
+
+                        Vector2 targetPos = GridToWorldPosition(x, writeY);
+                        float distance = Vector2.Distance(tileToMove.GetRectTransform().anchoredPosition, targetPos);
+                        float duration = distance / tileFallSpeed;
+                        longestDuration = Mathf.Max(longestDuration, duration);
+
+                        StartCoroutine(AnimateTileFall(tileToMove, targetPos));
                     }
+                    writeY--;
                 }
             }
-            
-            foreach (Coroutine c in dropAnimations)
-                yield return c;
         }
+
+        // Wait for the longest fall to finish (capped at 0.4s + bounce time)
+        if (longestDuration > 0f)
+            yield return new WaitForSeconds(Mathf.Min(longestDuration, 0.4f) + 0.06f);
     }
-    
+
+    /// <summary>
+    /// Animate a single tile falling to target position.
+    /// Uses ease-out (fast start, decelerates into landing) for a snappy, natural drop feel.
+    /// Duration is capped so even long falls stay quick.
+    /// </summary>
     private IEnumerator AnimateTileFall(Tile tile, Vector2 targetPosition)
     {
         if (tile == null) yield break;
-        
+
         RectTransform rt = tile.GetRectTransform();
         Vector2 startPos = rt.anchoredPosition;
         float distance = Vector2.Distance(startPos, targetPosition);
-        float duration = distance / tileFallSpeed;
-        
+        // Speed-based duration, capped at 0.4s so long falls stay quick but not jarring
+        float duration = Mathf.Min(distance / tileFallSpeed, 0.4f);
+
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / duration;
-            float easedT = 1f - Mathf.Pow(1f - t, 2f);
+            float t = Mathf.Clamp01(elapsed / duration);
+            // Ease-out: fast drop, decelerates into landing (1 - (1-t)^2)
+            float easedT = 1f - (1f - t) * (1f - t);
             rt.anchoredPosition = Vector2.Lerp(startPos, targetPosition, easedT);
             yield return null;
         }
-        
+
         rt.anchoredPosition = targetPosition;
-        yield return StartCoroutine(TileLandBounce(tile));
+        // Fire-and-forget bounce — doesn't block the pipeline
+        StartCoroutine(TileLandBounce(tile));
     }
-    
+
     private IEnumerator TileLandBounce(Tile tile)
     {
         if (tile == null) yield break;
@@ -1641,7 +1656,7 @@ public class GridManager : MonoBehaviour
         Transform t = tile.transform;
         t.localScale = new Vector3(1.1f, 0.9f, 1f);
 
-        // Sparkle on land — spread across tile width
+        // Sparkle on land
         GridVFX.Instance?.SpawnLandSparkle(tile.GetRectTransform().anchoredPosition, tileSize);
 
         yield return new WaitForSeconds(0.03f);
@@ -1649,53 +1664,69 @@ public class GridManager : MonoBehaviour
         yield return new WaitForSeconds(0.03f);
         t.localScale = Vector3.one;
     }
-    
+
+    /// <summary>
+    /// Spawn new tiles one by one with a small stagger delay between each.
+    /// Tiles spawn just above the grid and drop into place. The stagger gives a
+    /// satisfying "filling in" cascade rather than everything popping in at once.
+    /// </summary>
     private IEnumerator SpawnNewTilesCoroutine()
     {
-        List<(int x, int y, Tile tile)> tilesToDrop = new List<(int, int, Tile)>();
-        
+        // Collect all empty slots, ordered bottom-row-first so tiles fill from the bottom up
+        List<(int x, int y)> emptySlots = new List<(int, int)>();
+
         for (int x = 0; x < gridWidth; x++)
         {
-            int spawnIndex = 0;
             for (int y = gridHeight - 1; y >= 0; y--)
             {
                 if (grid[x, y] == null)
-                {
-                    Vector2 spawnPos = GridToWorldPosition(x, -1 - spawnIndex);
-                    GameObject tileObj = Instantiate(tilePrefab, gridContainer);
-                    Tile newTile = tileObj.GetComponent<Tile>();
-                    
-                    if (newTile != null)
-                    {
-                        int value = GetWeightedRandomValue();
-                        newTile.Initialize(value, x, y);
-                        newTile.SetPosition(spawnPos);
-                        newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
-                        // Font size handled by TextMeshPro auto-sizing in prefab
-
-                        grid[x, y] = newTile;
-                        tilesToDrop.Add((x, y, newTile));
-                    }
-                    spawnIndex++;
-                }
+                    emptySlots.Add((x, y));
             }
         }
-        
-        tilesToDrop.Sort((a, b) => {
+
+        if (emptySlots.Count == 0) yield break;
+
+        // Sort: bottom rows first, then left to right (natural fill order)
+        emptySlots.Sort((a, b) => {
             if (a.y != b.y) return b.y.CompareTo(a.y);
             return a.x.CompareTo(b.x);
         });
-        
-        for (int i = 0; i < tilesToDrop.Count; i++)
+
+        float lastFallDuration = 0f;
+
+        for (int i = 0; i < emptySlots.Count; i++)
         {
-            var (x, y, tile) = tilesToDrop[i];
-            Vector2 targetPos = GridToWorldPosition(x, y);
-            StartCoroutine(AnimateTileFall(tile, targetPos));
-            yield return new WaitForSeconds(tileFallDelay);
+            var (x, y) = emptySlots[i];
+
+            // Spawn just above the grid
+            Vector2 spawnPos = GridToWorldPosition(x, -1);
+            GameObject tileObj = Instantiate(tilePrefab, gridContainer);
+            Tile newTile = tileObj.GetComponent<Tile>();
+
+            if (newTile != null)
+            {
+                int value = GetWeightedRandomValue();
+                newTile.Initialize(value, x, y);
+                newTile.SetPosition(spawnPos);
+                newTile.GetRectTransform().sizeDelta = new Vector2(tileSize, tileSize);
+
+                grid[x, y] = newTile;
+
+                Vector2 targetPos = GridToWorldPosition(x, y);
+                float distance = Vector2.Distance(spawnPos, targetPos);
+                lastFallDuration = Mathf.Min(distance / tileFallSpeed, 0.4f);
+
+                StartCoroutine(AnimateTileFall(newTile, targetPos));
+            }
+
+            // Small stagger between each tile appearing (0.04s feels like a quick cascade)
+            yield return new WaitForSeconds(0.04f);
         }
-        
-        yield return new WaitForSeconds(0.05f);
-        Debug.Log("New tiles spawned");
+
+        // Wait for the last tile to finish falling + bounce
+        yield return new WaitForSeconds(lastFallDuration + 0.06f);
+
+        Debug.Log($"New tiles spawned: {emptySlots.Count}");
     }
     
     public Tile GetTile(int x, int y)
