@@ -350,7 +350,7 @@ public class GameManager : MonoBehaviour
     /// <summary>
     /// Called when a match is cleared, with tile values for enhanced number bonuses.
     /// </summary>
-    public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched, List<int> tileValues)
+    public void OnMatchCleared(int tilesCleared, int rowsMatched, int columnsMatched, List<int> tileValues, MatchResult matchResult = null)
     {
         if (!IsGameActive) return;
 
@@ -364,7 +364,16 @@ public class GameManager : MonoBehaviour
 
         for (int i = 0; i < linesCleared; i++)
         {
-            ProcessSingleSolve(tileValues);
+            // Determine the base score for this specific line (10, 20, 30, or 40)
+            int lineBaseScore = (matchResult != null) ? matchResult.GetLineSumByIndex(i) : baseMatchScore;
+            ProcessSingleSolve(tileValues, lineBaseScore);
+        }
+
+        // Ultra combo bonus: 5+ simultaneous lines awards a flat 1000 BP bonus
+        if (linesCleared >= 5)
+        {
+            Debug.Log($"<color=red>★★★ ULTRA COMBO! {linesCleared} LINES! +1000 BONUS BP ★★★</color>");
+            CommitScore(1000);
         }
     }
 
@@ -384,14 +393,15 @@ public class GameManager : MonoBehaviour
     #region Scoring
 
     /// <summary>
-    /// Process a single solve (Make10), applying all upgrade and snack bonuses.
+    /// Process a single solve, applying all upgrade and snack bonuses.
+    /// lineBaseScore is the actual sum of the matched line (10, 20, 30, or 40).
     /// </summary>
-    private void ProcessSingleSolve(List<int> tileValues = null)
+    private void ProcessSingleSolve(List<int> tileValues = null, int lineBaseScore = 10)
     {
         // During Hot Streak, use special scoring
         if (hotStreakActive)
         {
-            ProcessHotStreakSolve(tileValues);
+            ProcessHotStreakSolve(tileValues, lineBaseScore);
             return;
         }
 
@@ -399,6 +409,8 @@ public class GameManager : MonoBehaviour
         timeSinceLastSolve = 0f;
 
         var (effectiveBaseScore, enhancedBonus) = CalculateCommonBonuses(tileValues);
+        // Override base score with the line's actual sum
+        effectiveBaseScore = lineBaseScore;
 
         int pointsAwarded = 0;
 
@@ -569,10 +581,13 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Process scoring during Hot Streak (called from ProcessSingleSolve when hot streak is active).
+    /// lineBaseScore is the actual sum of the matched line (10, 20, 30, or 40).
     /// </summary>
-    private void ProcessHotStreakSolve(List<int> tileValues = null)
+    private void ProcessHotStreakSolve(List<int> tileValues = null, int lineBaseScore = 10)
     {
         var (effectiveBaseScore, enhancedBonus) = CalculateCommonBonuses(tileValues);
+        // Override base score with the line's actual sum
+        effectiveBaseScore = lineBaseScore;
 
         int multipliedScore = Mathf.RoundToInt(effectiveBaseScore * effectiveHotStreakMultiplier);
         int pointsAwarded = multipliedScore + enhancedBonus;

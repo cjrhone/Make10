@@ -47,6 +47,10 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip scoreTickSmallSFX;     // Small particle hits progress bar
     [SerializeField] private AudioClip scoreTickBigSFX;       // Big particle hits progress bar
 
+    [Header("Combo SFX")]
+    [SerializeField] private AudioClip comboMergeSFX;           // 2-4 line combo merge sound
+    [SerializeField] private AudioClip ultraComboSFX;           // 5-line ultra combo (very rare)
+
     // Volume state
     private float musicVolume;
     private float sfxVolume;
@@ -234,6 +238,8 @@ public class AudioManager : MonoBehaviour
     public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
     public void PlayScoreTickSmall() => PlaySFX(scoreTickSmallSFX);
     public void PlayScoreTickBig() => PlaySFX(scoreTickBigSFX);
+    public void PlayComboSound() => PlaySFX(comboMergeSFX);
+    public void PlayUltraComboSound() => PlaySFX(ultraComboSFX);
 
     #endregion
     

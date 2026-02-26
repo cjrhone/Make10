@@ -117,9 +117,15 @@ No "win" or "lose" — every round ends when the timer hits zero. The results sc
 
 ### Base Scoring
 ```
-First solve:  10 pts (no multiplier)
-Second solve: 10 pts + MULTIPLIER ACTIVATED (×1.25)
-Each solve:   10 × multiplier + increment
+Lines matching a multiple of 10 score their sum as base BP:
+  Line sums to 10 → 10 BP base
+  Line sums to 20 → 20 BP base
+  Line sums to 30 → 30 BP base
+  Line sums to 40 → 40 BP base (requires 8-tiles, future)
+
+First solve:  lineSum pts (no multiplier)
+Second solve: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
+Each solve:   lineSum × multiplier + increment
 
 Multiplier Growth:
 - Start: ×1.25
@@ -127,6 +133,15 @@ Multiplier Growth:
 - Max: ×3.00
 - Beyond max: TRIGGERS HOT STREAK (×5.00)
 ```
+
+### Combo Merge System
+When 2+ lines match simultaneously, individual popups fly inward and merge:
+- **2-4 lines**: Merge animation shows combined total (e.g., 10+20 → "30")
+- **5 lines (ultra rare)**: Displays "1000", awards 1000 bonus BP, max shake + particle burst
+- **Combo sound**: `comboMergeSFX` (AudioManager, Inspector-assignable)
+- **Ultra combo sound**: `ultraComboSFX` (AudioManager, Inspector-assignable)
+- **Color scheme**: 10=gold, 20=orange, 30=purple, 40=red
+- Per-line scoring still happens individually (combo visual is additive flair)
 
 ### Hot Streak Mode
 - **Trigger**: Multiplier exceeds ×3.00
@@ -140,9 +155,10 @@ Multiplier Growth:
 
 ### Configuration
 - **Size**: 5×5 grid (hardcoded in arcade mode)
-- **Tile Values**: 0-6 with weighted distribution
-- **Matching**: Rows/columns summing to exactly 10
+- **Tile Values**: 0-7 with weighted distribution
+- **Matching**: Rows/columns summing to any multiple of 10 (10, 20, 30, 40)
 - **Cascade**: Tiles fall after match, new tiles spawn
+- **Match Detection**: `MatchChecker.IsValidMatch(sum)` → `sum > 0 && sum % 10 == 0`
 
 ### Tile Weights (Base Distribution)
 Base weights defined in both `GameManager.cs` (GameSettings class) and `GridManager.cs` (fallback).

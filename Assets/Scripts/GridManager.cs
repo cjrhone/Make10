@@ -599,7 +599,7 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Scans all rows and columns, returns any where the sum equals exactly 10.
+    /// Scans all rows and columns, returns any where the sum is a valid match (multiple of 10).
     /// </summary>
     private List<(int index, bool isRow)> FindMatchingLines()
     {
@@ -615,7 +615,7 @@ public class GridManager : MonoBehaviour
                 if (grid[x, y] == null) { valid = false; break; }
                 sum += grid[x, y].Value;
             }
-            if (valid && sum == 10)
+            if (valid && sum > 0 && sum % 10 == 0)
                 matches.Add((y, true));
         }
 
@@ -629,7 +629,7 @@ public class GridManager : MonoBehaviour
                 if (grid[x, y] == null) { valid = false; break; }
                 sum += grid[x, y].Value;
             }
-            if (valid && sum == 10)
+            if (valid && sum > 0 && sum % 10 == 0)
                 matches.Add((x, false));
         }
 
@@ -638,8 +638,8 @@ public class GridManager : MonoBehaviour
 
     /// <summary>
     /// Picks a random tile in the given matching line and re-rolls its value
-    /// until the line no longer sums to 10, also avoiding creating a new match
-    /// in the perpendicular direction through that tile.
+    /// until the line no longer sums to a multiple of 10, also avoiding creating
+    /// a new match in the perpendicular direction through that tile.
     /// </summary>
     private void ReRollTileToBreakMatch(int lineIndex, bool isRow)
     {
@@ -694,7 +694,7 @@ public class GridManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Check if a single row or column sums to exactly 10.
+    /// Check if a single row or column sums to a valid match (multiple of 10).
     /// </summary>
     private bool CheckLineSum(int lineIndex, bool isRow)
     {
@@ -709,7 +709,7 @@ public class GridManager : MonoBehaviour
             sum += grid[x, y].Value;
         }
 
-        return sum == 10;
+        return sum > 0 && sum % 10 == 0;
     }
 
     #endregion
@@ -1099,7 +1099,8 @@ public class GridManager : MonoBehaviour
                 result.TotalMatchedTiles,
                 result.matchedRows.Count,
                 result.matchedColumns.Count,
-                tileValues
+                tileValues,
+                result
             );
             
             yield return StartCoroutine(DropTilesCoroutine());
@@ -1293,24 +1294,20 @@ public class GridManager : MonoBehaviour
             GridVFX.Instance.PulseAmbientParticles();
         }
 
-        // Spawn a "10" popup + explosion for EACH matched line simultaneously
-        List<Vector2> lineCenters = GetPerLineCenters(result);
-        if (lineCenters.Count <= 1)
+        // Spawn popup + explosion for matched lines, with per-line sums
+        List<(Vector2 center, int sum)> lineData = GetPerLineCentersWithSums(result);
+        if (lineData.Count <= 1)
         {
-            // Single match — use the convergence center (more precise)
-            yield return StartCoroutine(ShowTenEffectSpectacular(centerPos));
+            // Single match — full "10" popup animation at convergence center
+            int singleSum = lineData.Count > 0 ? lineData[0].sum : 10;
+            yield return StartCoroutine(ShowTenEffectSpectacular(centerPos, singleSum));
         }
         else
         {
-            // Multiple simultaneous matches — fire one popup per line, all at once
-            List<Coroutine> tenEffects = new List<Coroutine>();
-            foreach (Vector2 lineCenter in lineCenters)
-            {
-                tenEffects.Add(StartCoroutine(ShowTenEffectSpectacular(lineCenter)));
-            }
-            // Wait for all to finish
-            foreach (Coroutine c in tenEffects)
-                yield return c;
+            // Multiple simultaneous matches — skip individual popups, go straight to combo merge.
+            // PlayComboMerge handles everything: spawning numbers, flying them inward,
+            // showing the combined total, and particle explosions — all within ~0.55s
+            yield return StartCoroutine(PlayComboMerge(lineData));
         }
 
         if (GameManager.Instance != null)
@@ -1368,15 +1365,36 @@ public class GridManager : MonoBehaviour
 
         return centers;
     }
+
+    /// <summary>
+    /// Get center positions AND sums for each matched line (rows first, then columns).
+    /// </summary>
+    private List<(Vector2 center, int sum)> GetPerLineCentersWithSums(MatchResult result)
+    {
+        List<(Vector2, int)> data = new List<(Vector2, int)>();
+        int midX = gridWidth / 2;
+        int midY = gridHeight / 2;
+
+        foreach (int row in result.matchedRows)
+            data.Add((GridToWorldPosition(midX, row), result.rowSums.ContainsKey(row) ? result.rowSums[row] : 10));
+
+        foreach (int col in result.matchedColumns)
+            data.Add((GridToWorldPosition(col, midY), result.columnSums.ContainsKey(col) ? result.columnSums[col] : 10));
+
+        return data;
+    }
     
-    private IEnumerator ShowTenEffectSpectacular(Vector2 position)
+    private IEnumerator ShowTenEffectSpectacular(Vector2 position, int lineSum = 10)
     {
         // Chain tracking, SFX, and shake are handled in AnimateSolveSequence (once per cascade).
-        // This method now only handles the visual "10" popup + particle explosion per position.
+        // This method now only handles the visual popup + particle explosion per position.
 
-        // Calculate scale based on consecutive 10s
+        // Calculate scale based on consecutive matches + boost for higher sums
         float tenScale = Mathf.Min(baseTenScale + (consecutive10Count - 1) * tenScaleIncrement, maxTenScale);
-        Debug.Log($"<color=yellow>Consecutive 10s: {consecutive10Count}, Scale: {tenScale:F2}</color>");
+        float sumBoost = ((lineSum / 10f) - 1f) * 0.15f; // +15% per multiple above 10
+        tenScale += sumBoost;
+        tenScale = Mathf.Min(tenScale, maxTenScale * 1.5f);
+        Debug.Log($"<color=yellow>Match sum: {lineSum}, Consecutive: {consecutive10Count}, Scale: {tenScale:F2}</color>");
 
         // Trigger particle explosion VFX immediately with the 10 text
         float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
@@ -1390,20 +1408,24 @@ public class GridManager : MonoBehaviour
 
         RectTransform tenRT = tenObj.AddComponent<RectTransform>();
         tenRT.anchoredPosition = position;
-        tenRT.sizeDelta = new Vector2(200f * scaleFactor * tenScale, 120f * scaleFactor * tenScale);
+        tenRT.sizeDelta = new Vector2(280f * scaleFactor * tenScale, 170f * scaleFactor * tenScale);
 
         TMPro.TMP_Text tenText = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
-        tenText.text = "10";
-        tenText.fontSize = 82 * scaleFactor * tenScale;
+        tenText.text = lineSum.ToString();
+        tenText.fontSize = 120 * scaleFactor * tenScale;
         tenText.fontStyle = TMPro.FontStyles.Bold;
-        tenText.color = tenGlowColor;
         tenText.alignment = TMPro.TextAlignmentOptions.Center;
+
+        // Color tinting based on sum value
+        Color sumColor = GetSumColor(lineSum);
+        tenText.color = sumColor;
         tenText.enableVertexGradient = true;
+        Color sumColorLight = Color.Lerp(sumColor, Color.white, 0.5f);
         tenText.colorGradient = new TMPro.VertexGradient(
-            new Color(1f, 1f, 0.8f),
-            new Color(1f, 1f, 0.8f),
-            new Color(1f, 0.8f, 0.2f),
-            new Color(1f, 0.8f, 0.2f)
+            sumColorLight,
+            sumColorLight,
+            sumColor,
+            sumColor
         );
 
         GameObject glowObj = new GameObject("TenEffect_Glow");
@@ -1413,13 +1435,14 @@ public class GridManager : MonoBehaviour
 
         RectTransform glowRT = glowObj.AddComponent<RectTransform>();
         glowRT.anchoredPosition = position;
-        glowRT.sizeDelta = new Vector2(200f * scaleFactor * tenScale, 120f * scaleFactor * tenScale);
+        glowRT.sizeDelta = new Vector2(280f * scaleFactor * tenScale, 170f * scaleFactor * tenScale);
 
         TMPro.TMP_Text glowText = glowObj.AddComponent<TMPro.TextMeshProUGUI>();
-        glowText.text = "10";
-        glowText.fontSize = 90 * scaleFactor * tenScale;
+        glowText.text = lineSum.ToString();
+        glowText.fontSize = 130 * scaleFactor * tenScale;
         glowText.fontStyle = TMPro.FontStyles.Bold;
-        glowText.color = new Color(1f, 0.95f, 0.5f, 0.4f);
+        Color glowColor = GetSumColor(lineSum);
+        glowText.color = new Color(glowColor.r, glowColor.g, glowColor.b, 0.4f);
         glowText.alignment = TMPro.TextAlignmentOptions.Center;
         
         List<(RectTransform rt, Image img, Vector2 velocity, float rotSpeed)> sparkles = 
@@ -1562,7 +1585,239 @@ public class GridManager : MonoBehaviour
                 Destroy(obj);
         }
     }
-    
+
+    /// <summary>
+    /// Get a color for a line sum value (used for popup text tinting).
+    /// </summary>
+    private Color GetSumColor(int sum)
+    {
+        return sum switch
+        {
+            10 => new Color(1f, 0.9f, 0.3f, 1f),     // Gold (classic)
+            20 => new Color(1f, 0.6f, 0.15f, 1f),     // Orange
+            30 => new Color(0.85f, 0.3f, 0.85f, 1f),  // Purple
+            40 => new Color(1f, 0.2f, 0.2f, 1f),      // Red
+            _ => new Color(1f, 1f, 0.8f, 1f),          // White-gold fallback
+        };
+    }
+
+    /// <summary>
+    /// Get a color for the combo merged number based on line count.
+    /// </summary>
+    private Color GetComboColor(int comboCount)
+    {
+        return comboCount switch
+        {
+            2 => new Color(1f, 0.75f, 0.15f, 1f),     // Bright orange-gold
+            3 => new Color(0.9f, 0.35f, 0.9f, 1f),    // Purple
+            4 => new Color(1f, 0.25f, 0.25f, 1f),     // Red
+            _ => new Color(1f, 0.1f, 0.1f, 1f),       // Deep red (5+ lines)
+        };
+    }
+
+    /// <summary>
+    /// Combo merge animation: individual line numbers fly inward and combine into a merged total.
+    /// For 5+ line combos, displays "1000" with ultra effects.
+    /// </summary>
+    /// <summary>
+    /// Self-contained combo merge: spawns individual numbers at line centers, flies them inward,
+    /// shows the merged total, and fires particle explosions. Total duration ~0.55s (matching single match).
+    /// For 5+ line ultra combos, timing is slightly extended with extra VFX.
+    /// </summary>
+    private IEnumerator PlayComboMerge(List<(Vector2 center, int sum)> lineData)
+    {
+        int lineCount = lineData.Count;
+        int totalSum = 0;
+        foreach (var (_, sum) in lineData)
+            totalSum += sum;
+
+        bool isUltraCombo = lineCount >= 5;
+        string displayText = isUltraCombo ? "1000" : totalSum.ToString();
+
+        // Play combo sound immediately
+        if (isUltraCombo)
+            AudioManager.Instance?.PlayUltraComboSound();
+        else
+            AudioManager.Instance?.PlayComboSound();
+
+        // Fire particle explosions at each line center (replaces ShowTenEffectSpectacular's explosions)
+        float currentMultiplier = GameManager.Instance?.CurrentMultiplier ?? 1f;
+        foreach (var (center, _) in lineData)
+            TenExplosionVFX.Instance?.TriggerExplosion(center, currentMultiplier, gridContainer);
+
+        // Create number text at each line center (instantly visible, no pop-in delay)
+        List<GameObject> mergeObjects = new List<GameObject>();
+        List<(RectTransform rt, Vector2 startPos)> mergeItems = new List<(RectTransform, Vector2)>();
+
+        for (int i = 0; i < lineData.Count; i++)
+        {
+            var (center, sum) = lineData[i];
+            GameObject numObj = new GameObject($"ComboNumber_{i}");
+            numObj.transform.SetParent(gridContainer, false);
+            mergeObjects.Add(numObj);
+
+            RectTransform rt = numObj.AddComponent<RectTransform>();
+            rt.anchoredPosition = center;
+            rt.sizeDelta = new Vector2(200f * scaleFactor, 120f * scaleFactor);
+
+            TMPro.TMP_Text txt = numObj.AddComponent<TMPro.TextMeshProUGUI>();
+            txt.text = sum.ToString();
+            txt.fontSize = 90 * scaleFactor;
+            txt.fontStyle = TMPro.FontStyles.Bold;
+            txt.color = GetSumColor(sum);
+            txt.alignment = TMPro.TextAlignmentOptions.Center;
+
+            mergeItems.Add((rt, center));
+        }
+
+        // === Phase 1: Numbers fly toward grid center (0.2s) ===
+        Vector2 gridCenter = Vector2.zero;
+        float mergeDuration = 0.2f;
+        float mergeElapsed = 0f;
+
+        while (mergeElapsed < mergeDuration)
+        {
+            mergeElapsed += Time.deltaTime;
+            float t = mergeElapsed / mergeDuration;
+            float easeT = t * t; // Ease-in (accelerating)
+
+            for (int i = 0; i < mergeItems.Count; i++)
+            {
+                if (mergeObjects[i] == null) continue;
+                var (rt, startPos) = mergeItems[i];
+                rt.anchoredPosition = Vector2.Lerp(startPos, gridCenter, easeT);
+
+                float scale = Mathf.Lerp(1f, 0.3f, easeT);
+                mergeObjects[i].transform.localScale = Vector3.one * scale;
+
+                TMPro.TMP_Text txt = mergeObjects[i].GetComponent<TMPro.TMP_Text>();
+                if (txt != null)
+                {
+                    Color c = txt.color;
+                    c.a = Mathf.Lerp(1f, 0f, easeT);
+                    txt.color = c;
+                }
+            }
+            yield return null;
+        }
+
+        foreach (GameObject obj in mergeObjects)
+            if (obj != null) Destroy(obj);
+
+        // === Phase 2: Merged number pop-in at center (0.1s) ===
+        GameObject finalObj = new GameObject("ComboMergedNumber");
+        finalObj.transform.SetParent(gridContainer, false);
+
+        RectTransform finalRT = finalObj.AddComponent<RectTransform>();
+        finalRT.anchoredPosition = gridCenter;
+        float finalWidth = isUltraCombo ? 400f : 280f;
+        finalRT.sizeDelta = new Vector2(finalWidth * scaleFactor, 170f * scaleFactor);
+
+        TMPro.TMP_Text finalTxt = finalObj.AddComponent<TMPro.TextMeshProUGUI>();
+        finalTxt.text = displayText;
+        float finalFontSize = isUltraCombo ? 160f : 130f;
+        finalTxt.fontSize = finalFontSize * scaleFactor;
+        finalTxt.fontStyle = TMPro.FontStyles.Bold;
+        finalTxt.alignment = TMPro.TextAlignmentOptions.Center;
+
+        Color comboColor = isUltraCombo ? new Color(1f, 0.15f, 0.15f, 1f) : GetComboColor(lineCount);
+        finalTxt.color = comboColor;
+        finalTxt.enableVertexGradient = true;
+        Color comboLight = Color.Lerp(comboColor, Color.white, 0.5f);
+        finalTxt.colorGradient = new TMPro.VertexGradient(comboLight, comboLight, comboColor, comboColor);
+
+        // Glow behind merged number
+        GameObject finalGlow = new GameObject("ComboMergedGlow");
+        finalGlow.transform.SetParent(gridContainer, false);
+        finalGlow.transform.SetSiblingIndex(finalObj.transform.GetSiblingIndex());
+
+        RectTransform glowRT = finalGlow.AddComponent<RectTransform>();
+        glowRT.anchoredPosition = gridCenter;
+        glowRT.sizeDelta = new Vector2(finalWidth * scaleFactor, 170f * scaleFactor);
+
+        TMPro.TMP_Text glowTxt = finalGlow.AddComponent<TMPro.TextMeshProUGUI>();
+        glowTxt.text = displayText;
+        glowTxt.fontSize = (finalFontSize + 10f) * scaleFactor;
+        glowTxt.fontStyle = TMPro.FontStyles.Bold;
+        glowTxt.color = new Color(comboColor.r, comboColor.g, comboColor.b, 0.35f);
+        glowTxt.alignment = TMPro.TextAlignmentOptions.Center;
+
+        // Shake + center explosion on merge impact
+        if (isUltraCombo)
+        {
+            if (GridVFX.Instance != null)
+            {
+                GridVFX.Instance.TriggerShake(10);
+                GridVFX.Instance.PulseAmbientParticles();
+            }
+            TenExplosionVFX.Instance?.TriggerExplosion(gridCenter, 5f, gridContainer);
+            TenExplosionVFX.Instance?.TriggerExplosion(gridCenter + new Vector2(50f, 30f), 5f, gridContainer);
+            TenExplosionVFX.Instance?.TriggerExplosion(gridCenter + new Vector2(-50f, -30f), 5f, gridContainer);
+        }
+        else
+        {
+            if (GridVFX.Instance != null)
+                GridVFX.Instance.TriggerShake(lineCount + 1);
+            TenExplosionVFX.Instance?.TriggerExplosion(gridCenter, 2f, gridContainer);
+        }
+
+        // Quick pop-in with overshoot (0.1s)
+        finalObj.transform.localScale = Vector3.zero;
+        finalGlow.transform.localScale = Vector3.zero;
+        float popDuration = 0.1f;
+        float popElapsed = 0f;
+
+        while (popElapsed < popDuration)
+        {
+            popElapsed += Time.deltaTime;
+            float t = popElapsed / popDuration;
+            float overshoot = Mathf.Lerp(0f, 1f, t) * (1f + Mathf.Sin(t * Mathf.PI) * 0.5f);
+            finalObj.transform.localScale = Vector3.one * overshoot;
+            finalGlow.transform.localScale = Vector3.one * overshoot * 1.2f;
+            yield return null;
+        }
+        finalObj.transform.localScale = Vector3.one;
+        finalGlow.transform.localScale = Vector3.one * 1.2f;
+
+        // === Phase 3: Brief hold + fade (0.25s total, or 0.45s for ultra) ===
+        float holdAndFadeDuration = isUltraCombo ? 0.45f : 0.25f;
+        float hfElapsed = 0f;
+        Vector2 holdStart = gridCenter;
+        float fadeStartT = 0.5f; // Fade begins at 50% of hold duration
+
+        while (hfElapsed < holdAndFadeDuration)
+        {
+            hfElapsed += Time.deltaTime;
+            float t = hfElapsed / holdAndFadeDuration;
+
+            // Float upward gently
+            finalRT.anchoredPosition = holdStart + new Vector2(0, Mathf.Sin(t * Mathf.PI) * 15f * scaleFactor);
+            float pulse = 1f + Mathf.Sin(hfElapsed * 14f) * 0.04f;
+            finalObj.transform.localScale = Vector3.one * pulse;
+
+            // Glow pulse + fade
+            float glowPulse = 1.2f + Mathf.Sin(hfElapsed * 11f) * 0.08f;
+            finalGlow.transform.localScale = Vector3.one * glowPulse;
+            float glowAlpha = Mathf.Lerp(0.35f, 0f, t);
+            glowTxt.color = new Color(comboColor.r, comboColor.g, comboColor.b, glowAlpha);
+
+            // Text fades out in second half
+            if (t > fadeStartT)
+            {
+                float fadeT = (t - fadeStartT) / (1f - fadeStartT);
+                Color c = finalTxt.color;
+                c.a = Mathf.Lerp(1f, 0f, fadeT);
+                finalTxt.color = c;
+                finalObj.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.2f, fadeT);
+            }
+
+            yield return null;
+        }
+
+        Destroy(finalObj);
+        Destroy(finalGlow);
+    }
+
     private void ClearMatchedTiles(HashSet<Tile> tiles)
     {
         foreach (Tile tile in tiles)

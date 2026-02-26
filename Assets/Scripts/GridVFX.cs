@@ -28,10 +28,10 @@ public class GridVFX : MonoBehaviour
     [SerializeField] private float edgeFade = 0.12f;
 
     [Header("Screen Shake Settings")]
-    [SerializeField] private float baseShakeIntensity = 4f;
-    [SerializeField] private float shakeIntensityPerChain = 2f;
-    [SerializeField] private float maxShakeIntensity = 18f;
-    [SerializeField] private float shakeDuration = 0.2f;
+    [SerializeField] private float baseShakeIntensity = 8f;
+    [SerializeField] private float shakeIntensityPerChain = 3f;
+    [SerializeField] private float maxShakeIntensity = 24f;
+    [SerializeField] private float shakeDuration = 0.3f;
     [SerializeField] private float shakeFrequency = 35f;
 
     [Header("Tile Sparkle Settings")]

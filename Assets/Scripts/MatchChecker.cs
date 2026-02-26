@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Evaluates the grid for valid matches (rows/columns that sum to 10).
+/// Evaluates the grid for valid matches (rows/columns that sum to a multiple of 10).
 /// Pure logic - no MonoBehaviour needed, but using it for easy inspector access.
 /// </summary>
 public class MatchChecker : MonoBehaviour
@@ -22,6 +22,14 @@ public class MatchChecker : MonoBehaviour
         {
             gridManager = FindFirstObjectByType<GridManager>();
         }
+    }
+
+    /// <summary>
+    /// Check if a sum is a valid match (any positive multiple of 10).
+    /// </summary>
+    private bool IsValidMatch(int sum)
+    {
+        return sum > 0 && sum % 10 == 0;
     }
     
     /// <summary>
@@ -61,7 +69,7 @@ public class MatchChecker : MonoBehaviour
         for (int y = 0; y < gridSize.y; y++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, y, isRow: true);
-            if (sum == targetSum)
+            if (IsValidMatch(sum))
             {
                 foreach (Tile tile in tiles)
                     matchedTiles.Add(tile);
@@ -74,7 +82,7 @@ public class MatchChecker : MonoBehaviour
         for (int x = 0; x < gridSize.x; x++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, x, isRow: false);
-            if (sum == targetSum)
+            if (IsValidMatch(sum))
             {
                 foreach (Tile tile in tiles)
                     matchedTiles.Add(tile);
@@ -107,9 +115,10 @@ public class MatchChecker : MonoBehaviour
         for (int y = 0; y < gridSize.y; y++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, y, isRow: true);
-            if (sum == targetSum)
+            if (IsValidMatch(sum))
             {
                 result.matchedRows.Add(y);
+                result.rowSums[y] = sum;
                 foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
             }
@@ -119,9 +128,10 @@ public class MatchChecker : MonoBehaviour
         for (int x = 0; x < gridSize.x; x++)
         {
             var (tiles, sum) = GetLineTiles(grid, gridSize, x, isRow: false);
-            if (sum == targetSum)
+            if (IsValidMatch(sum))
             {
                 result.matchedColumns.Add(x);
+                result.columnSums[x] = sum;
                 foreach (Tile tile in tiles)
                     result.allMatchedTiles.Add(tile);
             }
@@ -204,7 +214,7 @@ public class MatchChecker : MonoBehaviour
         int sum = 0;
         for (int x = 0; x < gridSize.x; x++)
             sum += GetValueAfterSwap(x, y1);
-        if (sum == targetSum) return true;
+        if (IsValidMatch(sum)) return true;
         
         // Check row y2 (only if different from y1)
         if (y1 != y2)
@@ -212,14 +222,14 @@ public class MatchChecker : MonoBehaviour
             sum = 0;
             for (int x = 0; x < gridSize.x; x++)
                 sum += GetValueAfterSwap(x, y2);
-            if (sum == targetSum) return true;
+            if (IsValidMatch(sum)) return true;
         }
         
         // Check column x1
         sum = 0;
         for (int y = 0; y < gridSize.y; y++)
             sum += GetValueAfterSwap(x1, y);
-        if (sum == targetSum) return true;
+        if (IsValidMatch(sum)) return true;
         
         // Check column x2 (only if different from x1)
         if (x1 != x2)
@@ -227,28 +237,32 @@ public class MatchChecker : MonoBehaviour
             sum = 0;
             for (int y = 0; y < gridSize.y; y++)
                 sum += GetValueAfterSwap(x2, y);
-            if (sum == targetSum) return true;
+            if (IsValidMatch(sum)) return true;
         }
         
         return false;
     }
     
     /// <summary>
-    /// Check if any combination of tiles can sum to 10.
+    /// Check if any combination of tiles can sum to a multiple of 10 (10, 20, 30, or 40).
     /// </summary>
     public bool HasValidMoves()
     {
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
-        
+
         List<int> allValues = new List<int>();
         for (int y = 0; y < gridSize.y; y++)
             for (int x = 0; x < gridSize.x; x++)
                 if (grid[x, y] != null)
                     allValues.Add(grid[x, y].Value);
-        
+
         int tilesPerLine = gridSize.x;
-        return CanSum(allValues, tilesPerLine, targetSum, 0);
+        // Check all reachable multiples of 10
+        return CanSum(allValues, tilesPerLine, 10, 0)
+            || CanSum(allValues, tilesPerLine, 20, 0)
+            || CanSum(allValues, tilesPerLine, 30, 0)
+            || CanSum(allValues, tilesPerLine, 40, 0);
     }
     
     private bool CanSum(List<int> values, int count, int target, int startIndex)
@@ -292,7 +306,7 @@ public class MatchChecker : MonoBehaviour
                     values += tile.Value + " ";
                 }
             }
-            string matchIndicator = (sum == targetSum) ? " ← MATCH!" : "";
+            string matchIndicator = IsValidMatch(sum) ? $" ← MATCH! (×{sum/10})" : "";
             output += $"  Row {y}: [{values.Trim()}] = {sum}{matchIndicator}\n";
         }
         
@@ -310,7 +324,7 @@ public class MatchChecker : MonoBehaviour
                     values += tile.Value + " ";
                 }
             }
-            string matchIndicator = (sum == targetSum) ? " ← MATCH!" : "";
+            string matchIndicator = IsValidMatch(sum) ? $" ← MATCH! (×{sum/10})" : "";
             output += $"  Col {x}: [{values.Trim()}] = {sum}{matchIndicator}\n";
         }
         
@@ -376,7 +390,7 @@ public class MatchChecker : MonoBehaviour
             sum += v;
             vals += v + " ";
         }
-        output += $"  Row {y1}: [{vals.Trim()}] = {sum}" + (sum == 10 ? " ← MATCH!" : "") + "\n";
+        output += $"  Row {y1}: [{vals.Trim()}] = {sum}" + (IsValidMatch(sum) ? " ← MATCH!" : "") + "\n";
         
         // Check row y2 (if different)
         if (y1 != y2)
@@ -389,7 +403,7 @@ public class MatchChecker : MonoBehaviour
                 sum += v;
                 vals += v + " ";
             }
-            output += $"  Row {y2}: [{vals.Trim()}] = {sum}" + (sum == 10 ? " ← MATCH!" : "") + "\n";
+            output += $"  Row {y2}: [{vals.Trim()}] = {sum}" + (IsValidMatch(sum) ? " ← MATCH!" : "") + "\n";
         }
         
         // Check column x1
@@ -401,7 +415,7 @@ public class MatchChecker : MonoBehaviour
             sum += v;
             vals += v + " ";
         }
-        output += $"  Col {x1}: [{vals.Trim()}] = {sum}" + (sum == 10 ? " ← MATCH!" : "") + "\n";
+        output += $"  Col {x1}: [{vals.Trim()}] = {sum}" + (IsValidMatch(sum) ? " ← MATCH!" : "") + "\n";
         
         // Check column x2 (if different)
         if (x1 != x2)
@@ -414,7 +428,7 @@ public class MatchChecker : MonoBehaviour
                 sum += v;
                 vals += v + " ";
             }
-            output += $"  Col {x2}: [{vals.Trim()}] = {sum}" + (sum == 10 ? " ← MATCH!" : "") + "\n";
+            output += $"  Col {x2}: [{vals.Trim()}] = {sum}" + (IsValidMatch(sum) ? " ← MATCH!" : "") + "\n";
         }
         
         Debug.Log(output);
@@ -430,14 +444,39 @@ public class MatchResult
     public HashSet<Tile> allMatchedTiles = new HashSet<Tile>();
     public List<int> matchedRows = new List<int>();
     public List<int> matchedColumns = new List<int>();
-    
+
+    /// <summary>Per-line sums: rowIndex → sum (10, 20, 30, 40)</summary>
+    public Dictionary<int, int> rowSums = new Dictionary<int, int>();
+    /// <summary>Per-line sums: colIndex → sum (10, 20, 30, 40)</summary>
+    public Dictionary<int, int> columnSums = new Dictionary<int, int>();
+
     public bool HasMatches => allMatchedTiles.Count > 0;
     public int TotalMatchedTiles => allMatchedTiles.Count;
     public int TotalLines => matchedRows.Count + matchedColumns.Count;
-    
+
     public bool IsIntersection(Tile tile)
     {
         return matchedRows.Contains(tile.GridY) && matchedColumns.Contains(tile.GridX);
+    }
+
+    /// <summary>
+    /// Get the sum for a line by its index in iteration order (rows first, then columns).
+    /// Same order as GetPerLineCenters uses.
+    /// </summary>
+    public int GetLineSumByIndex(int lineIndex)
+    {
+        int idx = 0;
+        foreach (int row in matchedRows)
+        {
+            if (idx == lineIndex) return rowSums.ContainsKey(row) ? rowSums[row] : 10;
+            idx++;
+        }
+        foreach (int col in matchedColumns)
+        {
+            if (idx == lineIndex) return columnSums.ContainsKey(col) ? columnSums[col] : 10;
+            idx++;
+        }
+        return 10; // Fallback
     }
 }
 
