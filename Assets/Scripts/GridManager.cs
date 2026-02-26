@@ -62,7 +62,7 @@ public class GridManager : MonoBehaviour
     [SerializeField] private float weight1 = 0.24f;    // Gold — dominant primary
     [SerializeField] private float weight2 = 0.26f;    // Blue — dominant
     [SerializeField] private float weight3 = 0.22f;    // Green — strong mid-range
-    [SerializeField] private float weight4 = 0.20f;    // Red — solid base
+    [SerializeField] private float weight4 = 0.12f;    // Coral — reduced
     [SerializeField] private float weight5 = 0f;       // Orange — introduced by solve ramp
     [SerializeField] private float weight6 = 0f;       // Purple — introduced by solve ramp
     [SerializeField] private float weight7 = 0f;       // Teal — introduced by solve ramp

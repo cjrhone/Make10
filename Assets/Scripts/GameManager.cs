@@ -27,7 +27,7 @@ public class GameManager : MonoBehaviour
         [Range(0, 1)] public float weight1 = 0.24f;    // Gold — dominant primary
         [Range(0, 1)] public float weight2 = 0.26f;    // Blue — dominant (pairs well with 3s)
         [Range(0, 1)] public float weight3 = 0.22f;    // Green — strong mid-range
-        [Range(0, 1)] public float weight4 = 0.20f;    // Red — solid base
+        [Range(0, 1)] public float weight4 = 0.12f;    // Coral — reduced, was too dominant
         [Range(0, 1)] public float weight5 = 0f;       // Orange — introduced by solve ramp
         [Range(0, 1)] public float weight6 = 0f;       // Purple — introduced by solve ramp
         [Range(0, 1)] public float weight7 = 0f;       // Teal — introduced by solve ramp

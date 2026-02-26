@@ -9160,8 +9160,8 @@ MonoBehaviour:
   tilePrefab: {fileID: 6642934317941504149, guid: 495dab5cc8fad4cdea2ea54844c28c5f, type: 3}
   gridContainer: {fileID: 622586887}
   matchChecker: {fileID: 22128014}
-  tileFallSpeed: 1400
-  tileFallDelay: 0.01
+  tileFallSpeed: 800
+  tileFallDelay: 0.05
   postClearDelay: 0.05
   tileSwapDuration: 0.15
   unsolvableResetDelay: 1
@@ -9177,19 +9177,22 @@ MonoBehaviour:
   tenScaleIncrement: 0.15
   maxTenScale: 2
   consecutiveResetTime: 2
-  weight0: 0.1
-  weight1: 0.22
-  weight2: 0.24
-  weight3: 0.18
-  weight4: 0.14
-  weight5: 0.04
-  weight6: 0.025
-  weight7: 0.01
-  boostIntervalSeconds: 60
-  boostPerInterval: 0.3
-  maxBoostMultiplier: 3
+  weight0: 0.08
+  weight1: 0.24
+  weight2: 0.26
+  weight3: 0.22
+  weight4: 0.2
+  weight5: 0
+  weight6: 0
+  weight7: 0
+  solvesFor5s: 2
+  solvesFor6s: 5
+  solvesFor7s: 8
+  maxWeight5: 0.1
+  maxWeight6: 0.06
+  maxWeight7: 0.02
+  solvesToFullRamp: 12
   baseTileReduction: 0.85
-  highTileThreshold: 5
   enableHints: 1
   hintDelay: 10
   hintRepeatInterval: 3
@@ -11936,14 +11939,14 @@ MonoBehaviour:
   gameSettings:
     gridSize: 5
     winScore: 100
-    weight0: 0.1
-    weight1: 0.22
-    weight2: 0.24
-    weight3: 0.18
-    weight4: 0.14
-    weight5: 0.04
-    weight6: 0.025
-    weight7: 0.01
+    weight0: 0.08
+    weight1: 0.24
+    weight2: 0.26
+    weight3: 0.22
+    weight4: 0.2
+    weight5: 0
+    weight6: 0
+    weight7: 0
     weight8: 0
     weight9: 0
   gameDuration: 60
@@ -11956,11 +11959,11 @@ MonoBehaviour:
   maxMultiplier: 3
   streakTimeout: 10
   timeBonusPerMatch: 1.5
-  hotStreakDuration: 15
+  hotStreakDuration: 10
   hotStreakMultiplier: 5
   debugMode: 0
   debugStartingBP: 500
-  uiManager: {fileID: 178623199}
+  uiManager: {fileID: 0}
 --- !u!4 &1333256940
 Transform:
   m_ObjectHideFlags: 0
