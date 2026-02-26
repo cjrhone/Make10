@@ -39,7 +39,7 @@ public class SceneFlowManager : MonoBehaviour
     
     // Screen width for swipe calculations
     private float screenWidth;
-    
+
     // Current state
     public enum GameState { Loading, MainMenu, Options, Game, Results, Shop, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
@@ -66,7 +66,7 @@ public class SceneFlowManager : MonoBehaviour
         InitializePanels();
         StartCoroutine(LoadingSequence());
     }
-    
+
     /// <summary>
     /// Creates a SafeArea container under the Canvas and moves all children into it.
     /// This ensures UI respects the safe area on notched/Dynamic Island iPhones.

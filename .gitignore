@@ -44,6 +44,10 @@ sysinfo.txt
 *.unitypackage
 *.app
 
+# Signing keystores (never commit these)
+*.keystore
+*.jks
+
 # Crashlytics generated file
 crashlytics-build.properties
 
