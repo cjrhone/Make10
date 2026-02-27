@@ -1788,6 +1788,10 @@ MonoBehaviour:
   highScoreText: {fileID: 0}
   newHighScoreBanner: {fileID: 0}
   newHighScoreColor: {r: 1, g: 0.85, b: 0.1, a: 1}
+  starFilledColor: {r: 1, g: 0.85, b: 0.1, a: 1}
+  starEmptyColor: {r: 0.4, g: 0.4, b: 0.4, a: 0.5}
+  starSize: 64
+  starRevealDelay: 0.25
   unsolvablePopup: {fileID: 731897464}
   unsolvablePopupDuration: 1
   gameManager: {fileID: 1333256939}
@@ -9160,8 +9164,8 @@ MonoBehaviour:
   tilePrefab: {fileID: 6642934317941504149, guid: 495dab5cc8fad4cdea2ea54844c28c5f, type: 3}
   gridContainer: {fileID: 622586887}
   matchChecker: {fileID: 22128014}
-  tileFallSpeed: 800
-  tileFallDelay: 0.05
+  tileFallSpeed: 1600
+  tileFallDelay: 0.02
   postClearDelay: 0.05
   tileSwapDuration: 0.15
   unsolvableResetDelay: 1
@@ -9177,11 +9181,11 @@ MonoBehaviour:
   tenScaleIncrement: 0.15
   maxTenScale: 2
   consecutiveResetTime: 2
-  weight0: 0.08
-  weight1: 0.24
+  weight0: 0.12
+  weight1: 0.28
   weight2: 0.26
   weight3: 0.22
-  weight4: 0.2
+  weight4: 0.08
   weight5: 0
   weight6: 0
   weight7: 0
@@ -9213,13 +9217,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8fd5b15cad4bb4cff86299b1a1288f75, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GridVFX
-  beamSprite: {fileID: 8389134475083476877, guid: cd11c48a4a1cb4b1ca26b54e315c7518, type: 3}
-  sparkleSprites:
-  - {fileID: -6470460504253458178, guid: e4c5ced3827974a6aa9192fca2d9a8fa, type: 3}
-  - {fileID: 4130640169021434097, guid: 105dd55d53e33415dba92a1e73062421, type: 3}
-  - {fileID: 8288426215254106694, guid: 916b822703ac94263bc9faf0ff2f4141, type: 3}
-  - {fileID: 4113829005332862926, guid: 3fdd7b56fffdb4f4fb5f03ac3834faa4, type: 3}
-  beamFlashDuration: 0.45
+  beamSprite: {fileID: -1540426309290004842, guid: ea18a5fcf89bf46c9867aa23c6ef35b1, type: 3}
+  sparkleSprites: []
+  beamFlashDuration: 0.3
   beamOvershoot: 1.2
   beamSparkleCount: 8
   beamSparkleSize: 28
@@ -9228,20 +9228,20 @@ MonoBehaviour:
   gradientPower: 1.5
   uvScrollSpeed: 3
   edgeFade: 0.12
-  baseShakeIntensity: 4
-  shakeIntensityPerChain: 2
-  maxShakeIntensity: 18
-  shakeDuration: 0.2
+  baseShakeIntensity: 8
+  shakeIntensityPerChain: 3
+  maxShakeIntensity: 24
+  shakeDuration: 0.3
   shakeFrequency: 35
-  sparklesPerTile: 3
-  sparkleLifetime: 0.4
-  sparkleSpeed: 80
-  sparkleSize: 10
+  sparklesPerTile: 5
+  sparkleLifetime: 0.45
+  sparkleSpeed: 90
+  sparkleSize: 14
   sparkleColorA: {r: 1, g: 0.95, b: 0.6, a: 0.9}
   sparkleColorB: {r: 0.6, g: 0.9, b: 1, a: 0.9}
   enableAmbientParticles: 1
   ambientParticleCount: 8
-  ambientSpeed: 20
+  ambientSpeed: 18
   ambientSizeMin: 4
   ambientSizeMax: 10
   ambientAlpha: 0.06
@@ -11939,11 +11939,11 @@ MonoBehaviour:
   gameSettings:
     gridSize: 5
     winScore: 100
-    weight0: 0.08
-    weight1: 0.24
+    weight0: 0.12
+    weight1: 0.28
     weight2: 0.26
     weight3: 0.22
-    weight4: 0.2
+    weight4: 0.08
     weight5: 0
     weight6: 0
     weight7: 0
@@ -11961,6 +11961,11 @@ MonoBehaviour:
   timeBonusPerMatch: 1.5
   hotStreakDuration: 10
   hotStreakMultiplier: 5
+  speedBonusThreshold: 4
+  speedBonusAmount: 5
+  star1Threshold: 300
+  star2Threshold: 600
+  star3Threshold: 1000
   debugMode: 0
   debugStartingBP: 500
   uiManager: {fileID: 0}
@@ -14780,7 +14785,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 114.780624, y: -56.520035}
+  m_AnchoredPosition: {x: 22, y: 17}
   m_SizeDelta: {x: 306.2682, y: 87.5052}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1529845908
@@ -16614,6 +16619,8 @@ MonoBehaviour:
   multiplierIncreaseSFX: {fileID: 8300000, guid: 21f24e4cd71c84089a2cc8132c55a3a0, type: 3}
   scoreTickSmallSFX: {fileID: 8300000, guid: 2e7ea6b159df54e36a38247262e0e39f, type: 3}
   scoreTickBigSFX: {fileID: 8300000, guid: d248ca25b92b8479a9aa364df5c23767, type: 3}
+  comboMergeSFX: {fileID: 0}
+  ultraComboSFX: {fileID: 0}
 --- !u!114 &1720076974
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -22,7 +22,7 @@ Make10 is an arcade-style number puzzle game where players swap tiles to create 
 ### Scene Flow & UI
 | Script | Purpose |
 |--------|---------|
-| `SceneFlowManager.cs` | Master scene controller, panel transitions (10 game states) |
+| `SceneFlowManager.cs` | Master scene controller, panel transitions (9 game states) |
 | `RunManager.cs` | Persistent run state: BP currency, round progression |
 | `UIManager.cs` | Score, timer, multiplier display, results screen, Balatro-style breakdown |
 | `MainMenuUI.cs` | Main menu button handlers |
@@ -31,19 +31,17 @@ Make10 is an arcade-style number puzzle game where players swap tiles to create 
 ### Audio & VFX
 | Script | Purpose |
 |--------|---------|
-| `AudioManager.cs` | Centralized audio (music, SFX, voice), volume persistence |
+| `AudioManager.cs` | Centralized audio (music, SFX, voice), volume persistence. 3 AudioSources. |
 | `TenExplosionVFX.cs` | Particle explosion on "10" matches, soft glow particles |
 | `GridVFX.cs` | Line sweep beams, ambient particles, screen shake, land sparkles |
 | `HotStreakEffect.cs` | Fire effects, flames, embers during hot streak mode |
-| `AvatarManager.cs` | Character avatar states and animations |
+| `AvatarManager.cs` | Character avatar states and animations (single Image, 6 static PNGs) |
 | `LoadingBarVFX.cs` | Loading screen procedural effects |
 
 ### Utilities
 | Script | Purpose |
 |--------|---------|
-| `AnimationUtilities.cs` | Static animation library (PunchScale, PopIn, CountUp, etc.) |
-| `ParallexBackground.cs` | Parallax scrolling for backgrounds |
-| `TutorialDemoWidget.cs` | Tutorial content helper |
+| `AnimationUtilities.cs` | Static animation library (PunchScale, PopIn, CountUp, etc.) — all linear Lerp except CountUp |
 | `GlowTextureGenerator.cs` | Procedural soft glow texture generation (circular & diamond) |
 | `UIStyleGuide.cs` | Centralized UI styling constants and window sizes |
 | `PlayerInventory.cs` | Minimal shell (singleton + ClearInventory). No upgrades in arcade mode. |
@@ -54,7 +52,7 @@ Make10 is an arcade-style number puzzle game where players swap tiles to create 
 
 ```
 GameManager.Instance        → Game state, scoring, multiplier, hot streak
-SceneFlowManager.Instance   → Scene transitions, 10 game states
+SceneFlowManager.Instance   → Scene transitions, 9 game states
 UIManager.Instance          → UI updates, results screen
 AudioManager.Instance       → Audio playback, volume control
 RunManager.Instance         → BP currency, round progression
@@ -66,49 +64,16 @@ GridVFX.Instance            → Line sweeps, ambient particles, screen shake
 
 ---
 
-## Game Flow (Arcade Mode)
+## Game Flow (Current — Arcade Only)
 
 ```
-Loading → MainMenu → (Tutorial?) → Countdown → Game → Time's Up → Results → [Continue] → Countdown → Next Round ...
+Loading → MainMenu → (Tutorial?) → Countdown → Game → Time's Up → Results → [Continue] → Next Round ...
                                                                     Results → [Main Menu] → MainMenu
 ```
 
-No "win" or "lose" — every round ends when the timer hits zero. The results screen shows BP earned with a Balatro-style breakdown, then players continue to the next round or return to the main menu.
-
 ### Game States (SceneFlowManager)
-- **Loading**: Initialization with progress bar (min 1.5s)
-- **MainMenu**: Play, Options, Quit buttons
-- **Tutorial1/2**: 2-part onboarding
-- **Countdown**: "3...2...1...GO!"
-- **Game**: Active gameplay (timer-based rounds)
-- **Results**: Score breakdown screen (Balatro-style count-up) with Play Again + Main Menu buttons
-- **Options**: Settings overlay
-- **Quit**: Exit confirmation
-
----
-
-## Brain Points (BP) - Game Currency
-
-### How BP is Earned
-
-| Source | Formula | Description |
-|--------|---------|-------------|
-| Matches | 10 BP × multiplier | Each row/column summing to 10 |
-| Hot Streak | ×5 multiplier | During hot streak mode |
-
-### Results Screen Breakdown (Balatro-style)
-
 ```
-┌─────────────────────────────────────┐
-│         YOU ARE A GENIUS!           │
-│                                     │
-│   Score                    128 BP   │  ← Count-up animation
-│   Hot Streak               x2.5     │  ← Instant
-│   ──────────────────────────────    │
-│   TOTAL                    398 BP   │  ← Count-up animation
-│                                     │
-│         [Continue]                  │  ← Restarts with countdown (next round)
-└─────────────────────────────────────┘
+Loading, MainMenu, Tutorial1, Tutorial2, Countdown, Game, Results, Options, Quit
 ```
 
 ---
@@ -118,116 +83,58 @@ No "win" or "lose" — every round ends when the timer hits zero. The results sc
 ### Base Scoring
 ```
 Lines matching a multiple of 10 score their sum as base BP:
-  Line sums to 10 → 10 BP base
-  Line sums to 20 → 20 BP base
-  Line sums to 30 → 30 BP base
-  Line sums to 40 → 40 BP base (requires 8-tiles, future)
+  10-sum → 10 BP, 20-sum → 20 BP, 30-sum → 30 BP
 
 PLAYER SWAP MATCHES (cascadeCount == 1):
-  First solve:  lineSum pts (no multiplier)
-  Second solve: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
-  Each solve:   lineSum × multiplier + increment + speedBonus
+  Solve #1: lineSum pts (no multiplier)
+  Solve #2: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
+  Solve #3+: lineSum × multiplier + speedBonus
   Also: adds time bonus (timeBonusPerMatch per line)
 
 CASCADE MATCHES (cascadeCount >= 2):
   Flat lineSum BP only — no multiplier, no time bonus, no speed bonus.
-  Multiplier timer is frozen during cascades (!IsProcessing gate).
-  Cascade solves do NOT increment SolveCount or trigger hot streak.
-
-Speed Bonus (player swaps only):
-  If solved within 4s of last player solve → +5 BP
-  Fields: speedBonusThreshold (4s), speedBonusAmount (5)
-
-Multiplier Growth:
-- Start: ×1.25
-- Increment: +0.25 per solve
-- Max: ×3.00
-- Beyond max: TRIGGERS HOT STREAK (×5.00)
-- Timer freezes during cascade processing (IsProcessing)
+  Does NOT increment SolveCount or trigger hot streak.
 ```
 
-### Combo Merge System
-When 2+ lines match simultaneously, individual popups fly inward and merge:
-- **2-4 lines**: Merge animation shows combined total (e.g., 10+20 → "30")
-- **5 lines (ultra rare)**: Displays "1000", awards 1000 bonus BP, max shake + particle burst
-- **Combo sound**: `comboMergeSFX` (AudioManager, Inspector-assignable)
-- **Ultra combo sound**: `ultraComboSFX` (AudioManager, Inspector-assignable)
-- **Color scheme**: 10=gold, 20=orange, 30=purple, 40=red
-- Per-line scoring still happens individually (combo visual is additive flair)
+### Multiplier & Hot Streak
+```
+Multiplier: ×1.25 start → +0.25 per solve → ×3.00 max → triggers Hot Streak (×5.00, 10s)
+Speed Bonus: +5 BP if solved within 4s of last player solve
+```
 
-### Hot Streak Mode
-- **Trigger**: Multiplier exceeds ×3.00
-- **Duration**: 10 seconds
-- **Multiplier**: Fixed ×5.00
-- **Effects**: Fire VFX, special music, avatar shake
+### Star Rating (✓ Implemented)
+```
+★       = 300+ BP
+★★      = 600+ BP
+★★★     = 1000+ BP
+```
 
 ---
 
 ## Grid System
 
-### Configuration
-- **Size**: 5×5 grid (hardcoded in arcade mode)
-- **Tile Values**: 0-7 with weighted distribution
-- **Matching**: Rows/columns summing to any multiple of 10 (10, 20, 30, 40)
-- **Cascade**: Tiles fall after match, new tiles spawn (cascade matches score flat BP only)
-- **Match Detection**: `MatchChecker.IsValidMatch(sum)` → `sum > 0 && sum % 10 == 0`
-- **Anti-cascade spawning**: Single re-roll if new tile would complete a match (`WouldTileCompleteMatch()`)
-- **Tile bag system**: Tetris-style bag of 25 tiles, refilled from weighted distribution, Fisher-Yates shuffled
+- **Size**: 5×5, tile values 0-7 with weighted distribution
+- **Matching**: Rows/columns summing to any multiple of 10
+- **Tile bag**: Tetris-style bag of 25 tiles, Fisher-Yates shuffled
+- **Anti-cascade**: Single re-roll if new tile would complete a match
+- **Hint system**: 10s inactivity → particle trail, repeats every 3s
 
-### Tile Weights (Base Distribution)
-Base weights defined in both `GameManager.cs` (GameSettings class) and `GridManager.cs` (fallback).
-Only tiles 0-4 have base weight; tiles 5-7 start at 0 and are introduced by the solve-based ramp:
+### Progressive Difficulty (Solve-Based)
 ```
-0: 0.12  Grey   (wildcard) — boosted for easy early 10s
-1: 0.28  Gold   — boosted primary, easiest combos
-2: 0.26  Blue   — dominant (pairs well with 3s)
-3: 0.22  Green  — strong mid-range
-4: 0.08  Coral  — further reduced, less clutter
-5: 0.00  Orange — introduced after 2 solves (ramps to 0.10)
-6: 0.00  Purple — introduced after 5 solves (ramps to 0.06)
-7: 0.00  Teal   — introduced after 8 solves (ramps to 0.02)
+5s appear after 2 solves (ramps to weight 0.10)
+6s appear after 5 solves (ramps to weight 0.06)
+7s appear after 8 solves (ramps to weight 0.02)
+Full ramp at 12 solves. Low tiles reduce to 85%.
 ```
-
-### Progressive Difficulty Ramp (Solve-Based)
-High tiles (5, 6, 7) are introduced based on **player performance** (number of matches cleared), not elapsed time.
-This means struggling players keep getting easy boards, while skilled players face increasing challenge:
-- **5s appear**: After 2 solves (start at weight 0.02, ramp to 0.10)
-- **6s appear**: After 5 solves (start at weight 0.01, ramp to 0.06)
-- **7s appear**: After 8 solves (start at weight 0.005, ramp to 0.02)
-- **Full ramp**: At 12 solves, all high tiles are at max weight
-- **Low tile reduction**: Tiles 0-4 gently reduce to 85% as high tiles ramp in
-- **Method**: `GetWeightedRandomValue()` draws from tile bag; bag refilled via `RefillTileBag()` using `GetAdjustedWeights()`
-- Configurable via `solvesFor5s`, `solvesFor6s`, `solvesFor7s`, `maxWeight5/6/7`, `solvesToFullRamp`, `baseTileReduction`
-- `SolveCount` resets each round via `GameManager.ProcessSingleSolve()` (only player swaps increment)
-
-### Tile Bag System (Tetris-Style)
-- Bag of 25 tiles, distributed proportionally to current adjusted weights
-- Bag is shuffled (Fisher-Yates) so draw order is random within the bag
-- When bag empties, it refills based on current solve count (progressive ramp recalculated)
-- Bag cleared on round reset (`ResetGame()`, `SpawnGridOnly()`)
-- Guarantees consistent tile distribution over every 25 draws, reducing wild RNG variance
-
-### Anti-Cascade Tile Spawning
-- In `SpawnNewTilesCoroutine()`, each new tile gets one re-roll if it would complete a match
-- `WouldTileCompleteMatch(x, y, value)` checks if the tile's row or column would sum to a multiple of 10
-- Light touch: only one re-roll, accepts result either way (doesn't eliminate cascades, just reduces them slightly)
-- Approximation is fine since some tiles in the column may not have spawned yet
 
 ### Tile Colors
 ```
-0: Grey   (wildcard)
-1: Gold   (primary)
-2: Blue   (primary)
-3: Green  (1+2)
-4: Red    (primary)
-5: Orange (1+4)
-6: Purple (2+4)
+0: Grey (0.6, 0.6, 0.6)          5: Orange (0.95, 0.5, 0.1)
+1: Gold (0.85, 0.65, 0.1)        6: Purple (0.6, 0.2, 0.75)
+2: Blue (0.15, 0.4, 0.9)         7: Teal (0.1, 0.7, 0.7)
+3: Green (0.2, 0.7, 0.3)         Background: uniform (0.85, 0.85, 0.85)
+4: Coral (0.85, 0.45, 0.35)
 ```
-
-### Hint System
-- Activates after 10 seconds of inactivity
-- Shows particle trail indicating valid move
-- Repeats every 3 seconds
 
 ---
 
@@ -236,233 +143,411 @@ This means struggling players keep getting easy boards, while skilled players fa
 | Setting | Default | Location |
 |---------|---------|----------|
 | Game Duration | 60s | GameManager |
-| Multiplier Start | ×1.25 | GameManager |
-| Multiplier Max | ×3.00 | GameManager |
-| Multiplier Increment | +0.25 | GameManager |
-| Hot Streak Multiplier | ×5.00 | GameManager |
-| Hot Streak Duration | 10s | GameManager |
+| Multiplier Start/Max | ×1.25 / ×3.00 | GameManager |
+| Hot Streak | ×5.00, 10s | GameManager |
 | Grid Size | 5×5 | GridManager |
-| Canvas Resolution | 1080×1920 | Canvas |
-| 5s Appear After | 2 solves | GridManager |
-| 6s Appear After | 5 solves | GridManager |
-| 7s Appear After | 8 solves | GridManager |
-| Max Weight 5s | 0.10 | GridManager |
-| Max Weight 6s | 0.06 | GridManager |
-| Max Weight 7s | 0.02 | GridManager |
-| Full Ramp At | 12 solves | GridManager |
-| Base Tile Reduction | 0.85 | GridManager |
+| Canvas | 1080×1920 | Canvas |
 | Tile Bag Size | 25 | GridManager |
-| Speed Bonus Threshold | 4s | GameManager |
-| Speed Bonus Amount | 5 BP | GameManager |
+| Speed Bonus | 5 BP within 4s | GameManager |
 
 ---
 
-## Event System
+## Known Issues
 
-### GameManager Events
-```csharp
-OnScoreChanged(int newScore, int delta)
-OnTimeChanged(float timeRemaining)
-OnMultiplierChanged(bool active, float mult, float timer)
-OnHotStreakStarted()
-OnHotStreakEnded()
-OnGameWon()     // Fires on every round end (time's up)
-```
+### Audio Glitching (AudioManager.cs)
+All SFX share a single `sfxSource`. The time warning uses `sfxSource.Play()` with `loop = true`, which occupies the source. When match SFX call `PlayOneShot()` on the same source during the danger zone (<10s), sounds drop out or glitch. Root cause: `Play()` and `PlayOneShot()` conflict on the same AudioSource. This will be resolved by the FMOD migration in L3.
 
-### RunManager Events
-```csharp
-OnBPChanged(int currentBP)
-OnRoundChanged(int roundNumber)
-OnRunStarted()
-OnRunEnded()
-```
+### Scoring Opacity
+`floor(multiplierTimer)` as a hidden time bonus is opaque to players. `enhancedBonus` is always 0 in arcade mode. Session Time bonus on results screen is always ~60 (1 BP per second × 60s round). These should be reviewed during Zen mode implementation.
 
 ---
 
-## Audio System
+## Completed Work (February 2026 Polish Sprint)
 
-### Audio Sources (3 independent)
-1. **musicSource**: Background music (loops)
-2. **sfxSource**: Sound effects
-3. **voiceSource**: Voice/UI feedback
+- ✓ **P0**: Shop removal, back button cleanup, results screen dual buttons
+- ✓ **P1**: Star rating system (3 tiers, animated diamonds, wired into results)
+- ✓ **Hint system**: Particle trails after 10s inactivity
+- ✓ **Tile number colors**: All 10 values with distinct colors
 
-### Volume Persistence
-- Saved in PlayerPrefs: "MusicVolume", "SFXVolume", "VoiceVolume"
-- Auto-reset if accidentally muted (≤0.01)
-
----
-
-## Animation Utilities
-
-Available in `AnimationUtilities.cs`:
-- **PunchScale**: Scale 1→peak→1 (feedback)
-- **PopIn**: Scale 0→overshoot→1 (overlays)
-- **ScaleIn/Out**: Fade via scale
-- **FadeCanvasGroup**: Alpha fade
-- **FloatAndFade**: Upward motion + fade (popups)
-- **PulseLoop**: Continuous pulse
-- **CountUp**: Number counter (Balatro-style)
-- **DropIn**: Drop with elastic bounce
+**Still pending from old sprint (folded into Launch Sprint):**
+- Tile shadows (built but gated behind `isEnhanced`) → L1
+- Match VFX reorder (beam before "10") → L5
+- Beam opacity reduction → L5
+- Haptic feedback → L5
+- Credits/About section → L7
+- Leaderboard → L7
+- Tutorial popup click-outside bug → L7
 
 ---
 
-## Polish Sprint (February 2026)
+## Launch Sprint — "The Cake" (February/March 2026)
 
-### P0 — Shop Removal & Back Button ✓ COMPLETED
+### Design Philosophy
 
-**What was done:**
-- Deleted `ShopManager.cs` (363 lines) and its `.meta` file
-- Removed from `SceneFlowManager.cs`: `shopPanel` field, `GameState.Shop` enum value, `TransitionToShop()`, `TransitionToShopSequence()`, `TransitionFromShopToGame()`, `TransitionFromShopToGameSequence()`, `ReturnToMainMenuFromShop()`, shop case in `GoBack()`, all `shopPanel` references in `InitializePanels()`
-- Activated `ReturnMenuButton` on WinScreen in scene (was `m_IsActive: 0`), repositioned side-by-side with PlayAgainButton, updated text from "Menu" to "Main Menu", bumped font size from 24→36
-- Added `EnsureResultsButtonsActive()` safety method in `UIManager.cs` — called when winScreen shows, ensures both buttons are active even if scene state is wrong
-- Cleaned all shop references from CLAUDE.md (Script Inventory, Singletons, Game Flow, Game States)
+Make10's arcade mode is a 60-second math sprint. It's functional, but it doesn't let players enter a flow state. Games like Holedown, Threes, and Tetris Effect succeed because they give players room to breathe — strategic pacing, cohesive aesthetics, and audio that responds to gameplay. This sprint transforms Make10 from a single-mode puzzle test into a game with two distinct moods, musical responsiveness, and the visual cohesion of a polished mobile title.
 
-**Current results screen buttons (WinScreen):**
-- **PlayAgainButton** (left, x=-100) → `OnContinueButtonClicked()` → `RestartWithCountdown()`
-- **ReturnMenuButton** (right, x=150) → `OnMainMenuButtonClicked()` → `GoBack()` → MainMenu
+**The four layers:**
 
-**Note:** `ShopCard.cs` and `DataLoader.cs` still contain shop references in comments only — no compile impact. The `shopPanel` GameObject in the Unity scene hierarchy should still be manually deleted in the editor (we can't remove scene GameObjects from outside Unity), but it won't be referenced by any code.
+1. **Zen Mode** — An untimed endless mode that gives players a reason to stay (structural)
+2. **Adaptive Audio** — Matches that sound good and build an evolving soundscape (experiential)
+3. **Aesthetic Cohesion** — Easing, color, rounded forms, consistent motion, ambient life (polish)
+4. **Shop & Cosmetics** — 2D paper doll avatar system with BP-driven unlocks (progression)
+
+**Reference games:** Holedown (cohesive aesthetic, upgrade loop), Threes ("one more turn" retention), Tetris Effect (musical responsiveness, stem layering)
 
 ---
 
-### P1 — Star Rating System & Scoring Overhaul
+### L0 — Easing & Motion Overhaul
 
-**Star Rating — ✓ IMPLEMENTED**
+**Priority: CRITICAL**
 
-1-3 star rating displayed on the results screen after the total BP count-up. Stars are created procedurally using TMP ★ characters (no sprite assets needed).
+Every animation uses linear `Mathf.Lerp` or raw sine waves. This makes the game feel mechanical.
 
-**Implementation:**
-- **Thresholds:** `GameManager.cs` — `star1Threshold` (300 BP), `star2Threshold` (600 BP), `star3Threshold` (1000 BP). Serialized fields, tunable in Inspector
-- **Calculation:** `GameManager.GetStarRating(int totalBP)` returns 0-3 stars
-- **Threshold accessors:** `GameManager.Star1Threshold`, `Star2Threshold`, `Star3Threshold` (read-only)
-- **Display:** `UIManager.ShowStarRating(int starsEarned)` — creates 3 star objects in a HorizontalLayoutGroup inside BreakdownContainer. Each star pops in one at a time using `AnimationUtilities.PopIn()`. Earned stars are gold, unearned are dim grey
-- **Wired in:** `UIManager.ShowWinScreenBreakdown()` — stars appear after TOTAL count-up, before high score banner
-- **Cleanup:** Stars destroyed in `HideBreakdownElements()` when results screen resets
-- **Styling:** `starFilledColor` (gold), `starEmptyColor` (dim grey), `starSize` (64), `starRevealDelay` (0.25s) — all serialized
+#### Easing Library (AnimationUtilities.cs)
 
-**Star thresholds:**
 ```
-★       = 300+ BP (steady matching)
-★★      = 600+ BP (requires consistent multiplier usage)
-★★★     = 1000+ BP (requires hot streak mastery)
+New static methods:
+  EaseOutCubic(float t)     → 1 - (1-t)³           — landing, settling
+  EaseInOutCubic(float t)   → smooth S-curve        — transitions
+  EaseOutBack(float t)      → overshoot then settle — popups, UI
+  EaseOutElastic(float t)   → springy bounce        — tile landing
+  EaseInCubic(float t)      → slow start, fast end  — anticipation
 ```
 
-**Scoring Improvements**
+#### Methods to Update
 
-Current formula (`GameManager.ProcessSingleSolve()`, lines ~368-422):
-```
-Solve #1: baseMatchScore (10) + enhanced bonus (always 0 in arcade)
-Solve #2: same + activates multiplier at ×1.25
-Solve #3+: (10 × multiplier) + floor(multiplierTimer) + enhanced bonus
-Hot Streak: ProcessHotStreakSolve() — fixed ×5.00 multiplier
-```
+| Method | Current | New | Why |
+|--------|---------|-----|-----|
+| `PunchScale()` | Linear 2-part | EaseOutBack up, EaseOutCubic down | Snappy punch |
+| `PopIn()` | Linear 2-part | EaseOutBack pop, EaseOutCubic settle | Overshoot and settle |
+| `FloatAndFade()` | Linear | EaseOutCubic position, EaseInCubic alpha | Decelerate as rising |
+| `ScaleIn()` | Linear/curve | EaseOutBack default (keep curve override) | Panels overshoot |
+| `ScaleOut()` | Linear | EaseInCubic | Anticipation before shrink |
+| `DropIn()` | Custom bounce | EaseOutElastic | Cleaner bounce |
+| `CountUp()` | Already EaseOutCubic ✓ | No change | Already good |
 
-Issues to review:
-- `floor(multiplierTimer)` as a time bonus is opaque to players — they don't see it
-- The jump from solve #2 to #3 introduces multiplier + time bonus simultaneously
-- `enhancedBonus` is always 0 in arcade mode (`CalculateEnhancedNumberBonus()` returns 0, line ~427)
-- Results breakdown (UIManager lines ~793-861) shows "Score" + "Session Time" + "TOTAL" but Session Time bonus is just `Mathf.RoundToInt(sessionDuration)` — 1 BP per second of game time, which will always be ~60 for a full round
+#### Tile Fall (GridManager.cs)
+Current: `tileFallSpeed = 1600f` constant velocity. Change to time-based (0.25s) with `EaseOutCubic`. Add landing bounce (~5px overshoot, `EaseOutElastic` over 0.08s). Pairs with existing `SpawnLandSparkle()`.
 
-**Leaderboard — Local**
+#### Tile Swap (GridManager.cs)
+Current: `swapDuration = 0.15f` linear Lerp. Change to `EaseInOutCubic`. Add shallow arc: `yOffset = Mathf.Sin(t * Mathf.PI) * 8f`.
 
-Existing infrastructure:
-- `PlayerPrefs` keys: `Make10_HighScore`, `Make10_HighScoreBP`, `Make10_TotalGames` (GameManager lines ~78-80)
-- `HighScore` and `HighScoreBP` properties already exposed (line ~91-92)
-- `IsNewHighScore` flag set in `TimeUp()` (line ~601)
-- Main menu displays best score via `MainMenuUI.UpdateHighScoreDisplay()` (line ~64)
-- Results screen shows "NEW HIGH SCORE" banner via `UIManager.ShowNewHighScoreBanner()` (line ~866)
+#### Countdown Pop (SceneFlowManager.cs)
+Current: 1.5→1 linear. Change to `EaseOutBack`. "GO!" uses larger overshoot (1.8→1, `EaseOutElastic`).
 
-To build a proper leaderboard:
-- Store top N scores in PlayerPrefs (JSON array or indexed keys like `Make10_Score_1` through `Make10_Score_10`)
-- New UI panel accessible from MainMenu (add button in `MainMenuUI.cs`)
-- Could reuse `PopupWindow.cs` for the leaderboard display (scrollbar mode)
-- Each entry: rank, score, star rating, date
+#### Menu Title (MainMenuUI.cs)
+Current: 3 overlapping sine waves (chaos). Change to single smooth bob with `EaseInOutCubic`. Remove rotation wobble and scale pulse.
+
+**Scope:** Medium. Easing functions are trivial one-liners. Threading through existing methods is methodical.
 
 ---
 
-### P2 — Match Animation & VFX Polish
+### L1 — Tile Visual Overhaul
 
-**Current match sequence** (`GridManager.AnimateSolveSequence()`, line ~1200):
-```
-1. GridVFX.PlayLineSweeps() — beam flash fires (non-blocking coroutine)
-2. 0.08s pause
-3. AvatarManager.OnSolve() — avatar animation
-4. AudioManager.PlayConvergenceSound()
-5. Tiles converge toward center (solveConvergeDuration)
-6. ShowTenEffectSpectacular() per match line — "10" text + TenExplosionVFX.TriggerExplosion()
-   (these fire simultaneously: "10" popup appears at same time as particle explosion)
-7. ClearMatchedTiles()
-8. GameManager.OnMatchCleared() — scoring
-```
+**Priority: HIGH**
 
-**Requested changes:**
-- **Reduce beam opacity:** `GridVFX.cs` → `FlashBeam()` (line ~205). The beam is a 4-layer system: glow → core → hot core → sparkles. Adjust alpha values in the BURST/HOLD/FADE phases. Key colors defined at lines ~24-28 (`goldEdgeColor`, etc.)
-- **Sequence beam AFTER "10" popup:** Currently beam fires first (step 1), then "10" appears later (step 6). Reverse this: show "10" popup first with a PunchScale, brief hold, THEN fire the beam sweep. This means restructuring `AnimateSolveSequence()` — move `PlayLineSweeps()` call to after `ShowTenEffectSpectacular()`
-- **Make "10" punchier:** In `GridManager.ShowTenEffectSpectacular()` (line ~1368), the "10" text uses `AnimationUtilities.PopIn()`. Could increase overshoot, add screen shake on pop, or add a brief hold before fade
+#### A. Shadows (Already Built — Ungating Only)
+Shadow system in `Tile.cs` (`CreateShadowText()`) is gated behind `isEnhanced` (always `false`).
+1. Remove `isEnhanced` gate on shadow visibility
+2. Remove forced `SetActive(false)` in `UpdateEnhancedGlow()`
+3. In `SetValue()`, derive shadow color: `Color.Lerp(NumberColors[value], Color.black, 0.65f)`
+**Scope:** ~10 lines.
 
-**Haptic feedback — New Feature:**
-- No haptics exist yet (zero `Vibrate` or `Haptic` references in codebase)
-- Add `Handheld.Vibrate()` call in `GridManager.ShowTenEffectSpectacular()` right when the "10" text appears
-- For finer control on iOS: use `UnityEngine.iOS.Device.RequestStoreReview` or a haptics plugin
-- For Android: `Handheld.Vibrate()` works but is coarse (single buzz). Consider Unity's Input System haptics for gamepad or a native plugin for precise haptic patterns
-- Best insertion point: `GridManager.ShowTenEffectSpectacular()` line ~1378, right before/after `TenExplosionVFX.Instance?.TriggerExplosion()`
+#### B. Tinted Backgrounds
+All tiles are uniform grey. Add subtle tint: `Color.Lerp(Color.white, NumberColors[value], 0.12f)`
+Apply in `SetValue()` to `backgroundImage.color`.
+**Scope:** 2-3 lines.
 
-**Key VFX files for reference:**
-- `GridVFX.cs` — Beam flash (line ~205 `FlashBeam()`), screen shake (look for `ShakeScreen`), tile sparkles, ambient particles
-- `TenExplosionVFX.cs` — Particle explosion + collection to score slider. Timing: explosion 0.35s → pause 0.1s → collection 0.5s per particle. Colors: small=gold, big=purple
-- `HotStreakEffect.cs` — Fire/ember effects during hot streak
-- Particle sprites in `Assets/particles/` (30 files)
+#### C. Rounded Corners
+Add a white rounded-rect PNG (64×64, ~12px radius), 9-slice in Sprite Editor, assign to tile prefab Background Image.
+**Scope:** One asset + prefab change in Unity Editor.
+
+#### D. Selection Feedback
+Add `PunchScale(1.15f, 0.1f)` on first selection. Add `Handheld.Vibrate()` for haptic. Animate deselection (EaseOutCubic scale to 1.0 over 0.08s) instead of instant reset.
+**Scope:** ~10 lines in `Tile.cs`.
 
 ---
 
-### P3 — Visual Polish
+### L2 — Zen Mode (Endless / Untimed)
 
-**Tile Number Drop Shadows**
+**Priority: HIGH — Structural change enabling long play sessions.**
 
-A shadow system already exists in `Tile.cs` but it's built for "enhanced" numbers only:
-- `CreateShadowText()` (line ~152) creates a `TextMeshProUGUI` behind the main number
-- `shadowOffset` = `(3, -3)`, `shadowColor` = black at 50% alpha (line ~55-57)
-- `shadowSoftness` = 0.5 (dilation for soft edge)
-- The shadow text is created in `Awake()` (line ~143) but its visibility is tied to the `isEnhanced` flag
+#### Game Design
+- **No timer.** Game ends when board has no valid moves (like Threes).
+- **Progressive difficulty** via existing solve-based ramp (already performance-based).
+- **Multiplier: Option B (No Drain, Manual Reset)** — resets to ×1 on failed swap. Rewards thoughtful play, punishes random guessing.
+- **Session length target:** 5-15 min average, 20+ min skilled.
 
-**What to change:**
-- Make shadow always visible (not gated by enhanced mode)
-- Change `shadowColor` to derive from the tile's `NumberColors[Value]` array (line ~99-111) — use a darkened version: `Color.Lerp(NumberColors[value], Color.black, 0.6f)` or similar
-- Update `SetValue()` (line ~263) to set shadow color when the tile value changes
-- The `NumberColors` array for reference:
-  ```
-  0: (0.6, 0.6, 0.6)     Grey
-  1: (0.85, 0.65, 0.1)    Gold     → shadow: dark gold
-  2: (0.15, 0.4, 0.9)     Blue     → shadow: dark blue
-  3: (0.2, 0.7, 0.3)      Green    → shadow: dark green
-  4: (0.9, 0.2, 0.2)      Red      → shadow: dark red
-  5: (0.95, 0.5, 0.1)     Orange   → shadow: dark orange
-  6: (0.6, 0.2, 0.75)     Purple   → shadow: dark purple
-  ```
+#### Implementation
 
-**Tile Prefab Structure:**
-- `Assets/Prefabs/Tile.prefab` — the base tile prefab
-- Runtime hierarchy per tile: Background Image → NumberShadow (TMP) → NumberText (TMP) → SelectionHighlight → EnhancedGlow (Image)
-- Background is uniform light grey: `(0.85, 0.85, 0.85)` (Tile.cs line ~93)
-- Number text uses `numberScale` multiplier (default 1.0, configurable 0.5-2.0, line ~51)
-- Font: whatever TMP font is on the prefab (check prefab for font asset reference)
+**GameManager.cs:**
+1. Add `GameMode` enum: `{ Arcade, Zen }`
+2. Gate timer countdown behind `CurrentMode == GameMode.Arcade`
+3. Zen multiplier: no drain, reset on failed swap
+4. `ZenGameOver()` parallel to `TimeUp()` — fires when no valid moves
+5. `ResetRoundState()` — skip timer setup in Zen mode
 
-**Credits/About Section**
+**GridManager.cs:**
+- After cascade, run solvability check. Arcade: reshuffle. Zen: trigger `ZenGameOver()`.
 
-No credits UI currently exists in the scripts. The sprint note says "current formatting is broken, needs cleanup" — this likely refers to content in the Unity scene or a popup that's wired but not in the C# scripts. Check:
-- `PopupWindow.cs` — reusable popup system, could be used for credits
-- `MainMenuUI.cs` — look for any credits/about button handlers
-- The Unity scene hierarchy for any Credits or About GameObjects
+**SceneFlowManager.cs:**
+- Add `GameState.ModeSelect` to enum
+- Flow: MainMenu → ModeSelect → [Arcade] → Countdown → Game / [Zen] → Game (no countdown)
 
-**To implement credits:**
-- Add a credits button to `MainMenuUI.cs`
-- Use `PopupWindow.cs` in scrollbar mode for the content
-- Content: "Make10 by CJ Rhone / Wizard Bodega, Brainless Game Jam 2026" etc.
+**UIManager.cs:**
+- Zen: replace timer with "Tiles Cleared" or solve-based "Level" indicator
+- Results: "GAME OVER" with Tiles Cleared / Highest Multiplier / Longest Streak / TOTAL
+- Separate star thresholds: 500 / 1000 / 2000 BP
+
+**MainMenuUI.cs:** Separate high scores per mode.
+
+**Scope:** Large but modular. Everything is additive.
 
 ---
 
-### P4 — Future (Deferred)
+### L3 — Adaptive Audio & FMOD Migration
 
-- **New avatar animations:** `AvatarManager.cs` handles state machine. Add new states/triggers
-- **Android back button:** Requires Unity Input System integration. `GameManager.cs` already imports `UnityEngine.InputSystem` (line 2). Deferred due to complexity
-- **Tutorial popup polish:** `TutorialDemoWidget.cs` exists. Known issue: click-outside-to-dismiss fires prematurely. Related to `PopupWindow.cs` click handling
+**Priority: HIGH — Experiential layer + fixes current audio glitching.**
+
+#### Why FMOD
+
+The current AudioManager has 3 Unity AudioSources. All SFX share one source, causing dropout when the time warning loop (`Play()`) conflicts with match sounds (`PlayOneShot()`). Building an adaptive 4-stem music system on top of this would be fragile.
+
+FMOD solves both problems:
+- **Polyphony management**: Proper voice pooling, no SFX dropout
+- **Stem layering**: Multi-track events with parameter-driven mixing (multiplier → music intensity is just a parameter)
+- **Pitch shifting**: Parameter on match events, no manual `sfxSource.pitch` hacking
+- **Synchronization**: Stems stay in sync natively
+- **Free** for indie games under $200k revenue
+
+#### FMOD Integration Steps
+
+1. **Install FMOD for Unity** plugin (Unity Package Manager or .unitypackage from fmod.com)
+2. **Create FMOD Studio project** alongside Unity project
+3. **Migrate existing SFX**: Import current .wav files into FMOD, create events for each
+4. **Replace AudioManager internals**: Swap `AudioSource.PlayOneShot()` calls with `RuntimeManager.PlayOneShot()` or event instances
+5. **Keep AudioManager as facade**: Public API stays the same (`PlayTenPopSound()`, etc.), internal implementation changes to FMOD calls
+6. **Volume control**: Use FMOD buses (Master, Music, SFX, Voice) instead of per-source volume
+
+#### Adaptive Music Architecture (FMOD Studio)
+
+Create a single multi-track music event with game parameters:
+
+```
+FMOD Parameter: "Intensity" (0.0 → 1.0)
+  0.0  = Base layer only (ambient pad)
+  0.3  = + Rhythm layer
+  0.6  = + Melody layer
+  1.0  = + Intensity layer (hot streak)
+
+FMOD Parameter: "Inactivity" (0.0 → 1.0)
+  Layers fade out as inactivity increases
+
+FMOD Parameter: "GameMode" (0 = Arcade, 1 = Zen)
+  Selects between stem sets (upbeat vs ambient)
+```
+
+**Layer trigger logic (GameManager.Update → FMOD parameter updates):**
+
+| Layer | Trigger ON | Trigger OFF |
+|-------|-----------|-------------|
+| Base (pad) | Game starts | Game ends |
+| Rhythm | Multiplier ≥ ×1.5 OR 3+ solves | Below ×1.25 OR 8s inactivity |
+| Melody | Multiplier ≥ ×2.0 OR 6+ solves | Below ×1.5 OR 12s inactivity |
+| Intensity | Hot streak active | Hot streak ends |
+
+#### Tuned Match SFX (FMOD)
+
+Pitch shifting via FMOD event parameters instead of `sfxSource.pitch`:
+
+```
+Match sum 10 → pitch 1.0 (root note)
+Match sum 20 → pitch 1.25 (major 3rd)
+Match sum 30 → pitch 1.5 (perfect 5th)
+
+Cascade level 1 → pitch 1.0
+Cascade level 2 → pitch 1.12
+Cascade level 3 → pitch 1.25
+Cascade level 4 → pitch 1.5
+```
+
+#### Music Assets Needed (CJ — Parallel Track)
+
+Per mode (Arcade + Zen = 8 stems total):
+1. **Base**: Ambient pad / drone, harmonically simple, seamless loop
+2. **Rhythm**: Light percussion, same BPM/key as base
+3. **Melody**: Arpeggiated pattern, reward layer
+4. **Intensity**: Energetic, hot streak soundtrack
+
+All 4 stems per mode: same duration, same BPM, same key, designed to layer.
+
+**Scope:** Medium-large. FMOD integration is a one-time investment. Music production is the long pole.
+
+---
+
+### L4 — Ambient Life & Environmental Polish
+
+**Priority: MEDIUM**
+
+#### Ambient Particles (GridVFX.cs)
+Current: 8 particles, 18 px/sec, 0.06 alpha (nearly invisible).
+Change: 15-20 particles, 0.12-0.15 alpha, size variation (0.5×-1.5×), tinted to dominant board color. Hot streak: 30+, 0.25 alpha, warm tint. Zen: slower drift (12 px/sec), cooler colors.
+
+#### Idle Tile Breathing
+`1.0 + sin(Time.time * 0.5 + tileIndex * 0.3) * 0.008` — wave effect across grid, 0.8% variation. Gate behind `!IsSelected && !isAnimating` in `Tile.cs` Update.
+
+#### Score Environment Feedback
+- Match: non-matched tiles micro-punch (1.02 scale, 0.06s) with stagger ripple
+- Hot streak start: all tiles flash bright (30% white lerp, 0.15s)
+- Multiplier increase: particles briefly 2× speed
+
+**Scope:** Small-medium.
+
+---
+
+### L5 — Match VFX & Sequence Polish
+
+**Priority: MEDIUM**
+
+#### Reorder Match Sequence (GridManager.AnimateSolveSequence)
+Current: beam → pause → avatar → convergence → "10" popup
+New: convergence → "10" popup (PunchScale EaseOutBack) → 0.12s hold → beam (reduced opacity) → particles → avatar → screen shake → haptic
+
+#### Beam Opacity (GridVFX.cs FlashBeam)
+Reduce: glow 0.6→0.35, core full→0.7, hot core 1.4×→0.9×, sparkles 0.9→0.6
+
+#### "10" Popup Enhancement
+Increase PopIn overshoot 1.2→1.4. Add screen shake on pop. Hold 0.12s longer before fade. Scale by match sum (20→1.2×, 30→1.5×).
+
+#### Haptics
+`Handheld.Vibrate()` on: tile selection, match clear, hot streak trigger, game over.
+
+**Scope:** Medium.
+
+---
+
+### L6 — Shop System & Cosmetics
+
+**Priority: MEDIUM-HIGH — Progression loop for replayability.**
+
+#### Shop Design
+Accessible from main menu. BP earned from both modes unlocks 2D sprite overlay cosmetics.
+
+| Category | Slot | Launch Items |
+|----------|------|-------------|
+| Eyes | 1 | 4 (Default + 3) |
+| Hair | 1 | 4 (Default + 3) |
+| Clothes | 1 | 3 (Default + 2) |
+| Hat | 1 | 3 (None + 2) |
+
+14 items × ~6 poses = ~84 sprites (small partial images, not full redraws).
+
+#### Avatar Architecture (AvatarManager.cs)
+Current: Single Image, 6 static PNGs. New: Layered UI Image stack:
+```
+AvatarContainer → BodyLayer → ClothesLayer → EyesLayer → HairLayer → HatLayer
+```
+Existing coroutine animations apply to parent transform (all layers move together).
+
+#### Data Model
+- `CosmeticData.cs` — ScriptableObject: id, displayName, category, bpCost, poseSprites[], poseOffsets[], isDefault
+- `CosmeticInventory.cs` — Singleton: unlockedItems (HashSet), equippedItems (per category), persisted via PlayerPrefs JSON
+
+#### Shop UI
+```
+[Back]        SHOP        BP: 1240
+[Avatar Preview — live paper doll]
+[Eyes] [Hair] [Clothes] [Hat]  ← category tabs
+[Scrollable item grid: locked/owned/equipped states]
+```
+Purchase flow: tap locked item → preview on avatar → confirm → deduct BP → auto-equip.
+
+#### BP Persistence (RunManager.cs)
+- `"Make10_TotalBP"` — lifetime earned (never decreases)
+- `"Make10_SpendableBP"` — current balance (decreases on purchase)
+- `SpendBP(int amount)` → returns bool
+
+#### Pricing
+```
+Common:   200-400 BP  (1-2 arcade rounds)
+Uncommon: 500-800 BP  (3-4 rounds or 1 zen session)
+Rare:     1000-1500 BP (dedicated play)
+```
+
+#### New Scripts
+| Script | Purpose |
+|--------|---------|
+| `CosmeticData.cs` | ScriptableObject: cosmetic item definition |
+| `CosmeticInventory.cs` | Singleton: persistent unlock/equip state |
+| `ShopManager.cs` | Shop UI: categories, items, purchase flow |
+| `ShopCard.cs` | Individual item card in shop grid |
+
+**Scope:** Large. Art pipeline (~84 sprites) is the long pole.
+
+---
+
+### L7 — Remaining Polish
+
+**Priority: LOW-MEDIUM**
+
+- **Credits**: Button in MainMenuUI → PopupWindow scrollbar mode. "Make10 by CJ Rhone / Wizard Bodega"
+- **Leaderboard**: Top 10 per mode in PlayerPrefs JSON. PopupWindow display.
+- **Tutorial**: Add mode explanation slide. Fix click-outside-to-dismiss bug in PopupWindow.
+- **Android back button**: Deferred (Unity Input System complexity).
+
+---
+
+### Sprint Execution Order
+
+```
+Phase 1 — Foundation
+  1. L0: Easing overhaul
+  2. L1: Tile visual overhaul
+
+Phase 2 — The Mode
+  3. L2: Zen Mode
+  4. L7a: Tutorial updates
+
+Phase 3 — The Feel
+  5. L3: FMOD migration + adaptive audio
+  6. L5: Match VFX reorder + haptics
+  7. L4: Ambient life
+
+Phase 4 — The Loop
+  8. L6: Shop system + cosmetics
+  9. L7b: Credits, leaderboard, final polish
+
+Phase 5 — Music Production (parallel, CJ-driven)
+  ∥ 4-stem ambient set (Zen)
+  ∥ 4-stem upbeat set (Arcade)
+  ∥ Tuned match SFX (or pitch-shift approach)
+```
+
+**Phases 1-2 are the minimum viable launch.** Phases 3-4 can be a fast-follow.
+
+---
+
+### Post-Sprint State
+
+**New scripts:** CosmeticData.cs, CosmeticInventory.cs, ShopManager.cs, ShopCard.cs
+
+**Updated singletons:**
+```
+GameManager.Instance        → + GameMode enum, Zen mode logic
+CosmeticInventory.Instance  → NEW: cosmetic unlock/equip persistence
+ShopManager.Instance        → NEW: shop UI management
+```
+
+**Updated game flow:**
+```
+Loading → MainMenu → ModeSelect → [Arcade] → Countdown → Game (60s) → Results
+                                → [Zen]    → Game (endless) → Game Over → Results
+                   → Shop → MainMenu
+                   → Leaderboard / Credits / Options → MainMenu
+```
+
+**Updated game states:**
+```
+Loading, MainMenu, ModeSelect, Tutorial1, Tutorial2, Countdown,
+Game, Results, Shop, Leaderboard, Options, Credits, Quit
+```
