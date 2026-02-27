@@ -533,12 +533,13 @@ public class SceneFlowManager : MonoBehaviour
             {
                 countdownText.text = step;
 
-                if (step == finalWord)
+                bool isFinal = (step == finalWord);
+                if (isFinal)
                     AudioManager.Instance?.PlayCountdownGo();
                 else
                     AudioManager.Instance?.PlayCountdownBeep();
 
-                yield return CountdownPop();
+                yield return CountdownPop(isFinal);
             }
 
             yield return new WaitForSeconds(countdownStepDuration);
@@ -554,15 +555,26 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log($"Countdown sequence complete ({targetState})");
     }
     
-    private IEnumerator CountdownPop()
+    /// <summary>
+    /// Countdown number pop — EaseOutBack for "3/2/1", larger EaseOutElastic for "GO!".
+    /// </summary>
+    private IEnumerator CountdownPop(bool isFinalWord = false)
     {
-        countdownPanel.localScale = Vector3.one * 1.5f;
+        float startScale = isFinalWord ? 1.8f : 1.5f;
+        float duration = isFinalWord ? 0.2f : 0.15f;
+
+        countdownPanel.localScale = Vector3.one * startScale;
         float elapsed = 0f;
-        while (elapsed < 0.15f)
+        while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / 0.15f;
-            countdownPanel.localScale = Vector3.Lerp(Vector3.one * 1.5f, Vector3.one, t);
+            float t = Mathf.Clamp01(elapsed / duration);
+            float eased = isFinalWord
+                ? AnimationUtilities.EaseOutElastic(t)
+                : AnimationUtilities.EaseOutBack(t);
+            // EaseOutBack/Elastic go from 0→1, so we map startScale→1
+            float scale = Mathf.LerpUnclamped(startScale, 1f, eased);
+            countdownPanel.localScale = Vector3.one * scale;
             yield return null;
         }
         countdownPanel.localScale = Vector3.one;

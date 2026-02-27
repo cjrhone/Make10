@@ -932,22 +932,27 @@ public class GridManager : MonoBehaviour
         isProcessing = true;
         ResetHintTimer();
         AudioManager.Instance?.PlaySwapSound();
-        
+
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
         Vector2 posB = tileB.GetRectTransform().anchoredPosition;
-        
+
         float elapsed = 0f;
         while (elapsed < tileSwapDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / tileSwapDuration;
-            float smoothT = t * t * (3f - 2f * t);
-            
-            tileA.GetRectTransform().anchoredPosition = Vector2.Lerp(posA, posB, smoothT);
-            tileB.GetRectTransform().anchoredPosition = Vector2.Lerp(posB, posA, smoothT);
+            float t = Mathf.Clamp01(elapsed / tileSwapDuration);
+            float smoothT = AnimationUtilities.EaseInOutCubic(t);
+
+            // Shallow arc: tiles lift slightly as they cross paths
+            float arcOffset = Mathf.Sin(t * Mathf.PI) * 8f;
+            Vector2 arcA = Vector2.Lerp(posA, posB, smoothT) + new Vector2(0, arcOffset);
+            Vector2 arcB = Vector2.Lerp(posB, posA, smoothT) + new Vector2(0, arcOffset);
+
+            tileA.GetRectTransform().anchoredPosition = arcA;
+            tileB.GetRectTransform().anchoredPosition = arcB;
             yield return null;
         }
-        
+
         tileA.GetRectTransform().anchoredPosition = posB;
         tileB.GetRectTransform().anchoredPosition = posA;
         
@@ -1966,7 +1971,7 @@ public class GridManager : MonoBehaviour
 
                         Vector2 targetPos = GridToWorldPosition(x, writeY);
                         float distance = Vector2.Distance(tileToMove.GetRectTransform().anchoredPosition, targetPos);
-                        float duration = distance / tileFallSpeed;
+                        float duration = Mathf.Clamp(0.25f * (distance / 200f), 0.12f, 0.35f);
                         longestDuration = Mathf.Max(longestDuration, duration);
 
                         StartCoroutine(AnimateTileFall(tileToMove, targetPos));
@@ -1976,15 +1981,14 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        // Wait for the longest fall to finish (capped at 0.4s + bounce time)
+        // Wait for the longest fall to finish (capped at 0.35s + elastic bounce time)
         if (longestDuration > 0f)
-            yield return new WaitForSeconds(Mathf.Min(longestDuration, 0.4f) + 0.06f);
+            yield return new WaitForSeconds(longestDuration + 0.08f);
     }
 
     /// <summary>
     /// Animate a single tile falling to target position.
-    /// Uses ease-out (fast start, decelerates into landing) for a snappy, natural drop feel.
-    /// Duration is capped so even long falls stay quick.
+    /// Time-based (0.25s) with EaseOutCubic for a smooth deceleration into landing.
     /// </summary>
     private IEnumerator AnimateTileFall(Tile tile, Vector2 targetPosition)
     {
@@ -1992,17 +1996,16 @@ public class GridManager : MonoBehaviour
 
         RectTransform rt = tile.GetRectTransform();
         Vector2 startPos = rt.anchoredPosition;
+        // Time-based duration: 0.25s baseline, slightly longer for big falls, capped at 0.35s
         float distance = Vector2.Distance(startPos, targetPosition);
-        // Speed-based duration, capped at 0.4s so long falls stay quick but not jarring
-        float duration = Mathf.Min(distance / tileFallSpeed, 0.4f);
+        float duration = Mathf.Clamp(0.25f * (distance / 200f), 0.12f, 0.35f);
 
         float elapsed = 0f;
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
-            // Ease-out: fast drop, decelerates into landing (1 - (1-t)^2)
-            float easedT = 1f - (1f - t) * (1f - t);
+            float easedT = AnimationUtilities.EaseOutCubic(t);
             rt.anchoredPosition = Vector2.Lerp(startPos, targetPosition, easedT);
             yield return null;
         }
@@ -2012,20 +2015,34 @@ public class GridManager : MonoBehaviour
         StartCoroutine(TileLandBounce(tile));
     }
 
+    /// <summary>
+    /// Landing bounce — ~5px overshoot with EaseOutElastic over 0.08s.
+    /// Pairs with SpawnLandSparkle for visual feedback.
+    /// </summary>
     private IEnumerator TileLandBounce(Tile tile)
     {
         if (tile == null) yield break;
 
-        Transform t = tile.transform;
-        t.localScale = new Vector3(1.1f, 0.9f, 1f);
+        Transform tr = tile.transform;
 
         // Sparkle on land
         GridVFX.Instance?.SpawnLandSparkle(tile.GetRectTransform().anchoredPosition, tileSize);
 
-        yield return new WaitForSeconds(0.03f);
-        t.localScale = new Vector3(0.95f, 1.05f, 1f);
-        yield return new WaitForSeconds(0.03f);
-        t.localScale = Vector3.one;
+        // Elastic squash-stretch bounce over 0.08s
+        float bounceDuration = 0.08f;
+        float elapsed = 0f;
+        while (elapsed < bounceDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / bounceDuration);
+            float eased = AnimationUtilities.EaseOutElastic(t);
+            // Squash on impact (wide+short), then spring back to normal
+            float scaleX = Mathf.LerpUnclamped(1.1f, 1f, eased);
+            float scaleY = Mathf.LerpUnclamped(0.9f, 1f, eased);
+            tr.localScale = new Vector3(scaleX, scaleY, 1f);
+            yield return null;
+        }
+        tr.localScale = Vector3.one;
     }
 
     /// <summary>

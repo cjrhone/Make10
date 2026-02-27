@@ -125,7 +125,8 @@ public class MainMenuUI : MonoBehaviour
     }
     
     /// <summary>
-    /// Continuous bouncing animation for the title.
+    /// Continuous smooth bob animation for the title.
+    /// Single EaseInOutCubic oscillation — no rotation wobble, no scale pulse.
     /// </summary>
     private IEnumerator AnimateTitle()
     {
@@ -133,21 +134,17 @@ public class MainMenuUI : MonoBehaviour
         {
             if (titleCard != null)
             {
-                float t = Time.time * bounceSpeed;
-                
-                // Bounce up and down
-                float yOffset = Mathf.Sin(t) * bounceHeight;
+                // Map sine wave through EaseInOutCubic for smooth acceleration/deceleration
+                float rawT = (Mathf.Sin(Time.time * bounceSpeed) + 1f) / 2f; // 0→1 oscillation
+                float easedT = AnimationUtilities.EaseInOutCubic(rawT);
+                float yOffset = Mathf.Lerp(-bounceHeight, bounceHeight, easedT);
                 titleCard.anchoredPosition = titleStartPos + new Vector2(0, yOffset);
-                
-                // Slight rotation wobble
-                float rotation = Mathf.Sin(t * 1.3f) * titleRotateAmount;
-                titleCard.localEulerAngles = new Vector3(0, 0, rotation);
-                
-                // Subtle scale pulse
-                float scale = 1f + Mathf.Sin(t * 0.8f) * 0.03f;
-                titleCard.localScale = Vector3.one * scale;
+
+                // Clean: no rotation, no scale pulse
+                titleCard.localEulerAngles = Vector3.zero;
+                titleCard.localScale = Vector3.one;
             }
-            
+
             yield return null;
         }
     }
