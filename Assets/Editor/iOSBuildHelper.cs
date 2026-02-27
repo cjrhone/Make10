@@ -203,7 +203,9 @@ public class iOSBuildHelper : EditorWindow
 
         // Set the default (fallback) icon used across all platforms
         Texture2D[] defaultIcons = { icon1024 };
+        #pragma warning disable CS0618 // Legacy API still functional, modern API requires NamedBuildTarget
         PlayerSettings.SetIconsForTargetGroup(BuildTargetGroup.Unknown, defaultIcons);
+        #pragma warning restore CS0618
 
         AssetDatabase.SaveAssets();
         Debug.Log("[Make10] ✓ Default icon set to " + AssetDatabase.GetAssetPath(icon1024));

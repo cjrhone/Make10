@@ -5,11 +5,18 @@ using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
-/// Manages arcade game state: scoring, multiplier, hot streak, timer.
+/// Manages game state: scoring, multiplier, hot streak, timer.
+/// Supports Arcade (timed) and Zen (untimed/endless) modes.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
+
+    /// <summary>
+    /// Game mode — Arcade is timed (60s), Zen is untimed (ends when no moves remain).
+    /// </summary>
+    public enum GameMode { Arcade, Zen }
+    public GameMode CurrentMode { get; private set; } = GameMode.Arcade;
 
     #region Game Settings
 
@@ -47,7 +54,9 @@ public class GameManager : MonoBehaviour
 
     public int WinScore => gameSettings.winScore;
     [SerializeField] private float gameDuration = 60f;
+    #pragma warning disable CS0414
     [SerializeField] private float postWinDelay = 0.5f;
+    #pragma warning restore CS0414
 
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
@@ -77,8 +86,10 @@ public class GameManager : MonoBehaviour
     [SerializeField] private int star3Threshold = 1000;
 
     [Header("Debug Mode")]
+    #pragma warning disable CS0414 // Inspector-assigned fields
     [SerializeField] private bool debugMode = false;
     [SerializeField] private int debugStartingBP = 500;
+    #pragma warning restore CS0414
 
     [Header("References")]
     [SerializeField] private UIManager uiManager;
@@ -163,8 +174,10 @@ public class GameManager : MonoBehaviour
     public event Action OnHotStreakStarted;
     public event Action<float> OnHotStreakTimerChanged; // passes remaining time
     public event Action OnHotStreakEnded;
+    #pragma warning disable CS0067 // Reserved for future use (Zen mode / upgrades)
     public event Action<int> OnEnhancedNumberBonus; // bonus BP from enhanced numbers
     public event Action<float> OnTimeBonus; // time added from snacks/upgrades
+    #pragma warning restore CS0067
     
     private void Awake()
     {
@@ -210,7 +223,8 @@ public class GameManager : MonoBehaviour
             return; // Skip normal timer drain during hot streak
         }
 
-        if (!IsProcessing)
+        // Only drain timer in Arcade mode
+        if (!IsProcessing && CurrentMode == GameMode.Arcade)
         {
             DrainTime(Time.deltaTime);
         }
@@ -325,15 +339,26 @@ public class GameManager : MonoBehaviour
     }
     
     /// <summary>
+    /// Set the game mode before activating. Call this before ActivateGame().
+    /// </summary>
+    public void SetGameMode(GameMode mode)
+    {
+        CurrentMode = mode;
+        Debug.Log($"Game mode set to: {mode}");
+    }
+
+    /// <summary>
     /// Activate the game without resetting the grid (used when grid was pre-spawned).
     /// </summary>
     public void ActivateGame()
     {
         CacheEffectiveValues();
-        ResetRoundState(gameDuration);
+        // Zen mode: no timer — pass a very large duration so UI doesn't show 0
+        float duration = CurrentMode == GameMode.Zen ? 99999f : gameDuration;
+        ResetRoundState(duration);
         NotifyUIOfReset();
 
-        Debug.Log($"Game activated! Grid: {gameSettings.gridSize}x{gameSettings.gridSize}");
+        Debug.Log($"Game activated! Mode: {CurrentMode}, Grid: {gameSettings.gridSize}x{gameSettings.gridSize}");
     }
     
     public void OnCascadeStart()

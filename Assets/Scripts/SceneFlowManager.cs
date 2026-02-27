@@ -36,11 +36,12 @@ public class SceneFlowManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private Canvas mainCanvas;
     
-    // Screen width for swipe calculations
+    // Screen dimensions for transition calculations
     private float screenWidth;
+    private float screenHeight;
 
     // Current state
-    public enum GameState { Loading, MainMenu, Options, Game, Results, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, Options, Game, ZenGame, Results, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
     
     #region Initialization
@@ -58,6 +59,7 @@ public class SceneFlowManager : MonoBehaviour
         SetupSafeArea();
 
         screenWidth = GetCanvasWidth();
+        screenHeight = GetCanvasHeight();
     }
     
     private void Start()
@@ -117,6 +119,13 @@ public class SceneFlowManager : MonoBehaviour
         if (mainCanvas != null)
             return mainCanvas.GetComponent<RectTransform>().rect.width;
         return 1024f;
+    }
+
+    private float GetCanvasHeight()
+    {
+        if (mainCanvas != null)
+            return mainCanvas.GetComponent<RectTransform>().rect.height;
+        return 1920f;
     }
     
     private void InitializePanels()
@@ -288,6 +297,11 @@ public class SceneFlowManager : MonoBehaviour
                 StartCoroutine(ReturnToMainMenuFromGame());
                 break;
 
+            // Zen game → vertical slide back down to main menu
+            case GameState.ZenGame:
+                StartCoroutine(ReturnToMainMenuFromZen());
+                break;
+
             // Tutorial states → could go back to difficulty or cancel entirely
             case GameState.Tutorial1:
             case GameState.Tutorial2:
@@ -355,7 +369,40 @@ public class SceneFlowManager : MonoBehaviour
 
         Debug.Log("Returned to MainMenu from Game");
     }
-    
+
+    /// <summary>
+    /// Return to main menu from Zen mode (vertical slide down).
+    /// </summary>
+    private IEnumerator ReturnToMainMenuFromZen()
+    {
+        Debug.Log("ReturnToMainMenuFromZen - cleaning up...");
+
+        AudioManager.Instance?.StopMusic();
+        RunManager.Instance?.EndRun();
+        GameManager.Instance?.DeactivateGame();
+
+        // Reset game mode back to Arcade (default)
+        GameManager.Instance?.SetGameMode(GameManager.GameMode.Arcade);
+
+        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        gridManager?.ClearGrid();
+
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.HideAllGameOverScreens();
+
+        // Vertical slide: game panel slides down, main menu enters from above
+        yield return VerticalSlideTransition(gamePanel, mainMenuPanel, slideUp: true);
+        CurrentState = GameState.MainMenu;
+
+        // Reset game panel position for future horizontal transitions
+        SetPanelPosition(gamePanel, screenWidth);
+        SetPanelVerticalPosition(gamePanel, 0);
+
+        AudioManager.Instance?.PlayMenuMusic();
+
+        Debug.Log("Returned to MainMenu from Zen");
+    }
+
     /// <summary>
     /// Cancel from tutorials and return to main menu.
     /// </summary>
@@ -395,9 +442,10 @@ public class SceneFlowManager : MonoBehaviour
         CurrentState = GameState.Loading;
         Debug.Log("LoadingSequence started - tracking actual initialization");
 
-        // Recalculate canvas width after layout pass for accurate slide positioning
+        // Recalculate canvas dimensions after layout pass for accurate slide positioning
         yield return null;
         screenWidth = GetCanvasWidth();
+        screenHeight = GetCanvasHeight();
 
         loadingDisplayProgress = 0f;
         float startTime = Time.time;
@@ -611,6 +659,47 @@ public class SceneFlowManager : MonoBehaviour
         to.anchoredPosition = toEnd;
     }
     
+    /// <summary>
+    /// Vertical slide transition — slides panels up or down.
+    /// slideUp=true: 'from' slides up off-screen, 'to' enters from below.
+    /// </summary>
+    private IEnumerator VerticalSlideTransition(RectTransform from, RectTransform to, bool slideUp)
+    {
+        AudioManager.Instance?.PlayTransitionSwipe();
+
+        float direction = slideUp ? 1f : -1f;
+
+        // Position 'to' panel below (or above) screen
+        SetPanelVerticalPosition(to, -direction * screenHeight);
+
+        Vector2 fromStart = from.anchoredPosition;
+        Vector2 toStart = to.anchoredPosition;
+        Vector2 fromEnd = new Vector2(fromStart.x, direction * screenHeight);
+        Vector2 toEnd = new Vector2(toStart.x, 0);
+
+        float elapsed = 0f;
+        while (elapsed < transitionDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = transitionCurve.Evaluate(elapsed / transitionDuration);
+
+            from.anchoredPosition = Vector2.Lerp(fromStart, fromEnd, t);
+            to.anchoredPosition = Vector2.Lerp(toStart, toEnd, t);
+            yield return null;
+        }
+
+        from.anchoredPosition = fromEnd;
+        to.anchoredPosition = toEnd;
+    }
+
+    private void SetPanelVerticalPosition(RectTransform panel, float yPos)
+    {
+        if (panel == null) return;
+        Vector2 pos = panel.anchoredPosition;
+        pos.y = yPos;
+        panel.anchoredPosition = pos;
+    }
+
     private IEnumerator FadeTransition(RectTransform panel, bool fadeIn)
     {
         if (panel == null) yield break;
@@ -669,6 +758,50 @@ public class SceneFlowManager : MonoBehaviour
         {
             StartCoroutine(PlaySequence());
         });
+    }
+
+    /// <summary>
+    /// Zen button pressed — vertical slide up into Zen Mode game.
+    /// Wire this to ZenButton's onClick in Inspector.
+    /// </summary>
+    public void OnZenPressed()
+    {
+        Debug.Log($"OnZenPressed called! CurrentState = {CurrentState}");
+        HandleButton(GameState.MainMenu, () =>
+        {
+            StartCoroutine(ZenPlaySequence());
+        });
+    }
+
+    private IEnumerator ZenPlaySequence()
+    {
+        // Stop menu music
+        AudioManager.Instance?.StopMusic();
+
+        // Set game mode to Zen
+        GameManager.Instance?.SetGameMode(GameManager.GameMode.Zen);
+
+        // Start campaign/run tracking
+        CampaignManager.Instance?.StartNewCampaign();
+        RunManager.Instance?.StartNewRun();
+
+        // Vertical slide: main menu scrolls up, game panel enters from below
+        yield return VerticalSlideTransition(mainMenuPanel, gamePanel, slideUp: false);
+
+        // Spawn grid
+        FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
+        yield return new WaitForSeconds(0.1f);
+
+        // Activate game immediately (no countdown in Zen mode)
+        CurrentState = GameState.ZenGame;
+        GameManager.Instance?.ActivateGame();
+        FindFirstObjectByType<GridManager>()?.OnRoundStarted();
+        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+
+        // Start game music
+        AudioManager.Instance?.PlayGameMusic();
+
+        Debug.Log("Zen Mode started — no timer, no countdown");
     }
 
     public void OnOptionsPressed()
@@ -751,7 +884,7 @@ public class SceneFlowManager : MonoBehaviour
         CurrentState = GameState.Results;
     }
 
-    public bool IsInGameplay() => CurrentState == GameState.Game;
+    public bool IsInGameplay() => CurrentState == GameState.Game || CurrentState == GameState.ZenGame;
 
     
     public void RestartWithCountdown()

@@ -236,7 +236,7 @@ public class PopupWindow : MonoBehaviour
         tmp.color = textColor;
         tmp.alignment = alignment;
         tmp.fontStyle = style;
-        tmp.enableWordWrapping = true;
+        tmp.textWrappingMode = TextWrappingModes.Normal;
         tmp.overflowMode = TextOverflowModes.Truncate;
         tmp.lineSpacing = 8f;
 
@@ -517,7 +517,7 @@ public class PopupWindow : MonoBehaviour
         titleText.fontStyle = FontStyles.Bold;
         titleText.color = UIStyleGuide.ColorTitleText;
         titleText.alignment = TextAlignmentOptions.Center;
-        titleText.enableWordWrapping = false;
+        titleText.textWrappingMode = TextWrappingModes.NoWrap;
         titleText.overflowMode = TextOverflowModes.Ellipsis;
         RectTransform titleRect = titleObj.GetComponent<RectTransform>();
         titleRect.anchorMin = new Vector2(0.05f, 0);

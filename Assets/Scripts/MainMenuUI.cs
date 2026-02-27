@@ -12,7 +12,9 @@ public class MainMenuUI : MonoBehaviour
     [SerializeField] private RectTransform titleCard;
     [SerializeField] private float bounceHeight = 20f;
     [SerializeField] private float bounceSpeed = 2f;
+    #pragma warning disable CS0414 // Kept for Inspector visibility, rotation removed in L0
     [SerializeField] private float titleRotateAmount = 3f;
+    #pragma warning restore CS0414
     
     [Header("Banner Settings")]
     [SerializeField] private RectTransform topBanner;

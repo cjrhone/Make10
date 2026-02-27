@@ -14,7 +14,9 @@ public class GridManager : MonoBehaviour
     [SerializeField] private int gridHeight = 5;
     [SerializeField] private float baseTileSpacing = 10f; // Base spacing at reference size
     [SerializeField] private float referenceContainerSize = 550f; // Reference size for proportional scaling
+    #pragma warning disable CS0414 // Inspector-assigned fields
     [SerializeField] private float baseFontSize = 72f; // Base font size at reference size
+    #pragma warning restore CS0414
 
     [Header("Editor Preview")]
     [SerializeField] private Color editorGridLineColor = new Color(1f, 1f, 0f, 0.5f);
@@ -32,8 +34,10 @@ public class GridManager : MonoBehaviour
     
     [Header("Animation Settings")]
     [SerializeField] private float tileFallSpeed = 1600f;
+    #pragma warning disable CS0414 // Inspector-assigned, may be used in future tuning
     [SerializeField] private float tileFallDelay = 0.02f;
     [SerializeField] private float postClearDelay = 0.05f;
+    #pragma warning restore CS0414
     [SerializeField] private float tileSwapDuration = 0.15f;
     [SerializeField] private float unsolvableResetDelay = 1f;
     

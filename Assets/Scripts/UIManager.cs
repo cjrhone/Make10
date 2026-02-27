@@ -92,7 +92,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private TMP_Text totalValueText;
     [SerializeField] private float breakdownLineDelay = 0.3f;
     [SerializeField] private float countUpDuration = 0.5f;
+    #pragma warning disable CS0414
     [SerializeField] private float timeBonusPerSecond = 1f;
+    #pragma warning restore CS0414
 
     [Header("High Score")]
     [SerializeField] private TMP_Text highScoreText;

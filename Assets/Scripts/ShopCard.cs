@@ -43,7 +43,9 @@ public class ShopCard : MonoBehaviour, IPointerClickHandler, IPointerEnterHandle
     private float floatOffset;
     private bool isFloating = true;
     private bool isSelected = false;
+    #pragma warning disable CS0414
     private bool isHovered = false;
+    #pragma warning restore CS0414
     private Coroutine hoverCoroutine;
 
     // Card data - supports both types

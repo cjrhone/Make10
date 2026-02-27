@@ -75,6 +75,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private RectTransform rectTransform;
     private Coroutine pulseCoroutine;
     private Coroutine glowCoroutine;
+    private Coroutine deselectCoroutine;
     private Vector2 originalAnchoredPosition; // Store original position for floating
     private bool wasFloating = false; // Track if we actually started floating
     private bool isEnhanced = false; // Track if this tile's number is enhanced
@@ -90,8 +91,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     private static readonly float dragActivationThreshold = 15f; // px movement before drag activates
     
     // Tile background - uniform grey for all tiles
-    private static readonly Color TileBackgroundColor = new Color(0.85f, 0.85f, 0.85f); // Light grey
-    
+    private static readonly Color TileBackgroundColor = new Color(0.85f, 0.85f, 0.85f);
+
     // Number text colors - Color math philosophy:
     // Primaries: 1 (Gold/Yellow), 2 (Blue), 4 (Red)
     // Secondaries: 3 (Green = 1+2), 5 (Orange = 1+4), 6 (Purple = 2+4)
@@ -419,16 +420,25 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     public void Select()
     {
         IsSelected = true;
-        
+
+        // Cancel any in-progress deselect animation
+        if (deselectCoroutine != null)
+        {
+            StopCoroutine(deselectCoroutine);
+            deselectCoroutine = null;
+        }
+
         // Store original position for floating
         originalAnchoredPosition = rectTransform.anchoredPosition;
         wasFloating = true;
-        
+
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(true);
         }
-        
+
+        // Snappy punch on first selection
+        StartCoroutine(AnimationUtilities.PunchScale(transform, 1.15f, 0.1f));
         StartPulse();
     }
     
@@ -438,27 +448,53 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     public void Deselect()
     {
         IsSelected = false;
-        
+
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(false);
         }
-        
+
         // Restore uniform grey background
         if (backgroundImage != null)
         {
             backgroundImage.color = TileBackgroundColor;
         }
-        
+
         StopPulse();
-        transform.localScale = Vector3.one;
-        
+
+        // Animate scale back to 1.0 instead of instant reset
+        if (deselectCoroutine != null)
+            StopCoroutine(deselectCoroutine);
+        deselectCoroutine = StartCoroutine(AnimateDeselect());
+
         // Only restore position if we were actually floating
         if (wasFloating && rectTransform != null)
         {
             rectTransform.anchoredPosition = originalAnchoredPosition;
             wasFloating = false;
         }
+    }
+
+    /// <summary>
+    /// Smooth EaseOutCubic scale from current back to 1.0 over 0.08s.
+    /// </summary>
+    private IEnumerator AnimateDeselect()
+    {
+        float duration = 0.08f;
+        float elapsed = 0f;
+        Vector3 startScale = transform.localScale;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float eased = AnimationUtilities.EaseOutCubic(t);
+            transform.localScale = Vector3.Lerp(startScale, Vector3.one, eased);
+            yield return null;
+        }
+
+        transform.localScale = Vector3.one;
+        deselectCoroutine = null;
     }
     
     /// <summary>

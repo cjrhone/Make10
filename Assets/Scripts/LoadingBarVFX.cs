@@ -210,7 +210,6 @@ public class LoadingBarVFX : MonoBehaviour
             float shimmerX = wavePosition * progress * barWidth;
 
             // Gaussian-like intensity falloff
-            float shimmerWidth = 40f;
             float normalizedX = shimmerX / barWidth;
 
             // Create the shimmer highlight using a gradient mask approach
