@@ -83,7 +83,23 @@ public class GridManager : MonoBehaviour
     private Tile draggedTile = null;
     private int dragCurrentGridX, dragCurrentGridY;
 
+    // MakeZen: track last swapped tiles for merge position logic
+    private Tile lastSwappedFirst;
+    private Tile lastSwappedSecond;
+
     public event System.Action OnGridUnsolvable;
+
+    /// <summary>
+    /// Data for a single matching line in Zen mode (one row or column).
+    /// </summary>
+    private struct ZenLineMatch
+    {
+        public bool isRow;          // true = row match, false = column match
+        public int lineIndex;       // which row (y) or column (x)
+        public int sum;             // line sum (10, 20, 30, ...)
+        public Tile[] tiles;        // all tiles in this line (length = gridWidth or gridHeight)
+        public int mergeGridPos;    // grid position along the line for the merge tile
+    }
 
     /// <summary>
     /// Called when a round starts to reset progressive tile weight tracking.
@@ -579,6 +595,10 @@ public class GridManager : MonoBehaviour
         ResetHintTimer();
         AudioManager.Instance?.PlaySwapSound();
 
+        // MakeZen: track swapped tiles for merge position logic
+        lastSwappedFirst = tileA;
+        lastSwappedSecond = tileB;
+
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
         Vector2 posB = tileB.GetRectTransform().anchoredPosition;
 
@@ -722,6 +742,12 @@ public class GridManager : MonoBehaviour
 
         Debug.Log($"Drag ended: {tile} at [{dragCurrentGridX},{dragCurrentGridY}]");
 
+        // MakeZen: track the dragged tile as both first and second swap
+        // (drag-swap doesn't have a clean "two tile" swap, but the dragged tile's
+        // final position is the most natural merge point)
+        lastSwappedFirst = tile;
+        lastSwappedSecond = tile;
+
         isDragging = false;
         draggedTile = null;
 
@@ -804,13 +830,261 @@ public class GridManager : MonoBehaviour
         return new Vector2Int(gridX, gridY);
     }
 
+    // ==========================================
+    // MAKEZEN: MERGE & GRAVITY SYSTEM
+    // ==========================================
+
+    /// <summary>
+    /// Find the first matching line (row or column) on the grid.
+    /// Returns null if no matches exist. Used for Zen mode's line-by-line processing.
+    /// </summary>
+    private ZenLineMatch? FindFirstZenMatch()
+    {
+        // Check rows first
+        for (int y = 0; y < gridHeight; y++)
+        {
+            int sum = 0;
+            bool allPresent = true;
+            Tile[] lineTiles = new Tile[gridWidth];
+            for (int x = 0; x < gridWidth; x++)
+            {
+                if (grid[x, y] == null) { allPresent = false; break; }
+                lineTiles[x] = grid[x, y];
+                sum += grid[x, y].Value;
+            }
+            if (allPresent && sum > 0 && sum % 10 == 0)
+            {
+                return new ZenLineMatch
+                {
+                    isRow = true,
+                    lineIndex = y,
+                    sum = sum,
+                    tiles = lineTiles
+                };
+            }
+        }
+
+        // Check columns
+        for (int x = 0; x < gridWidth; x++)
+        {
+            int sum = 0;
+            bool allPresent = true;
+            Tile[] lineTiles = new Tile[gridHeight];
+            for (int y = 0; y < gridHeight; y++)
+            {
+                if (grid[x, y] == null) { allPresent = false; break; }
+                lineTiles[y] = grid[x, y];
+                sum += grid[x, y].Value;
+            }
+            if (allPresent && sum > 0 && sum % 10 == 0)
+            {
+                return new ZenLineMatch
+                {
+                    isRow = false,
+                    lineIndex = x,
+                    sum = sum,
+                    tiles = lineTiles
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Determine where the locked tile should appear after a Zen match.
+    /// Priority: second swapped tile position > first swapped > line center.
+    /// Port of prototype's getMergePos().
+    /// </summary>
+    private int GetZenMergePosition(ZenLineMatch match)
+    {
+        // Prefer where the secondSwapped tile sits on this line
+        if (lastSwappedSecond != null)
+        {
+            if (match.isRow && lastSwappedSecond.GridY == match.lineIndex)
+                return lastSwappedSecond.GridX;
+            if (!match.isRow && lastSwappedSecond.GridX == match.lineIndex)
+                return lastSwappedSecond.GridY;
+        }
+
+        // Fallback: firstSwapped position on this line
+        if (lastSwappedFirst != null)
+        {
+            if (match.isRow && lastSwappedFirst.GridY == match.lineIndex)
+                return lastSwappedFirst.GridX;
+            if (!match.isRow && lastSwappedFirst.GridX == match.lineIndex)
+                return lastSwappedFirst.GridY;
+        }
+
+        // Final fallback: center of line
+        return (match.isRow ? gridWidth : gridHeight) / 2;
+    }
+
+    /// <summary>
+    /// Animate a single Zen match: beam flash, convergence to merge point,
+    /// locked tile creation, other tile removal, scoring.
+    /// </summary>
+    private IEnumerator AnimateZenMatch(ZenLineMatch match, int cascadeCount)
+    {
+        int mergePos = GetZenMergePosition(match);
+        match.mergeGridPos = mergePos;
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.IsSolveAnimationPlaying = true;
+
+        // Identify the merge tile and the tiles to remove
+        Tile mergeTile;
+        int mergeX, mergeY;
+        if (match.isRow)
+        {
+            mergeX = mergePos;
+            mergeY = match.lineIndex;
+        }
+        else
+        {
+            mergeX = match.lineIndex;
+            mergeY = mergePos;
+        }
+        mergeTile = grid[mergeX, mergeY];
+
+        // Build a single-line MatchResult for VFX (beam flash)
+        MatchResult singleLineResult = new MatchResult();
+        foreach (Tile t in match.tiles)
+        {
+            if (t != null) singleLineResult.allMatchedTiles.Add(t);
+        }
+        if (match.isRow)
+        {
+            singleLineResult.matchedRows.Add(match.lineIndex);
+            singleLineResult.rowSums[match.lineIndex] = match.sum;
+        }
+        else
+        {
+            singleLineResult.matchedColumns.Add(match.lineIndex);
+            singleLineResult.columnSums[match.lineIndex] = match.sum;
+        }
+
+        // Fire beam flash (non-blocking)
+        if (GridVFX.Instance != null)
+            StartCoroutine(GridVFX.Instance.PlayLineSweeps(singleLineResult, tileSize, tileSpacing));
+
+        yield return new WaitForSeconds(0.08f);
+
+        // Trigger avatar solve animation
+        AvatarManager.Instance?.OnSolve();
+        AudioManager.Instance?.PlayConvergenceSound();
+
+        // Convergence: all non-merge tiles in the line slide toward the merge tile
+        Vector2 mergeWorldPos = GridToWorldPosition(mergeX, mergeY);
+        Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
+        List<Tile> tilesToRemove = new List<Tile>();
+
+        foreach (Tile t in match.tiles)
+        {
+            if (t == null) continue;
+            originalPositions[t] = t.GetRectTransform().anchoredPosition;
+            if (t != mergeTile)
+                tilesToRemove.Add(t);
+        }
+
+        // Animate convergence (tiles slide + shrink toward merge position)
+        float elapsed = 0f;
+        while (elapsed < solveConvergeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / solveConvergeDuration;
+            float easedT = t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
+
+            foreach (Tile tile in tilesToRemove)
+            {
+                if (tile == null || !originalPositions.ContainsKey(tile)) continue;
+
+                RectTransform rt = tile.GetRectTransform();
+                Vector2 startPos = originalPositions[tile];
+                rt.anchoredPosition = Vector2.Lerp(startPos, mergeWorldPos, easedT);
+
+                float scale = Mathf.Lerp(1f, convergeShrinkAmount, easedT);
+                tile.transform.localScale = Vector3.one * scale;
+                tile.transform.localEulerAngles = new Vector3(0, 0, easedT * 180f);
+
+                // Fade tile background
+                Image img = tile.GetComponent<Image>();
+                if (img != null)
+                    img.color = new Color(0.85f, 0.85f, 0.85f, 1f - easedT);
+            }
+
+            // Merge tile: subtle grow pulse during convergence
+            if (mergeTile != null)
+            {
+                float pulseScale = 1f + Mathf.Sin(easedT * Mathf.PI) * 0.08f;
+                mergeTile.transform.localScale = Vector3.one * pulseScale;
+            }
+
+            yield return null;
+        }
+
+        // === Convergence complete: create locked tile, remove others ===
+
+        // Collect original tile values BEFORE modifying/destroying (for scoring)
+        List<int> tileValues = new List<int>();
+        foreach (Tile tile in match.tiles)
+        {
+            if (tile != null) tileValues.Add(tile.Value);
+        }
+
+        // SFX and chain tracking
+        int consecutiveCount = gridValidation.RegisterMatch();
+        AudioManager.Instance?.PlayTenPopSound(consecutiveCount);
+        if (GridVFX.Instance != null)
+        {
+            GridVFX.Instance.TriggerShake(consecutiveCount);
+            GridVFX.Instance.PulseAmbientParticles();
+        }
+
+        // Convert merge tile to locked (set value = line sum)
+        if (mergeTile != null)
+        {
+            mergeTile.SetValue(match.sum);
+            mergeTile.transform.localScale = Vector3.one;
+            Debug.Log($"<color=cyan>[Zen]</color> Locked tile created: value {match.sum} at [{mergeX},{mergeY}]");
+        }
+
+        // Remove the other tiles from the grid
+        foreach (Tile tile in tilesToRemove)
+        {
+            if (tile != null)
+            {
+                grid[tile.GridX, tile.GridY] = null;
+                Destroy(tile.gameObject);
+            }
+        }
+
+        // Show sum popup at merge position
+        yield return StartCoroutine(ShowTenEffectSpectacular(mergeWorldPos, match.sum));
+
+        // Report scoring to GameManager
+        GameManager.Instance?.OnMatchCleared(
+            match.tiles.Length,        // tilesCleared
+            match.isRow ? 1 : 0,       // rowsMatched
+            match.isRow ? 0 : 1,       // columnsMatched
+            tileValues,
+            singleLineResult,
+            cascadeCount
+        );
+
+        if (GameManager.Instance != null)
+            GameManager.Instance.IsSolveAnimationPlaying = false;
+    }
+
     private IEnumerator ProcessMatchesCoroutine()
     {
         isProcessing = true;
         int cascadeCount = 0;
-        
+        bool isZenMode = GameManager.Instance != null
+            && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
+
         GameManager.Instance?.OnCascadeStart();
-        
+
         while (true)
         {
             // Stop processing if game is no longer active (e.g. win/loss triggered)
@@ -826,6 +1100,49 @@ public class GridManager : MonoBehaviour
                 break;
             }
 
+            // ──────────────────────────────────────────────
+            // ZEN MODE: line-by-line merge processing
+            // ──────────────────────────────────────────────
+            if (isZenMode)
+            {
+                ZenLineMatch? zenMatch = FindFirstZenMatch();
+
+                if (zenMatch == null)
+                {
+                    if (cascadeCount > 0)
+                        Debug.Log($"<color=cyan>[Zen]</color> Cascade complete! {cascadeCount} chain(s)");
+                    else
+                    {
+                        Debug.Log("<color=cyan>[Zen]</color> No matches found.");
+                        GameManager.Instance?.OnFailedSwap();
+                    }
+                    break;
+                }
+
+                cascadeCount++;
+
+                // Clear swap references for chain matches (cascades have no "player" position)
+                if (cascadeCount > 1)
+                {
+                    lastSwappedFirst = null;
+                    lastSwappedSecond = null;
+                }
+
+                ZenLineMatch match = zenMatch.Value;
+                Debug.Log($"<color=cyan>[Zen] MATCH {cascadeCount}!</color> " +
+                    $"{(match.isRow ? "Row" : "Col")} {match.lineIndex}, sum = {match.sum}");
+
+                yield return StartCoroutine(AnimateZenMatch(match, cascadeCount));
+
+                yield return StartCoroutine(DropTilesCoroutine());
+                yield return StartCoroutine(SpawnNewTilesCoroutine());
+
+                continue; // Check for chain matches
+            }
+
+            // ──────────────────────────────────────────────
+            // ARCADE MODE: existing all-at-once processing
+            // ──────────────────────────────────────────────
             MatchResult result = matchChecker.GetMatchResult();
 
             if (!result.HasMatches)
@@ -866,7 +1183,7 @@ public class GridManager : MonoBehaviour
                 result,
                 cascadeCount    // 1 = player swap, 2+ = cascade
             );
-            
+
             yield return StartCoroutine(DropTilesCoroutine());
             yield return StartCoroutine(SpawnNewTilesCoroutine());
         }
@@ -918,14 +1235,25 @@ public class GridManager : MonoBehaviour
     
     private IEnumerator ResetGridWithEffect()
     {
+        bool isZenMode = GameManager.Instance != null
+            && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
+
+        if (isZenMode)
+        {
+            // Zen reshuffle: only re-roll non-locked tiles, preserve locked tiles in place
+            yield return StartCoroutine(ZenResetGridWithEffect());
+            yield break;
+        }
+
+        // Arcade mode: full grid reset (original behavior)
         Debug.Log("<color=yellow>Grid reset with visual effect (no points awarded)</color>");
-        
+
         List<Tile> allTiles = new List<Tile>();
         for (int y = 0; y < gridHeight; y++)
             for (int x = 0; x < gridWidth; x++)
                 if (grid[x, y] != null)
                     allTiles.Add(grid[x, y]);
-        
+
         float flashDuration = 0.3f;
         float elapsed = 0f;
         while (elapsed < flashDuration)
@@ -933,7 +1261,7 @@ public class GridManager : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.PingPong(elapsed * 8f, 1f);
             Color flashColor = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.3f), t);
-            
+
             foreach (Tile tile in allTiles)
             {
                 if (tile != null)
@@ -944,20 +1272,20 @@ public class GridManager : MonoBehaviour
             }
             yield return null;
         }
-        
+
         float fallDuration = 0.4f;
         elapsed = 0f;
-        
+
         Dictionary<Tile, Vector2> originalPositions = new Dictionary<Tile, Vector2>();
         foreach (Tile tile in allTiles)
             if (tile != null)
                 originalPositions[tile] = tile.GetRectTransform().anchoredPosition;
-        
+
         while (elapsed < fallDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / fallDuration;
-            
+
             foreach (Tile tile in allTiles)
             {
                 if (tile != null && originalPositions.ContainsKey(tile))
@@ -968,7 +1296,7 @@ public class GridManager : MonoBehaviour
                     float fallDistance = 800f * scaleFactor * t * t;
 
                     rt.anchoredPosition = originalPos + new Vector2(shake, -fallDistance);
-                    
+
                     Image img = tile.GetComponent<Image>();
                     if (img != null)
                     {
@@ -976,15 +1304,94 @@ public class GridManager : MonoBehaviour
                         c.a = 1f - t;
                         img.color = c;
                     }
-                    
+
                     tile.transform.localScale = Vector3.one * (1f - t * 0.3f);
                 }
             }
             yield return null;
         }
-        
+
         ClearGrid();
         SpawnGrid();
+        StartCoroutine(ProcessMatchesCoroutine());
+    }
+
+    /// <summary>
+    /// Zen-specific grid reshuffle: preserves locked tiles in place,
+    /// re-rolls only free (non-locked) tiles. Attempts up to 500 times
+    /// to generate a board with no initial matches and at least one valid move.
+    /// Port of prototype's resetBoard().
+    /// </summary>
+    private IEnumerator ZenResetGridWithEffect()
+    {
+        Debug.Log("<color=cyan>[Zen]</color> Reshuffle — preserving locked tiles");
+
+        // Collect non-locked tiles for flash animation
+        List<Tile> freeTiles = new List<Tile>();
+        for (int y = 0; y < gridHeight; y++)
+            for (int x = 0; x < gridWidth; x++)
+                if (grid[x, y] != null && !grid[x, y].IsLocked)
+                    freeTiles.Add(grid[x, y]);
+
+        // Flash only free tiles
+        float flashDuration = 0.3f;
+        float elapsed = 0f;
+        while (elapsed < flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.PingPong(elapsed * 8f, 1f);
+            Color flashColor = Color.Lerp(Color.white, new Color(0.3f, 0.8f, 1f), t); // Cyan flash for Zen
+
+            foreach (Tile tile in freeTiles)
+            {
+                if (tile != null)
+                {
+                    Image img = tile.GetComponent<Image>();
+                    if (img != null) img.color = flashColor;
+                }
+            }
+            yield return null;
+        }
+
+        // Re-roll free tile values (try up to 500 times for a valid board)
+        bool foundValid = false;
+        for (int attempt = 0; attempt < 500; attempt++)
+        {
+            // Re-roll all non-locked tiles
+            foreach (Tile tile in freeTiles)
+            {
+                if (tile != null && !tile.IsLocked)
+                {
+                    int newValue = tileWeightManager.GetWeightedRandomValue();
+                    tile.SetValue(newValue);
+                }
+            }
+
+            // Check: no initial matches AND has valid moves
+            bool hasMatch = FindFirstZenMatch() != null;
+            bool hasValidMoves = matchChecker.HasValidMoves();
+
+            if (!hasMatch && hasValidMoves)
+            {
+                foundValid = true;
+                Debug.Log($"<color=cyan>[Zen]</color> Valid reshuffle found on attempt {attempt + 1}");
+                break;
+            }
+        }
+
+        if (!foundValid)
+            Debug.LogWarning("[Zen] Could not find ideal reshuffle in 500 attempts — using last result.");
+
+        // Brief scale-bounce on free tiles to visually confirm the reshuffle
+        foreach (Tile tile in freeTiles)
+        {
+            if (tile != null)
+                StartCoroutine(AnimationUtilities.PunchScale(tile.transform, 1.15f, 0.12f));
+        }
+
+        yield return new WaitForSeconds(0.15f);
+
+        // Resume match processing (shouldn't find matches, but safety check)
         StartCoroutine(ProcessMatchesCoroutine());
     }
     

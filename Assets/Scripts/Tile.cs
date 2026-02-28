@@ -288,11 +288,12 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     }
     
     /// <summary>
-    /// Set the tile's numeric value (0-9).
+    /// Set the tile's numeric value. Regular tiles use 0-9; locked tiles (MakeZen) can be 10+.
+    /// In a 5×5 grid with high locked tiles, sums above 70 are reachable (e.g., locked 40 + locked 30 + tiles).
     /// </summary>
     public void SetValue(int value)
     {
-        Value = Mathf.Clamp(value, 0, 70); // Allow locked tile values (10-70+)
+        Value = Mathf.Max(value, 0); // No upper cap — locked tiles can reach high sums
         UpdateNumberDisplay();
     }
     

@@ -21,6 +21,7 @@ MakeZen is a 5-minute math meditation. Where Arcade is a sprint (frantic, adrena
 | `GameManager.cs` | Game state, scoring, multiplier system, hot streak mode. Timer-only rounds (no win threshold). |
 | `GridManager.cs` | Grid spawning, tile management, cascade matching, hint system |
 | `TileWeightManager.cs` | Tile value weights, progressive difficulty ramp, Tetris-style tile bag |
+| `GridValidation.cs` | Initial match prevention, anti-cascade checks, consecutive match tracking/scaling |
 | `Tile.cs` | Individual tile behavior, click/swipe input, selection state |
 | `MatchChecker.cs` | Match detection, row/column sum validation, solvability checks |
 | `CampaignManager.cs` | Lightweight round counter (arcade mode shell) |
@@ -66,6 +67,8 @@ CampaignManager.Instance    → Lightweight round counter
 AvatarManager.Instance      → Avatar state machine
 TenExplosionVFX.Instance    → Particle effects
 GridVFX.Instance            → Line sweeps, ambient particles, screen shake
+TileWeightManager.Instance  → Tile value weights, tile bag, progressive difficulty ramp
+GridValidation.Instance     → Match prevention, anti-cascade, consecutive match tracking
 ```
 
 ---
@@ -198,7 +201,7 @@ Locked tiles (value ≥ 10):
 | Grid Size | 5×5 | 5×5 | GridManager |
 | Max Reshuffles | Unlimited | 3 | GameManager |
 | Canvas | 1080×1920 | 1080×1920 | Canvas |
-| Tile Bag Size | 25 | 25 | GridManager |
+| Tile Bag Size | 25 | 25 | TileWeightManager |
 | Speed Bonus | 5 BP within 4s | 5 BP within 4s | GameManager |
 | Time Bonus/Match | +1.5s per line | None | GameManager |
 
@@ -456,7 +459,7 @@ The current `ProcessMatchesCoroutine` flow is: detect match → animate → clea
 
 **Scope:** ~15 lines.
 
-#### Difficulty Ramp (GridManager.cs)
+#### Difficulty Ramp (TileWeightManager.cs)
 
 Extend existing solve-based ramp to match prototype's 7-tier system:
 
@@ -470,7 +473,7 @@ Current (Arcade):              New (MakeZen):
                                  Drop 0s after 90 matches (mastery)
 ```
 
-Add `GetZenDifficulty(int matchCount)` returning `(int minTile, int maxTile, string label)`. Gate behind mode check in `GetAdjustedWeights()`.
+Add `GetZenDifficulty(int matchCount)` to TileWeightManager returning `(int minTile, int maxTile, string label)`. Gate behind mode check in `GetAdjustedWeights()`.
 
 **Scope:** ~30 lines. Parallel to existing ramp, not replacing it.
 
@@ -483,7 +486,7 @@ Add `GetZenDifficulty(int matchCount)` returning `(int minTile, int maxTile, str
 - ❌ Convergence particle effects (use existing match VFX)
 - ❌ Any changes to Arcade mode behavior
 
-**Total scope estimate:** ~350-450 new/changed lines across 6 files. No new scripts needed.
+**Total scope estimate:** ~350-450 new/changed lines across 6 files. TileWeightManager.cs and GridValidation.cs already created (Session A.1). GridManager is ~1,920 lines (trimmed from 2,292).
 
 ---
 
@@ -688,8 +691,8 @@ Phase 1 — Foundation
 
 Phase 2 — MakeZen MVP (5 implementation sessions)
   Session A: Locked tile system (Tile.cs) + MatchChecker awareness ✓
-  Session A.1: Extract TileWeightManager from GridManager (hygiene/refactor)
-  Session B: Merge/gravity flow (GridManager.cs — ProcessZenMatch)
+  Session A.1: Extract TileWeightManager + GridValidation from GridManager ✓
+  Session B: Merge/gravity flow (GridManager.cs — ProcessZenMatch)  ← NEXT
   Session C: Game flow wiring (GameManager, SceneFlowManager, difficulty ramp)
   Session D: UI + results + playtesting (UIManager, MainMenuUI, bug fixing)
 
@@ -724,53 +727,35 @@ Phase 5 — Music Production (parallel, CJ-driven)
 6. MatchChecker: update `HasValidMoves()` and `FindHintMove()` to skip locked tiles as swap candidates
 7. **Test:** Manually set a tile to value 10 in the editor → verify it renders as locked, can't be selected, glow works
 
-#### Session A.1 — Extract TileWeightManager (~1-2 hours, collaborative)
-**Files:** `GridManager.cs` (extract from), `TileWeightManager.cs` (new)
-**Goal:** Move tile value weights, progressive difficulty ramp, and tile bag system out of GridManager into a dedicated manager. Reduces GridManager's 46 Inspector fields by 20. Sets up clean home for Zen 7-tier difficulty ramp (Session C).
+#### Session A.1 — Extract TileWeightManager + GridValidation ✓ COMPLETE
+**Files:** `GridManager.cs` (extract from), `TileWeightManager.cs` (new), `GridValidation.cs` (new)
+**Goal:** Reduce GridManager complexity by extracting self-contained subsystems into dedicated managers.
 
-**⚠️ Collaborative session — CJ must handle Unity Editor steps (marked with 🎮).**
+**What was extracted:**
 
-**What moves to TileWeightManager.cs (new MonoBehaviour, singleton):**
-```
-Fields (20 serialized):
-  weight0-weight7            — base tile value weights
-  solvesFor5s/6s/7s          — progressive ramp thresholds
-  maxWeight5/6/7             — ramp ceiling weights
-  solvesToFullRamp           — when ramp completes
-  baseTileReduction          — how much low tiles reduce
+1. **TileWeightManager.cs** (new singleton) — tile value weights (weight0-7), progressive difficulty ramp (solvesFor5s/6s/7s, maxWeight5/6/7, solvesToFullRamp, baseTileReduction), Tetris-style tile bag system (GetWeightedRandomValue, RefillTileBag, GetAdjustedWeights, GetCurrentWeights). Public API: `GetWeightedRandomValue()`, `ClearBag()`.
 
-Private state:
-  tileBag (List<int>)        — Tetris-style bag of 25 tiles
-  weights[] (float[10])      — runtime weight array
+2. **GridValidation.cs** (new singleton) — consecutive 10s scaling (baseTenScale, tenScaleIncrement, maxTenScale, consecutiveResetTime), initial match prevention (EnsureNoInitialMatches, FindMatchingLines, ReRollTileToBreakMatch, CheckLineSum), anti-cascade checks (WouldTileCompleteMatch). Public API: `RegisterMatch()`, `GetTenScale(lineSum)`, `ConsecutiveCount`, `ResetConsecutive()`, `EnsureNoInitialMatches(grid, w, h, twm)`, `WouldTileCompleteMatch(grid, w, h, x, y, val)`.
 
-Methods:
-  GetWeightedRandomValue()   — main public API (called by GridManager)
-  RefillTileBag()            — Fisher-Yates shuffle bag refill
-  GetAdjustedWeights()       — progressive ramp based on SolveCount
-  GetCurrentWeights()        — fallback weight lookup from GameManager
-```
+**GridManager.cs changes:** Removed ~340 lines and 20 serialized fields. Added `[SerializeField] private TileWeightManager tileWeightManager` and `[SerializeField] private GridValidation gridValidation` under a "Managers" header. All call sites updated to delegate through these managers.
 
-**What stays in GridManager:**
-```
-CreateTile()               — calls tileWeightManager.GetWeightedRandomValue()
-SpawnNewTilesCoroutine()   — calls tileWeightManager.GetWeightedRandomValue()
-Everything else            — grid state, input, match processing, VFX, hints
-```
+**🎮 Unity Editor setup (required for each new manager):**
+- Create GameObject, add component, copy serialized values, drag reference into GridManager Inspector.
 
-**Steps:**
-1. Claude: Create `TileWeightManager.cs` with extracted fields and methods
-2. Claude: Modify `GridManager.cs` — remove extracted fields/methods, add `[SerializeField] private TileWeightManager tileWeightManager` reference, replace internal calls with `tileWeightManager.GetWeightedRandomValue()`
-3. 🎮 CJ in Unity: Create TileWeightManager GameObject, add component, copy weight values from GridManager Inspector before removing them
-4. 🎮 CJ in Unity: Drag TileWeightManager reference into GridManager's new field
-5. Claude: Verify no compilation errors, review call sites
-6. **Test:** Play Arcade mode → tiles spawn with correct weight distribution → progressive ramp still works after 5+ solves
-
-**Future: Session C will add `GetZenDifficulty()` to TileWeightManager instead of GridManager.**
+**Future: Session C will add `GetZenDifficulty()` to TileWeightManager.**
 
 #### Session B — Merge & Gravity (~2-3 hours, most complex)
-**Files:** `GridManager.cs`
+**Files:** `GridManager.cs` (primary), `GridValidation.cs` (anti-cascade calls already delegated)
 **Goal:** Matches create locked tiles instead of clearing the line.
 
+**Key context for Session B:**
+- `GridManager.cs` is now ~1,920 lines (down from 2,292 after A.1 extractions)
+- Anti-cascade check is `gridValidation.WouldTileCompleteMatch(grid, gridWidth, gridHeight, x, y, value)` — already wired
+- Tile spawning uses `tileWeightManager.GetWeightedRandomValue()` — already wired
+- Locked tile rendering (Tile.cs) and MatchChecker awareness already done in Session A
+- Reference prototype: `MakeZen/make10zen_v6.jsx` — use `getMergePos()` and `processMatches()` as ground truth
+
+**Steps:**
 1. Add `ProcessZenMatch(MatchResult, Tile firstSwapped, Tile secondSwapped)` method
 2. Implement merge position logic (from prototype's `getMergePos`)
 3. Convergence animation: matched tiles shrink/slide toward merge position
@@ -807,25 +792,31 @@ Everything else            — grid state, input, match processing, VFX, hints
 
 ### Post-Sprint State (After MakeZen MVP)
 
-**New scripts:** `TileWeightManager.cs` (extracted from GridManager — tile weights, bag system, difficulty ramp)
+**New scripts (already created):**
+- `TileWeightManager.cs` — extracted from GridManager: tile weights, bag system, difficulty ramp (Session A.1)
+- `GridValidation.cs` — extracted from GridManager: match prevention, anti-cascade, consecutive match tracking (Session A.1)
 
 **Future sprint scripts:** CosmeticData.cs, CosmeticInventory.cs, ShopManager.cs, ShopCard.cs (L6)
 
 **Modified scripts (MakeZen MVP):**
 ```
-Tile.cs            → + IsLocked, locked tile rendering, glow ungating, interaction blocking
-GridManager.cs     → - tile weights (extracted to TileWeightManager), + ProcessZenMatch(), merge logic, Zen gravity, Zen reshuffle
-TileWeightManager.cs → NEW: tile value weights, progressive ramp, tile bag, + 7-tier Zen difficulty ramp
-MatchChecker.cs    → + locked tile awareness in move validation
-GameManager.cs     → + 5-min timer, failed swap penalty, Zen stats tracking
-SceneFlowManager.cs → + ModeSelect state
-UIManager.cs       → + locked tile counter, Zen results screen, calm timer
-MainMenuUI.cs      → + mode select buttons, per-mode high scores
+Tile.cs              → + IsLocked, locked tile rendering, glow ungating, interaction blocking (Session A ✓)
+MatchChecker.cs      → + locked tile awareness in move validation (Session A ✓)
+GridManager.cs       → - tile weights, match prevention, consecutive tracking (extracted A.1 ✓)
+                       + ProcessZenMatch(), merge logic, Zen gravity, Zen reshuffle (Session B)
+TileWeightManager.cs → NEW ✓, + 7-tier Zen difficulty ramp (Session C)
+GridValidation.cs    → NEW ✓ (no further MakeZen changes expected)
+GameManager.cs       → + 5-min timer, failed swap penalty, Zen stats tracking (Session C)
+SceneFlowManager.cs  → + ModeSelect state (Session C)
+UIManager.cs         → + locked tile counter, Zen results screen, calm timer (Session D)
+MainMenuUI.cs        → + mode select buttons, per-mode high scores (Session D)
 ```
 
 **Updated singletons:**
 ```
 GameManager.Instance        → + MakeZen timer (300s), failed swap penalty, Zen stats
+TileWeightManager.Instance  → NEW ✓ (tile weights, bag, progressive ramp)
+GridValidation.Instance     → NEW ✓ (match prevention, consecutive tracking)
 ```
 
 **Updated game flow:**

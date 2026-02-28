@@ -206,9 +206,22 @@ public class GridValidation : MonoBehaviour
     /// </summary>
     private void ReRollTileToBreakMatch(Tile[,] grid, int gridWidth, int gridHeight, int lineIndex, bool isRow, TileWeightManager tileWeightManager)
     {
-        // Pick a random position in the line to re-roll
+        // Pick a random NON-LOCKED position in the line to re-roll
         int lineLength = isRow ? gridWidth : gridHeight;
-        int pos = Random.Range(0, lineLength);
+
+        // Collect eligible (non-locked) positions
+        List<int> eligiblePositions = new List<int>();
+        for (int i = 0; i < lineLength; i++)
+        {
+            int tx = isRow ? i : lineIndex;
+            int ty = isRow ? lineIndex : i;
+            if (grid[tx, ty] != null && !grid[tx, ty].IsLocked)
+                eligiblePositions.Add(i);
+        }
+
+        if (eligiblePositions.Count == 0) return; // All tiles locked, can't re-roll
+
+        int pos = eligiblePositions[Random.Range(0, eligiblePositions.Count)];
 
         int tileX = isRow ? pos : lineIndex;
         int tileY = isRow ? lineIndex : pos;
