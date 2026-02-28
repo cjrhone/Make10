@@ -151,44 +151,44 @@ public class MatchChecker : MonoBehaviour
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
         
-        // Try every possible adjacent swap
+        // Try every possible adjacent swap (skip locked tiles — can't be swapped)
         for (int y = 0; y < gridSize.y; y++)
         {
             for (int x = 0; x < gridSize.x; x++)
             {
                 Tile tile = grid[x, y];
-                if (tile == null) continue;
-                
+                if (tile == null || tile.IsLocked) continue;
+
                 // Try swapping right
-                if (x + 1 < gridSize.x && grid[x + 1, y] != null)
+                if (x + 1 < gridSize.x && grid[x + 1, y] != null && !grid[x + 1, y].IsLocked)
                 {
                     if (WouldCreateMatch(x, y, x + 1, y))
                         return new HintMove(tile, SwipeDirection.Right);
                 }
-                
+
                 // Try swapping down
-                if (y + 1 < gridSize.y && grid[x, y + 1] != null)
+                if (y + 1 < gridSize.y && grid[x, y + 1] != null && !grid[x, y + 1].IsLocked)
                 {
                     if (WouldCreateMatch(x, y, x, y + 1))
                         return new HintMove(tile, SwipeDirection.Down);
                 }
-                
+
                 // Try swapping left
-                if (x - 1 >= 0 && grid[x - 1, y] != null)
+                if (x - 1 >= 0 && grid[x - 1, y] != null && !grid[x - 1, y].IsLocked)
                 {
                     if (WouldCreateMatch(x, y, x - 1, y))
                         return new HintMove(tile, SwipeDirection.Left);
                 }
-                
+
                 // Try swapping up
-                if (y - 1 >= 0 && grid[x, y - 1] != null)
+                if (y - 1 >= 0 && grid[x, y - 1] != null && !grid[x, y - 1].IsLocked)
                 {
                     if (WouldCreateMatch(x, y, x, y - 1))
                         return new HintMove(tile, SwipeDirection.Up);
                 }
             }
         }
-        
+
         return null; // No hint found
     }
     
@@ -253,18 +253,27 @@ public class MatchChecker : MonoBehaviour
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
 
-        List<int> allValues = new List<int>();
+        // Check actual adjacent swaps (accounts for locked tiles that can't be swapped)
         for (int y = 0; y < gridSize.y; y++)
+        {
             for (int x = 0; x < gridSize.x; x++)
-                if (grid[x, y] != null)
-                    allValues.Add(grid[x, y].Value);
+            {
+                Tile tile = grid[x, y];
+                if (tile == null || tile.IsLocked) continue;
 
-        int tilesPerLine = gridSize.x;
-        // Check all reachable multiples of 10
-        return CanSum(allValues, tilesPerLine, 10, 0)
-            || CanSum(allValues, tilesPerLine, 20, 0)
-            || CanSum(allValues, tilesPerLine, 30, 0)
-            || CanSum(allValues, tilesPerLine, 40, 0);
+                // Check right and down only (avoids double-checking symmetric swaps)
+                if (x + 1 < gridSize.x && grid[x + 1, y] != null && !grid[x + 1, y].IsLocked)
+                {
+                    if (WouldCreateMatch(x, y, x + 1, y)) return true;
+                }
+                if (y + 1 < gridSize.y && grid[x, y + 1] != null && !grid[x, y + 1].IsLocked)
+                {
+                    if (WouldCreateMatch(x, y, x, y + 1)) return true;
+                }
+            }
+        }
+
+        return false;
     }
     
     private bool CanSum(List<int> values, int count, int target, int startIndex)

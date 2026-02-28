@@ -64,7 +64,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     public int GridX { get; set; }
     public int GridY { get; set; }
     public bool IsSelected { get; private set; }
-    
+    public bool IsLocked => Value >= 10;
+
     // Events
     public static event Action<Tile> OnTileClicked;
     public static event Action<Tile, SwipeDirection> OnTileSwiped;
@@ -110,6 +111,34 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         new Color(0.9f, 0.35f, 0.6f),    // 8 - Pink
         new Color(0.75f, 0.1f, 0.15f)    // 9 - Crimson
     };
+
+    // Locked tile colors (for merged tiles in MakeZen mode)
+    // Indexed by: (value / 10 - 1). Value 10 → index 0, value 20 → index 1, etc.
+    private static readonly Color[] LockedTileColors = new Color[8]
+    {
+        new Color(0.94f, 0.82f, 0.37f),   // 10 - Gold (#f0d060)
+        new Color(0.82f, 0.56f, 1.00f),   // 20 - Purple (#d090ff)
+        new Color(0.31f, 0.91f, 0.82f),   // 30 - Teal (#50e8d0)
+        new Color(1.00f, 0.37f, 0.37f),   // 40 - Red (#ff6060)
+        new Color(1.00f, 0.62f, 0.19f),   // 50 - Orange (#ffa030)
+        new Color(0.37f, 0.62f, 1.00f),   // 60 - Blue (#60a0ff)
+        new Color(0.88f, 0.37f, 0.88f),   // 70 - Magenta (#e060e0)
+        new Color(0.88f, 0.37f, 0.88f)    // 80+ - Magenta (same as 70)
+    };
+
+    /// <summary>Get the color for a locked tile by its value (10, 20, 30, etc.).</summary>
+    private static Color GetLockedTileColor(int value)
+    {
+        if (value < 10) return Color.white;
+        int index = Mathf.Min((value / 10) - 1, LockedTileColors.Length - 1);
+        return LockedTileColors[index];
+    }
+
+    /// <summary>Safe color lookup: returns locked tier color for locked tiles, NumberColors for regular.</summary>
+    private Color GetTileColor()
+    {
+        return IsLocked ? GetLockedTileColor(Value) : NumberColors[Value];
+    }
 
     private void Awake()
     {
@@ -263,7 +292,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void SetValue(int value)
     {
-        Value = Mathf.Clamp(value, 0, 9);
+        Value = Mathf.Clamp(value, 0, 70); // Allow locked tile values (10-70+)
         UpdateNumberDisplay();
     }
     
@@ -275,7 +304,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         if (numberText != null)
         {
             numberText.text = Value.ToString();
-            numberText.color = NumberColors[Value]; // Colored numbers
+            numberText.color = GetTileColor();
             numberText.enabled = true;
             numberText.gameObject.SetActive(true);
 
@@ -287,13 +316,20 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             Debug.LogError($"Tile [{GridX},{GridY}]: No Text component found!", this);
         }
 
-        // Set uniform grey background for all tiles
+        // Set background: subtle tint for locked tiles, uniform grey for regular
         if (backgroundImage != null)
         {
-            backgroundImage.color = TileBackgroundColor;
+            if (IsLocked)
+            {
+                backgroundImage.color = Color.Lerp(Color.white, GetLockedTileColor(Value), 0.12f);
+            }
+            else
+            {
+                backgroundImage.color = TileBackgroundColor;
+            }
         }
 
-        // Check if this number is enhanced and update glow
+        // Check if this tile should have enhanced glow (locked tiles get glow)
         UpdateEnhancedGlow();
     }
 
@@ -302,12 +338,42 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     private void UpdateEnhancedGlow()
     {
-        isEnhanced = false;
+        isEnhanced = IsLocked;
+
         if (enhancedGlowImage != null)
-            enhancedGlowImage.gameObject.SetActive(false);
+        {
+            if (isEnhanced)
+            {
+                enhancedGlowImage.gameObject.SetActive(true);
+                Color glowColor = GetLockedTileColor(Value);
+                glowColor.a = glowMinAlpha;
+                enhancedGlowImage.color = glowColor;
+            }
+            else
+            {
+                enhancedGlowImage.gameObject.SetActive(false);
+            }
+        }
+
         if (shadowText != null)
-            shadowText.gameObject.SetActive(false);
-        StopGlowPulse();
+        {
+            if (isEnhanced)
+            {
+                shadowText.gameObject.SetActive(true);
+                shadowText.text = Value.ToString();
+                Color lockedColor = GetLockedTileColor(Value);
+                shadowText.color = Color.Lerp(lockedColor, Color.black, 0.65f);
+            }
+            else
+            {
+                shadowText.gameObject.SetActive(false);
+            }
+        }
+
+        if (isEnhanced)
+            StartGlowPulse();
+        else
+            StopGlowPulse();
     }
 
     /// <summary>
@@ -337,7 +403,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         if (numberText != null)
         {
             numberText.transform.localScale = Vector3.one * numberScale;
-            numberText.color = NumberColors[Value];
+            numberText.color = GetTileColor();
         }
 
         // Reset shadow scale
@@ -352,7 +418,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     private IEnumerator GlowPulseCoroutine()
     {
-        Color baseNumberColor = NumberColors[Value];
+        Color baseNumberColor = GetTileColor();
         Color brightNumberColor = Color.Lerp(baseNumberColor, Color.white, numberBrightenAmount);
 
         while (isEnhanced && enhancedGlowImage != null && enhancedGlowImage.gameObject.activeSelf)
@@ -361,7 +427,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             float glowT = (Mathf.Sin(Time.time * glowPulseSpeed) + 1f) / 2f;
             float alpha = Mathf.Lerp(glowMinAlpha, glowMaxAlpha, glowT);
 
-            Color glowColor = NumberColors[Value];
+            Color glowColor = GetTileColor();
             glowColor.a = alpha;
             enhancedGlowImage.color = glowColor;
 
@@ -391,7 +457,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         if (numberText != null)
         {
             numberText.transform.localScale = Vector3.one * numberScale;
-            numberText.color = NumberColors[Value];
+            numberText.color = GetTileColor();
         }
 
         // Reset shadow scale
@@ -406,12 +472,15 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void RefreshEnhancedStatus()
     {
-        isEnhanced = false;
+        isEnhanced = IsLocked;
 
         if (enhancedGlowImage != null)
-            enhancedGlowImage.gameObject.SetActive(false);
+            enhancedGlowImage.gameObject.SetActive(isEnhanced);
 
-        StopGlowPulse();
+        if (isEnhanced)
+            StartGlowPulse();
+        else
+            StopGlowPulse();
     }
     
     /// <summary>
@@ -419,6 +488,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void Select()
     {
+        if (IsLocked) return; // Locked tiles can't be selected
+
         IsSelected = true;
 
         // Cancel any in-progress deselect animation
@@ -454,10 +525,13 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             selectionHighlight.SetActive(false);
         }
 
-        // Restore uniform grey background
+        // Restore background color (tinted for locked tiles, grey for regular)
         if (backgroundImage != null)
         {
-            backgroundImage.color = TileBackgroundColor;
+            if (IsLocked)
+                backgroundImage.color = Color.Lerp(Color.white, GetLockedTileColor(Value), 0.12f);
+            else
+                backgroundImage.color = TileBackgroundColor;
         }
 
         StopPulse();
@@ -556,6 +630,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void OnPointerClick(PointerEventData eventData)
     {
+        if (IsLocked) return; // Locked tiles can't be clicked
+
         // Don't trigger click if we just did a swipe
         if (!isSwiping)
         {
@@ -571,6 +647,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void OnBeginDrag(PointerEventData eventData)
     {
+        if (IsLocked) return; // Locked tiles can't be dragged
+
         swipeStartPos = eventData.position;
         isSwiping = false;
         isDragSwapping = false;
@@ -582,6 +660,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void OnDrag(PointerEventData eventData)
     {
+        if (IsLocked) return; // Locked tiles can't be dragged
+
         Vector2 currentDelta = eventData.position - swipeStartPos;
 
         // Check if we've crossed the activation threshold to start drag-swapping
@@ -613,6 +693,8 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public void OnEndDrag(PointerEventData eventData)
     {
+        if (IsLocked) return; // Locked tiles can't be dragged
+
         // If we were drag-swapping, finish the drag and suppress click
         if (isDragSwapping)
         {
