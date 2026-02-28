@@ -43,6 +43,10 @@ public class SceneFlowManager : MonoBehaviour
     // Current state
     public enum GameState { Loading, MainMenu, Options, Game, ZenGame, Results, Tutorial1, Tutorial2, Countdown, Quit }
     public GameState CurrentState { get; private set; }
+
+    // Track which mode the Results screen originated from (for correct back-navigation)
+    public bool ResultsFromZen => resultsFromZen;
+    private bool resultsFromZen = false;
     
     #region Initialization
     
@@ -293,8 +297,15 @@ public class SceneFlowManager : MonoBehaviour
 
             // Game state → full cleanup and return to main menu
             case GameState.Game:
-            case GameState.Results:
                 StartCoroutine(ReturnToMainMenuFromGame());
+                break;
+
+            // Results → route based on which mode we came from
+            case GameState.Results:
+                if (resultsFromZen)
+                    StartCoroutine(ReturnToMainMenuFromZen());
+                else
+                    StartCoroutine(ReturnToMainMenuFromGame());
                 break;
 
             // Zen game → vertical slide back down to main menu
@@ -749,7 +760,7 @@ public class SceneFlowManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Play button pressed - starts game directly.
+    /// Play button pressed - starts Arcade mode directly.
     /// </summary>
     public void OnPlayPressed()
     {
@@ -883,7 +894,8 @@ public class SceneFlowManager : MonoBehaviour
     
     public void OnGameEnded()
     {
-        Debug.Log($"SceneFlowManager: Game ended - showing results");
+        Debug.Log($"SceneFlowManager: Game ended - showing results (from {CurrentState})");
+        resultsFromZen = (CurrentState == GameState.ZenGame);
         CurrentState = GameState.Results;
     }
 

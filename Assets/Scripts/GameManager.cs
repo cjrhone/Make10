@@ -13,7 +13,7 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     /// <summary>
-    /// Game mode — Arcade is timed (60s), Zen is untimed (ends when no moves remain).
+    /// Game mode — Arcade is timed (60s), Zen is timed (300s) with failed-swap penalties.
     /// </summary>
     public enum GameMode { Arcade, Zen }
     public GameMode CurrentMode { get; private set; } = GameMode.Arcade;
@@ -95,6 +95,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private UIManager uiManager;
 
     [Header("Zen Mode Settings")]
+    [SerializeField] private float zenGameDuration = 300f;  // 5 minutes
+    [SerializeField] private float zenFailedSwapPenalty = 3f; // Seconds deducted on bad swap
     [SerializeField] private int zenMaxReshuffles = 3;
     [SerializeField] private int zenStar1Threshold = 500;
     [SerializeField] private int zenStar2Threshold = 1000;
@@ -113,10 +115,20 @@ public class GameManager : MonoBehaviour
     public int ZenReshufflesRemaining => zenReshufflesRemaining;
     public int ZenMaxReshuffles => zenMaxReshuffles;
 
+    // Zen stats (per-session, reset each game)
+    private int zenMatchCount;
+    private int zenLockedTileCount;
+    private int zenHighestLockedValue;
+    private int zenChainCount;
+    public int ZenMatchCount => zenMatchCount;
+    public int ZenLockedTileCount => zenLockedTileCount;
+    public int ZenHighestLockedValue => zenHighestLockedValue;
+    public int ZenChainCount => zenChainCount;
+
     // Current state
     public int Score { get; private set; }
     public float TimeRemaining { get; private set; }
-    public float GameDuration => gameDuration;
+    public float GameDuration => CurrentMode == GameMode.Zen ? zenGameDuration : gameDuration;
     public bool IsGameActive { get; private set; }
     public bool IsProcessing { get; set; }
     public bool IsSolveAnimationPlaying { get; set; }
@@ -244,8 +256,8 @@ public class GameManager : MonoBehaviour
             return; // Skip normal timer drain during hot streak
         }
 
-        // Only drain timer in Arcade mode
-        if (!IsProcessing && CurrentMode == GameMode.Arcade)
+        // Drain timer in both modes (Arcade: 60s, Zen: 300s)
+        if (!IsProcessing)
         {
             DrainTime(Time.deltaTime);
         }
@@ -319,8 +331,12 @@ public class GameManager : MonoBehaviour
         sessionStartTime = Time.time;
         lastSessionDuration = 0f;
 
-        // Zen mode: initialize reshuffles
+        // Zen mode: initialize reshuffles and stats
         zenReshufflesRemaining = zenMaxReshuffles;
+        zenMatchCount = 0;
+        zenLockedTileCount = 0;
+        zenHighestLockedValue = 0;
+        zenChainCount = 0;
 
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
@@ -378,12 +394,11 @@ public class GameManager : MonoBehaviour
     public void ActivateGame()
     {
         CacheEffectiveValues();
-        // Zen mode: no timer — pass a very large duration so UI doesn't show 0
-        float duration = CurrentMode == GameMode.Zen ? 99999f : gameDuration;
+        float duration = CurrentMode == GameMode.Zen ? zenGameDuration : gameDuration;
         ResetRoundState(duration);
         NotifyUIOfReset();
 
-        Debug.Log($"Game activated! Mode: {CurrentMode}, Grid: {gameSettings.gridSize}x{gameSettings.gridSize}");
+        Debug.Log($"Game activated! Mode: {CurrentMode}, Duration: {duration}s, Grid: {gameSettings.gridSize}x{gameSettings.gridSize}");
     }
     
     public void OnCascadeStart()
@@ -418,8 +433,9 @@ public class GameManager : MonoBehaviour
 
         if (isPlayerMatch)
         {
-            // PLAYER SWAP: full scoring with time bonus, multiplier, speed bonus
-            if (linesCleared > 0)
+            // PLAYER SWAP: full scoring with multiplier, speed bonus
+            // Time bonus only in Arcade (Zen timer is fixed 300s minus penalties)
+            if (linesCleared > 0 && CurrentMode == GameMode.Arcade)
             {
                 AddTime(timeBonusPerMatch * linesCleared);
             }
@@ -722,21 +738,26 @@ public class GameManager : MonoBehaviour
         GridManager gm = FindFirstObjectByType<GridManager>();
         gm?.FreezeGrid();
 
+        // Use mode-appropriate persistence keys
+        string gamesKey = CurrentMode == GameMode.Zen ? ZEN_TOTAL_GAMES_KEY : TOTAL_GAMES_KEY;
+        string hsKey = CurrentMode == GameMode.Zen ? ZEN_HIGH_SCORE_KEY : HIGH_SCORE_KEY;
+
         // Track total games played
-        int gamesPlayed = PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0) + 1;
-        PlayerPrefs.SetInt(TOTAL_GAMES_KEY, gamesPlayed);
+        int gamesPlayed = PlayerPrefs.GetInt(gamesKey, 0) + 1;
+        PlayerPrefs.SetInt(gamesKey, gamesPlayed);
 
         // Check for new high score (raw score)
-        IsNewHighScore = Score > HighScore;
+        IsNewHighScore = Score > PlayerPrefs.GetInt(hsKey, 0);
         if (IsNewHighScore)
         {
-            PlayerPrefs.SetInt(HIGH_SCORE_KEY, Score);
-            Debug.Log($"<color=yellow>*** NEW HIGH SCORE: {Score}! ***</color>");
+            PlayerPrefs.SetInt(hsKey, Score);
+            Debug.Log($"<color=yellow>*** NEW HIGH SCORE ({CurrentMode}): {Score}! ***</color>");
         }
 
         PlayerPrefs.Save();
 
-        Debug.Log($"<color=cyan>*** TIME'S UP! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s | Games: {gamesPlayed}");
+        string endMessage = CurrentMode == GameMode.Zen ? "STILLNESS" : "TIME'S UP";
+        Debug.Log($"<color=cyan>*** {endMessage}! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s | Games: {gamesPlayed}");
         SceneFlowManager.Instance?.OnGameEnded();
         OnGameWon?.Invoke();
     }
@@ -783,10 +804,57 @@ public class GameManager : MonoBehaviour
     public void OnFailedSwap()
     {
         if (CurrentMode != GameMode.Zen) return;
-        if (!multiplierActive) return;
 
-        Debug.Log("<color=red>[Zen] Failed swap — multiplier reset!</color>");
-        DeactivateMultiplierBar();
+        // Time penalty: always applies on failed swap
+        TimeRemaining -= zenFailedSwapPenalty;
+        TimeRemaining = Mathf.Max(0f, TimeRemaining);
+        OnTimeChanged?.Invoke(TimeRemaining);
+        Debug.Log($"<color=red>[Zen] Failed swap — -{zenFailedSwapPenalty}s! Timer: {TimeRemaining:F1}s</color>");
+
+        // Multiplier reset: only if multiplier was active
+        if (multiplierActive)
+        {
+            Debug.Log("<color=red>[Zen] Multiplier reset!</color>");
+            DeactivateMultiplierBar();
+        }
+
+        // Check if time penalty caused game over
+        if (TimeRemaining <= 0f)
+        {
+            TimeUp();
+        }
+    }
+
+    /// <summary>
+    /// Record a match in Zen mode (used for difficulty ramp).
+    /// Called by GridManager after each successful match line.
+    /// </summary>
+    public void RecordZenMatch()
+    {
+        if (CurrentMode != GameMode.Zen) return;
+        zenMatchCount++;
+    }
+
+    /// <summary>
+    /// Record a locked tile creation in Zen mode.
+    /// Called by GridManager when tiles merge into a locked tile.
+    /// </summary>
+    public void RecordZenLockedTile(int lockedValue)
+    {
+        if (CurrentMode != GameMode.Zen) return;
+        zenLockedTileCount++;
+        if (lockedValue > zenHighestLockedValue)
+            zenHighestLockedValue = lockedValue;
+    }
+
+    /// <summary>
+    /// Record a cascade chain in Zen mode.
+    /// Called by GridManager when a cascade triggers additional matches.
+    /// </summary>
+    public void RecordZenChain()
+    {
+        if (CurrentMode != GameMode.Zen) return;
+        zenChainCount++;
     }
 
     /// <summary>

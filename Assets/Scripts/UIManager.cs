@@ -109,6 +109,9 @@ public class UIManager : MonoBehaviour
     private GameObject starContainer;
     private GameObject resultsTitleObj;
     private GameObject performanceMessageObj;
+    private List<GameObject> zenStatLineObjects = new List<GameObject>();
+    private TMP_Text zenLockedTileCounterText;
+    private GameObject zenLockedTileCounterObj;
     private List<Image> starImages = new List<Image>();
 
     [Header("Unsolvable Grid Popup")]
@@ -274,7 +277,15 @@ public class UIManager : MonoBehaviour
         }
 
         UpdateScoreDisplay(0);
-        UpdateTimerDisplay(gameManager?.GameDuration ?? 60f);
+        // Use mode-appropriate timer display on init
+        float initDuration = gameManager?.GameDuration ?? 60f;
+        if (gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen)
+            UpdateZenTimerDisplay(initDuration);
+        else
+            UpdateTimerDisplay(initDuration);
+
+        // Create/show locked tile counter for Zen mode
+        CreateZenLockedTileCounter();
 
         // Auto-find HotStreakEffect if not assigned
         if (hotStreakEffect == null && multiplierPanel != null)
@@ -347,10 +358,11 @@ public class UIManager : MonoBehaviour
 
     private void HandleTimeChanged(float timeRemaining)
     {
-        // In Zen mode, show solve count instead of timer
+        // Both modes show the countdown timer
+        // Zen uses calmer styling (danger zone only in last 30s)
         if (gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen)
         {
-            UpdateZenTimerDisplay();
+            UpdateZenTimerDisplay(timeRemaining);
             return;
         }
         UpdateTimerDisplay(timeRemaining);
@@ -418,6 +430,52 @@ public class UIManager : MonoBehaviour
         {
             scoreProgressFillImage.color = scoreProgressFullColor;
         }
+
+        // Update locked tile counter for Zen mode
+        UpdateZenLockedTileCounter();
+    }
+
+    /// <summary>
+    /// Create the locked tile counter (◆ count) for Zen mode HUD.
+    /// Positioned below the score text. Only visible in Zen mode.
+    /// </summary>
+    private void CreateZenLockedTileCounter()
+    {
+        // Destroy old counter if exists
+        if (zenLockedTileCounterObj != null)
+        {
+            Destroy(zenLockedTileCounterObj);
+            zenLockedTileCounterObj = null;
+            zenLockedTileCounterText = null;
+        }
+
+        bool isZen = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen;
+        if (!isZen || scoreText == null) return;
+
+        zenLockedTileCounterObj = new GameObject("ZenLockedTileCounter");
+        zenLockedTileCounterObj.transform.SetParent(scoreText.transform.parent, false);
+
+        RectTransform rt = zenLockedTileCounterObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = new Vector2(0f, -35f); // Below score text
+        rt.sizeDelta = new Vector2(200f, 30f);
+
+        zenLockedTileCounterText = zenLockedTileCounterObj.AddComponent<TextMeshProUGUI>();
+        zenLockedTileCounterText.text = "◆ 0";
+        zenLockedTileCounterText.fontSize = 24f;
+        zenLockedTileCounterText.alignment = TextAlignmentOptions.Center;
+        zenLockedTileCounterText.color = new Color(0.94f, 0.82f, 0.38f, 0.85f); // Warm gold, subtle
+        zenLockedTileCounterText.font = scoreText.font;
+    }
+
+    /// <summary>
+    /// Update the locked tile counter text to reflect current count.
+    /// </summary>
+    private void UpdateZenLockedTileCounter()
+    {
+        if (zenLockedTileCounterText == null || gameManager == null) return;
+        zenLockedTileCounterText.text = $"◆ {gameManager.ZenLockedTileCount}";
     }
 
     private void UpdateTimerDisplay(float timeRemaining)
@@ -427,6 +485,10 @@ public class UIManager : MonoBehaviour
             timerSlider.gameObject.SetActive(true);
         if (timerFillImage != null && !timerFillImage.gameObject.activeSelf)
             timerFillImage.gameObject.SetActive(true);
+
+        // Ensure slider maxValue matches current mode duration (may differ after switching modes)
+        if (timerSlider != null && gameManager != null && timerSlider.maxValue != gameManager.GameDuration)
+            timerSlider.maxValue = gameManager.GameDuration;
 
         int seconds = Mathf.CeilToInt(timeRemaining);
 
@@ -471,32 +533,70 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// In Zen mode, replace the timer with a solve counter and reshuffles remaining.
+    /// Zen timer: shows countdown like Arcade but with calmer styling.
+    /// Danger zone only triggers in last 30s (vs 10s Arcade).
+    /// Formats as M:SS for the longer 5-minute duration.
     /// </summary>
-    private void UpdateZenTimerDisplay()
+    private void UpdateZenTimerDisplay(float timeRemaining)
     {
+        // Re-enable timer elements in case they were previously hidden
+        if (timerSlider != null && !timerSlider.gameObject.activeSelf)
+            timerSlider.gameObject.SetActive(true);
+        if (timerFillImage != null && !timerFillImage.gameObject.activeSelf)
+            timerFillImage.gameObject.SetActive(true);
+
+        // Ensure slider maxValue matches Zen duration (InitializeGameUI sets it to Arcade's 60s)
+        if (timerSlider != null && gameManager != null && timerSlider.maxValue != gameManager.GameDuration)
+            timerSlider.maxValue = gameManager.GameDuration;
+
+        int totalSeconds = Mathf.CeilToInt(timeRemaining);
+        int minutes = totalSeconds / 60;
+        int secs = totalSeconds % 60;
+        string timeStr = minutes > 0 ? $"{minutes}:{secs:D2}" : secs.ToString();
+
+        // Zen danger zone: last 30s warning, last 10s danger
+        Color stateColor;
+        if (timeRemaining <= 10f)
+        {
+            stateColor = timerDangerColor;
+            StartPulse(ref timerPulseCoroutine, timerText?.transform, 1f, 1.15f, 8f);
+            StartTimeWarningSound();
+        }
+        else if (timeRemaining <= 30f)
+        {
+            stateColor = timerWarningColor;
+            StopPulse(ref timerPulseCoroutine, timerText?.transform);
+            StopTimeWarningSound();
+        }
+        else
+        {
+            stateColor = new Color(0.5f, 0.8f, 1f); // Calm blue for Zen
+            StopPulse(ref timerPulseCoroutine, timerText?.transform);
+            StopTimeWarningSound();
+        }
+
+        // Update text
         if (timerText != null)
         {
-            int solves = gameManager != null ? gameManager.SolveCount : 0;
-            timerText.text = solves.ToString();
-            timerText.color = new Color(0.5f, 0.8f, 1f); // Calm blue
+            timerText.text = timeStr;
+            if (useTimerTextColorChange)
+                timerText.color = stateColor;
         }
 
         if (timerShadowText != null)
-        {
-            int solves = gameManager != null ? gameManager.SolveCount : 0;
-            timerShadowText.text = solves.ToString();
-        }
+            timerShadowText.text = timeStr;
 
-        // Hide the timer slider/fill in Zen mode
+        // Update slider
         if (timerSlider != null)
-            timerSlider.gameObject.SetActive(false);
-        if (timerFillImage != null)
-            timerFillImage.gameObject.SetActive(false);
+            timerSlider.value = timeRemaining;
 
-        // No pulse or warning sounds in Zen
-        StopPulse(ref timerPulseCoroutine, timerText?.transform);
-        StopTimeWarningSound();
+        // Update fill
+        if (timerFillImage != null && gameManager != null)
+        {
+            timerFillImage.fillAmount = timeRemaining / gameManager.GameDuration;
+            if (useTimerFillColorChange)
+                timerFillImage.color = stateColor;
+        }
     }
 
     private void UpdateMultiplierBar(bool active, float multiplier, float timer)
@@ -799,6 +899,25 @@ public class UIManager : MonoBehaviour
         Destroy(popup);
     }
 
+    /// <summary>
+    /// Show a penalty popup (e.g. "-3s") in red. Reuses the score popup prefab.
+    /// </summary>
+    public void ShowPenaltyPopup(string message)
+    {
+        if (scorePopupPrefab == null || scorePopupParent == null) return;
+
+        GameObject popup = Instantiate(scorePopupPrefab, scorePopupParent);
+        TMP_Text popupText = popup.GetComponent<TMP_Text>();
+
+        if (popupText != null)
+        {
+            popupText.text = message;
+            popupText.color = new Color(0.9f, 0.2f, 0.2f, 1f); // Red
+        }
+
+        StartCoroutine(AnimateAndDestroyPopup(popup));
+    }
+
     private IEnumerator ShowFinishThenResult(bool isWin)
     {
         // STOP game music immediately when FINISH appears
@@ -857,9 +976,10 @@ public class UIManager : MonoBehaviour
         // Get values from GameManager
         int baseScore = gameManager.Score;
         float sessionDuration = gameManager.SessionDuration;
+        bool isZen = gameManager.CurrentMode == GameManager.GameMode.Zen;
 
-        // Calculate breakdown
-        int sessionTimeBonus = Mathf.RoundToInt(sessionDuration); // 1 BP per second survived
+        // Calculate breakdown — Zen has no session time bonus
+        int sessionTimeBonus = isZen ? 0 : Mathf.RoundToInt(sessionDuration);
         int total = baseScore + sessionTimeBonus;
 
         // Hide all breakdown elements initially
@@ -873,8 +993,7 @@ public class UIManager : MonoBehaviour
         yield return new WaitForSeconds(0.3f);
 
         // Title header — mode-dependent
-        bool isZen = gameManager.CurrentMode == GameManager.GameMode.Zen;
-        string resultsTitle = isZen ? "GAME OVER" : "ROUND COMPLETE";
+        string resultsTitle = isZen ? "Well Done." : "ROUND COMPLETE";
 
         Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
         if (breakdownContainer != null && resultsTitleObj == null)
@@ -914,32 +1033,53 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 2: Session Time - counts up as BP (label varies by mode)
-        if (sessionTimeLabelText != null && sessionTimeValueText != null)
+        if (isZen)
         {
-            sessionTimeLabelText.transform.parent.gameObject.SetActive(true);
-            sessionTimeLabelText.text = isZen ? "Survival Time" : "Session Time";
-            AudioManager.Instance?.PlayButtonClick();
-            yield return StartCoroutine(AnimationUtilities.CountUp(sessionTimeValueText, 0, sessionTimeBonus, countUpDuration, "+ {0} BP"));
+            // Zen breakdown: show gameplay stats instead of session time bonus
+            yield return StartCoroutine(ShowZenStatsBreakdown(breakdownContainer));
+
+            // Divider line
+            if (breakdownDivider != null)
+                breakdownDivider.gameObject.SetActive(true);
+
+            yield return new WaitForSeconds(breakdownLineDelay);
+
+            // TOTAL — Zen has no session time bonus, just base score
+            if (totalLabelText != null && totalValueText != null)
+            {
+                totalLabelText.transform.parent.gameObject.SetActive(true);
+                totalLabelText.text = "TOTAL";
+                AudioManager.Instance?.PlayButtonClick();
+                yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, baseScore, countUpDuration * 1.2f, "{0} BP"));
+            }
         }
-
-        yield return new WaitForSeconds(breakdownLineDelay);
-
-        // Divider line
-        if (breakdownDivider != null)
+        else
         {
-            breakdownDivider.gameObject.SetActive(true);
-        }
+            // Arcade breakdown: session time bonus
+            if (sessionTimeLabelText != null && sessionTimeValueText != null)
+            {
+                sessionTimeLabelText.transform.parent.gameObject.SetActive(true);
+                sessionTimeLabelText.text = "Session Time";
+                AudioManager.Instance?.PlayButtonClick();
+                yield return StartCoroutine(AnimationUtilities.CountUp(sessionTimeValueText, 0, sessionTimeBonus, countUpDuration, "+ {0} BP"));
+            }
 
-        yield return new WaitForSeconds(breakdownLineDelay);
+            yield return new WaitForSeconds(breakdownLineDelay);
 
-        // TOTAL - appears and counts up
-        if (totalLabelText != null && totalValueText != null)
-        {
-            totalLabelText.transform.parent.gameObject.SetActive(true);
-            totalLabelText.text = "TOTAL";
-            AudioManager.Instance?.PlayButtonClick();
-            yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, total, countUpDuration * 1.2f, "{0} BP"));
+            // Divider line
+            if (breakdownDivider != null)
+                breakdownDivider.gameObject.SetActive(true);
+
+            yield return new WaitForSeconds(breakdownLineDelay);
+
+            // TOTAL — Arcade includes session time bonus
+            if (totalLabelText != null && totalValueText != null)
+            {
+                totalLabelText.transform.parent.gameObject.SetActive(true);
+                totalLabelText.text = "TOTAL";
+                AudioManager.Instance?.PlayButtonClick();
+                yield return StartCoroutine(AnimationUtilities.CountUp(totalValueText, 0, total, countUpDuration * 1.2f, "{0} BP"));
+            }
         }
 
         // Star rating after total
@@ -967,6 +1107,96 @@ public class UIManager : MonoBehaviour
             yield return new WaitForSeconds(0.2f);
             ShowNewHighScoreBanner();
         }
+    }
+
+    /// <summary>
+    /// Show Zen-specific stats in the results breakdown: Highest Tile, Matches, Chains, Reshuffles Used.
+    /// Creates stat lines programmatically inside the BreakdownContainer.
+    /// </summary>
+    private IEnumerator ShowZenStatsBreakdown(Transform breakdownContainer)
+    {
+        if (gameManager == null || breakdownContainer == null) yield break;
+
+        int highestTile = gameManager.ZenHighestLockedValue;
+        int matches = gameManager.ZenMatchCount;
+        int chains = gameManager.ZenChainCount;
+        int reshufflesUsed = gameManager.ZenMaxReshuffles - gameManager.ZenReshufflesRemaining;
+
+        // Stat lines: label, value (displayed as string, not BP)
+        var zenStats = new (string label, string value)[]
+        {
+            ("Highest Tile", highestTile > 0 ? highestTile.ToString() : "—"),
+            ("Matches", matches.ToString()),
+            ("Chains", chains.ToString()),
+            ("Reshuffles", $"{reshufflesUsed} / {gameManager.ZenMaxReshuffles}")
+        };
+
+        foreach (var stat in zenStats)
+        {
+            yield return new WaitForSeconds(breakdownLineDelay * 0.6f);
+
+            GameObject lineObj = CreateZenStatLine(breakdownContainer, stat.label, stat.value);
+            zenStatLineObjects.Add(lineObj);
+
+            lineObj.SetActive(true);
+            lineObj.transform.localScale = Vector3.zero;
+            AudioManager.Instance?.PlayButtonClick();
+            yield return StartCoroutine(AnimationUtilities.PopIn(lineObj.transform, 1.05f, 0.15f, 0.03f));
+        }
+
+        yield return new WaitForSeconds(breakdownLineDelay);
+    }
+
+    /// <summary>
+    /// Create a single label/value stat line for the Zen results breakdown.
+    /// Matches the layout style of existing breakdown rows.
+    /// </summary>
+    private GameObject CreateZenStatLine(Transform parent, string label, string value)
+    {
+        GameObject lineObj = new GameObject($"ZenStat_{label}");
+        lineObj.transform.SetParent(parent, false);
+
+        RectTransform lineRT = lineObj.AddComponent<RectTransform>();
+        lineRT.sizeDelta = new Vector2(0, 40f);
+
+        // Use HorizontalLayoutGroup to space label and value
+        var hlg = lineObj.AddComponent<HorizontalLayoutGroup>();
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+        hlg.spacing = 20f;
+        hlg.childForceExpandWidth = true;
+        hlg.childForceExpandHeight = false;
+        hlg.childControlWidth = true;
+        hlg.childControlHeight = true;
+
+        // Label (left-aligned)
+        GameObject labelObj = new GameObject("Label");
+        labelObj.transform.SetParent(lineObj.transform, false);
+        RectTransform labelRT = labelObj.AddComponent<RectTransform>();
+        labelRT.sizeDelta = new Vector2(0, 40f);
+
+        TMP_Text labelText = labelObj.AddComponent<TextMeshProUGUI>();
+        labelText.text = label;
+        labelText.fontSize = 32f;
+        labelText.alignment = TextAlignmentOptions.Left;
+        labelText.color = new Color(0.7f, 0.7f, 0.75f); // Soft grey
+        if (winScoreText != null) labelText.font = winScoreText.font;
+
+        // Value (right-aligned)
+        GameObject valueObj = new GameObject("Value");
+        valueObj.transform.SetParent(lineObj.transform, false);
+        RectTransform valueRT = valueObj.AddComponent<RectTransform>();
+        valueRT.sizeDelta = new Vector2(0, 40f);
+
+        TMP_Text valueText = valueObj.AddComponent<TextMeshProUGUI>();
+        valueText.text = value;
+        valueText.fontSize = 34f;
+        valueText.fontStyle = FontStyles.Bold;
+        valueText.alignment = TextAlignmentOptions.Right;
+        valueText.color = new Color(0.95f, 0.95f, 0.95f); // Off-white
+        if (winScoreText != null) valueText.font = winScoreText.font;
+
+        lineObj.SetActive(false);
+        return lineObj;
     }
 
     /// <summary>
@@ -1065,6 +1295,8 @@ public class UIManager : MonoBehaviour
         if (starContainer != null) { Destroy(starContainer); starImages.Clear(); }
         if (resultsTitleObj != null) { Destroy(resultsTitleObj); resultsTitleObj = null; }
         if (performanceMessageObj != null) { Destroy(performanceMessageObj); performanceMessageObj = null; }
+        foreach (var obj in zenStatLineObjects) { if (obj != null) Destroy(obj); }
+        zenStatLineObjects.Clear();
     }
 
     /// <summary>
@@ -1363,19 +1595,19 @@ public class UIManager : MonoBehaviour
     #region Public Methods
 
     /// <summary>
-    /// Continue button clicked on results screen - restarts the game.
+    /// Continue button clicked on results screen.
+    /// Arcade: restarts with countdown. Zen: returns to main menu.
     /// </summary>
     public void OnContinueButtonClicked()
     {
         AudioManager.Instance?.PlayButtonClick();
 
-        // Calculate total BP earned (same formula as breakdown)
+        // Calculate total BP earned
         if (gameManager != null)
         {
             int baseScore = gameManager.Score;
-            float sessionDuration = gameManager.SessionDuration;
-
-            int sessionTimeBonus = Mathf.RoundToInt(sessionDuration);
+            bool isZen = SceneFlowManager.Instance != null && SceneFlowManager.Instance.ResultsFromZen;
+            int sessionTimeBonus = isZen ? 0 : Mathf.RoundToInt(gameManager.SessionDuration);
             int totalBP = baseScore + sessionTimeBonus;
 
             // Add BP to RunManager
@@ -1388,8 +1620,18 @@ public class UIManager : MonoBehaviour
         SetActiveIfNotNull(winScreen, false);
         HideBreakdownElements();
 
-        // Restart the game with countdown
-        SceneFlowManager.Instance?.RestartWithCountdown();
+        // Zen: return to main menu so player can pick mode again
+        // Arcade: restart with countdown
+        if (SceneFlowManager.Instance != null && SceneFlowManager.Instance.ResultsFromZen)
+        {
+            RunManager.Instance?.EndRun();
+            CleanupGameOverState();
+            SceneFlowManager.Instance.GoBack();
+        }
+        else
+        {
+            SceneFlowManager.Instance?.RestartWithCountdown();
+        }
     }
 
     /// <summary>
@@ -1429,6 +1671,14 @@ public class UIManager : MonoBehaviour
         // Hide game over screens
         SetActiveIfNotNull(winScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
+
+        // Destroy Zen locked tile counter
+        if (zenLockedTileCounterObj != null)
+        {
+            Destroy(zenLockedTileCounterObj);
+            zenLockedTileCounterObj = null;
+            zenLockedTileCounterText = null;
+        }
 
         // Hide breakdown elements
         HideBreakdownElements();

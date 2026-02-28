@@ -248,6 +248,7 @@ public class GridManager : MonoBehaviour
         // Only track hint timer when game is active and not processing
         if (!enableHints) return;
         if (GameManager.Instance == null || !GameManager.Instance.IsGameActive) return;
+        if (GameManager.Instance.CurrentMode == GameManager.GameMode.Zen) return; // No hints in Zen — let the player think
         if (isProcessing) return;
         
         timeSinceLastMove += Time.deltaTime;
@@ -637,6 +638,57 @@ public class GridManager : MonoBehaviour
         
         isProcessing = false;
         StartCoroutine(ProcessMatchesCoroutine());
+    }
+
+    /// <summary>
+    /// Visual feedback for a failed swap: screen shake + red flash on swapped tiles.
+    /// Called when a player swap produces no match (Zen or Arcade).
+    /// </summary>
+    private void PlayFailedSwapFeedback()
+    {
+        // Arcade: no feedback — player is already time-pressured, just let them keep going
+        if (GameManager.Instance == null || GameManager.Instance.CurrentMode != GameManager.GameMode.Zen)
+            return;
+
+        // Zen: screen shake + red flash + penalty popup (punishes guessing)
+        GridVFX.Instance?.TriggerShake(0); // chainCount 0 → base intensity only
+
+        // Flash the swapped tiles red briefly
+        if (lastSwappedFirst != null)
+            StartCoroutine(FlashTileRed(lastSwappedFirst));
+        if (lastSwappedSecond != null && lastSwappedSecond != lastSwappedFirst)
+            StartCoroutine(FlashTileRed(lastSwappedSecond));
+
+        UIManager.Instance?.ShowPenaltyPopup("-3s");
+    }
+
+    /// <summary>
+    /// Briefly flash a tile's background red then restore original color.
+    /// </summary>
+    private IEnumerator FlashTileRed(Tile tile)
+    {
+        if (tile == null) yield break;
+
+        Image bg = tile.GetComponent<Image>();
+        if (bg == null) yield break;
+
+        Color originalColor = bg.color;
+        Color flashColor = new Color(0.9f, 0.2f, 0.2f, 1f); // Red flash
+
+        // Flash on
+        float flashDuration = 0.12f;
+        float elapsed = 0f;
+        while (elapsed < flashDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / flashDuration;
+            bg.color = Color.Lerp(flashColor, originalColor, AnimationUtilities.EaseOutCubic(t));
+            yield return null;
+        }
+        bg.color = originalColor;
+
+        // Quick punch scale to emphasize the error
+        yield return AnimationUtilities.PunchScale(tile.transform, 0.9f, 0.1f);
     }
 
     // ==========================================
@@ -1052,6 +1104,10 @@ public class GridManager : MonoBehaviour
             mergeTile.SetValue(match.sum);
             mergeTile.transform.localScale = Vector3.one;
             Debug.Log($"<color=cyan>[Zen]</color> Locked tile created: value {match.sum} at [{mergeX},{mergeY}]");
+
+            // Track Zen stats for difficulty ramp and results screen
+            GameManager.Instance?.RecordZenMatch();
+            GameManager.Instance?.RecordZenLockedTile(match.sum);
         }
 
         // Remove the other tiles from the grid
@@ -1123,6 +1179,7 @@ public class GridManager : MonoBehaviour
                         // Only treat as failed swap if this was triggered by an actual player swap.
                         // Skip on game start, post-reshuffle, and other non-swap entries.
                         Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap.");
+                        PlayFailedSwapFeedback();
                         GameManager.Instance?.OnFailedSwap();
                     }
                     else
@@ -1139,6 +1196,7 @@ public class GridManager : MonoBehaviour
                 {
                     lastSwappedFirst = null;
                     lastSwappedSecond = null;
+                    GameManager.Instance?.RecordZenChain();
                 }
 
                 ZenLineMatch match = zenMatch.Value;
@@ -1165,6 +1223,7 @@ public class GridManager : MonoBehaviour
                 else
                 {
                     Debug.Log("No matches found.");
+                    PlayFailedSwapFeedback();
                     // Zen mode: reset multiplier on failed swap (no match from player action)
                     GameManager.Instance?.OnFailedSwap();
                 }

@@ -70,10 +70,23 @@ public class TileWeightManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Calculate the current adjusted weights based on solve count and progressive ramp.
-    /// Used by both the tile bag system and any other weight-dependent logic.
+    /// Calculate the current adjusted weights based on mode, solve/match count, and progressive ramp.
+    /// Arcade: solve-based ramp introducing 5s, 6s, 7s gradually.
+    /// Zen: 7-tier match-based ramp widening the full tile range.
     /// </summary>
     private float[] GetAdjustedWeights()
+    {
+        // Branch by game mode
+        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen)
+            return GetZenAdjustedWeights();
+
+        return GetArcadeAdjustedWeights();
+    }
+
+    /// <summary>
+    /// Arcade difficulty ramp: solve-based, gradually introduces 5s/6s/7s.
+    /// </summary>
+    private float[] GetArcadeAdjustedWeights()
     {
         int solves = GameManager.Instance != null ? GameManager.Instance.SolveCount : 0;
 
@@ -119,6 +132,49 @@ public class TileWeightManager : MonoBehaviour
         }
 
         return adjustedWeights;
+    }
+
+    /// <summary>
+    /// Zen difficulty ramp: 7 tiers based on cumulative match count.
+    /// Each tier widens the tile value range, creating progressive pressure.
+    /// Matches the prototype's difficulty design (make10zen_v6.jsx).
+    /// </summary>
+    private float[] GetZenAdjustedWeights()
+    {
+        int matches = GameManager.Instance != null ? GameManager.Instance.ZenMatchCount : 0;
+        var (minTile, maxTile, _) = GetZenDifficulty(matches);
+
+        // Build uniform-ish weights for the active tile range
+        float[] adjustedWeights = new float[10];
+        for (int i = minTile; i <= maxTile; i++)
+        {
+            // Base weight — lower tiles slightly more common for playability
+            if (i <= 4)
+                adjustedWeights[i] = 0.15f;
+            else
+                adjustedWeights[i] = 0.10f;
+        }
+
+        // Special case: "mastery" tier (90+ matches) drops 0s entirely
+        if (matches >= 90)
+            adjustedWeights[0] = 0f;
+
+        return adjustedWeights;
+    }
+
+    /// <summary>
+    /// Get the Zen difficulty tier for a given match count.
+    /// Returns (minTile, maxTile, label) defining the active tile value range.
+    /// </summary>
+    public (int minTile, int maxTile, string label) GetZenDifficulty(int matchCount)
+    {
+        if (matchCount >= 90) return (1, 9, "mastery");
+        if (matchCount >= 65) return (0, 9, "deep");
+        if (matchCount >= 45) return (0, 8, "focused");
+        if (matchCount >= 30) return (0, 7, "rising");
+        if (matchCount >= 18) return (0, 6, "steady");
+        if (matchCount >= 8)  return (0, 5, "gentle");
+        return (0, 4, "calm");
     }
 
     /// <summary>

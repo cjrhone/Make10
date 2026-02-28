@@ -694,7 +694,8 @@ Phase 2 — MakeZen MVP (5 implementation sessions)
   Session A.1: Extract TileWeightManager + GridValidation from GridManager ✓
   Session B: Merge/gravity flow (GridManager.cs — ProcessZenMatch)  ← NEXT
   Session C: Game flow wiring (GameManager, SceneFlowManager, difficulty ramp)
-  Session D: UI + results + playtesting (UIManager, MainMenuUI, bug fixing)
+  Session D: UI + results + navigation fixes (UIManager, SceneFlowManager, MainMenuUI)
+  Session E: Zen swap-any mechanic + animated revert (Tile.cs, GridManager.cs, MatchChecker.cs)
 
 Phase 3 — The Feel
   5. L3: FMOD migration + adaptive audio
@@ -778,15 +779,79 @@ Phase 5 — Music Production (parallel, CJ-driven)
 5. **Test:** Launch game → select MakeZen → 5-min timer starts → failed swap costs 3s → game ends at 0:00
 
 #### Session D — UI, Results & Polish (~1-2 hours)
-**Files:** `UIManager.cs`, `MainMenuUI.cs`
-**Goal:** MakeZen has proper UI and a satisfying results screen.
+**Files:** `UIManager.cs`, `SceneFlowManager.cs`, `MainMenuUI.cs`
+**Goal:** MakeZen has proper UI, correct navigation, and a satisfying results screen.
 
-1. UIManager: Add locked tile counter display, calm timer styling, conditional danger-zone
-2. Results screen: "STILLNESS" header, MakeZen stats (highest tile, matches, chains, reshuffles)
-3. MainMenuUI: Mode select buttons, per-mode high scores
-4. Full playtest: play 3 complete sessions, note any bugs or feel issues
-5. Bug fixing pass: edge cases from playtesting
-6. **Test:** Complete full MakeZen round → results show correct stats → return to menu → high score saved
+1. **Results header**: Change Zen results title from "GAME OVER" to "Well Done." (line 944 in UIManager.cs)
+2. **Zen results breakdown**: Replace "Survival Time" line with Zen-specific stats:
+   - Highest Tile (GameManager.ZenHighestLockedValue)
+   - Matches (GameManager.ZenMatchCount)
+   - Chains (GameManager.ZenChainCount)
+   - Reshuffles Used (zenMaxReshuffles - ZenReshufflesRemaining)
+   Keep Score line and Total as-is (scoring math unchanged).
+3. **Navigation bug fix — Return to Main Menu**: `OnGameEnded()` sets state to `GameState.Results`, so `GoBack()` routes through Arcade return path (horizontal slide) instead of `ReturnToMainMenuFromZen()` (vertical slide). Fix: track originating mode in a field (e.g., `private GameManager.GameMode resultsOriginMode`) set in `OnGameEnded()`, then branch in `GoBack()` Results case.
+4. **Navigation bug fix — Play Again from Zen**: Currently calls `RestartWithCountdown()` (Arcade restart with countdown). For Zen: "Play Again" should return to MainMenu (vertical slide) so player can choose mode again. Branch in `UIManager.OnContinueButtonClicked()` based on mode.
+5. **Locked tile counter on HUD**: Small "◆ 7" indicator near score, only visible in Zen mode. GameManager already exposes `ZenLockedTileCount`. Create programmatically in UIManager like other HUD elements.
+6. **Calm timer verification**: `UpdateZenTimerDisplay()` already exists. Verify danger-zone red flash uses 30s threshold (not Arcade's 10s). Calmer color during normal play.
+7. **Per-mode high score on MainMenu**: High scores already persisted separately. Display Zen high score alongside Arcade high score (or show relevant one based on last-played mode).
+8. **Test:** Complete full MakeZen round → "Well Done." header → Zen stats display correctly → Return to Menu uses vertical slide → Play Again returns to MainMenu → high score saved per mode
+
+#### Session E — Zen Swap-Any Mechanic (~2-3 hours)
+**Files:** `Tile.cs`, `GridManager.cs`, `MatchChecker.cs`
+**Goal:** Zen mode uses a "swap any two free tiles" mechanic with animated revert on failed swaps.
+
+**Design:** In Zen mode, players can swap ANY two non-locked tiles on the board (not just adjacent). The swap always animates forward first. If the swap results in a match, normal match processing continues. If the swap does NOT result in a match, tiles animate back to their original positions with screen shake + red flash + existing 3s penalty + multiplier reset.
+
+This creates a more deliberate, strategic feel — players scan the whole board for combinations rather than frantically swapping neighbors.
+
+**Tile.cs — Input Changes:**
+1. Remove adjacency requirement for Zen mode. Currently tile selection validates that second-selected tile is adjacent to first. In Zen: any non-locked tile is a valid second selection.
+2. Selection flow stays the same: tap tile 1 → tap tile 2 → attempt swap.
+3. Guard: both tiles must have `!IsLocked`. Already implemented for first selection; ensure second selection also checks.
+4. Visual feedback: first selected tile stays highlighted while player picks second tile (already works).
+
+**GridManager.cs — Swap System Changes:**
+1. **`AttemptSwap()` or equivalent**: Currently validates adjacency, then calls swap animation. For Zen:
+   - Skip adjacency check (mode-gated)
+   - Animate swap (tiles travel to each other's grid positions — may need longer duration for distant tiles, or keep constant)
+   - After swap animation completes: run match detection on the new board state
+   - If match found → proceed to `ProcessMatchesCoroutine()` as normal
+   - If NO match found → call new `RevertSwapCoroutine(tileA, tileB)`:
+     a. Animate tiles back to original positions (reverse the swap animation)
+     b. Trigger screen shake (existing `GridVFX.Instance?.TriggerScreenShake()`)
+     c. Red flash on grid background (brief Color.Lerp to red, 0.15s)
+     d. Call `GameManager.Instance.OnFailedSwap()` (already handles 3s penalty + multiplier reset)
+   - Reset grid array to pre-swap state before revert animation
+2. **Swap animation for non-adjacent tiles**: Current arc animation (`yOffset = Mathf.Sin(t * Mathf.PI) * 8f`) works for adjacent. For distant tiles, consider:
+   - Same arc but scaled to distance
+   - Or straight-line path (simpler, still reads clearly)
+   - Duration: fixed 0.2s regardless of distance (keeps game feel snappy)
+3. **Mode gating**: All changes behind `GameManager.Instance.CurrentMode == GameManager.GameMode.Zen`. Arcade swap behavior unchanged.
+
+**MatchChecker.cs — Validation Changes:**
+1. **`HasValidMoves()` for Zen**: Must check ALL pairs of free (non-locked) tiles, not just adjacent pairs. For a 5×5 grid with N free tiles, that's N*(N-1)/2 pairs (worst case ~300). For each pair: simulate swap → check all 10 lines (5 rows + 5 cols) for multiples of 10 → undo swap. This is more expensive but still trivial for a 5×5 grid.
+2. **`FindHintMove()` for Zen**: Same — iterate all free tile pairs, return first valid swap. Consider caching or early-exit optimization.
+3. **`FindAllSwaps()` internal**: Same expansion for Zen mode.
+4. **Performance note**: Even brute-force all-pairs on 5×5 is <300 checks × 10 lines = 3000 sum checks. Negligible.
+
+**Existing infrastructure to reuse:**
+- `GameManager.OnFailedSwap()` — already handles 3s penalty + multiplier reset (✓)
+- `GridVFX.Instance.TriggerScreenShake()` — already exists (✓)
+- Screen shake already fires on failed swap in current code (verify)
+- Swap animation coroutine in GridManager — extend rather than rewrite
+
+**Key edge cases:**
+- Player taps same tile twice → deselect (already handled)
+- Player taps locked tile as second selection → ignore, keep first selection active
+- Swap creates multiple matches simultaneously → process all (existing cascade system handles this)
+- Swap animation interrupted by game-over timer → cancel gracefully
+
+**What's explicitly NOT in this session:**
+- ❌ Changing Arcade swap behavior (stays adjacent-only)
+- ❌ Visual indicator showing valid swap targets (highlight possible pairs) — future polish
+- ❌ Drag-to-swap for distant tiles (tap-tap only for non-adjacent)
+
+**Scope estimate:** ~150-200 new/changed lines across 3 files. Primary complexity is in GridManager swap flow and MatchChecker all-pairs validation.
 
 ---
 
@@ -804,12 +869,15 @@ Tile.cs              → + IsLocked, locked tile rendering, glow ungating, inter
 MatchChecker.cs      → + locked tile awareness in move validation (Session A ✓)
 GridManager.cs       → - tile weights, match prevention, consecutive tracking (extracted A.1 ✓)
                        + ProcessZenMatch(), merge logic, Zen gravity, Zen reshuffle (Session B)
+                       + Swap-any mechanic, animated revert on failed swap (Session E)
+MatchChecker.cs      → + locked tile awareness in move validation (Session A ✓)
+                       + All-pairs swap validation for Zen (Session E)
 TileWeightManager.cs → NEW ✓, + 7-tier Zen difficulty ramp (Session C)
 GridValidation.cs    → NEW ✓ (no further MakeZen changes expected)
 GameManager.cs       → + 5-min timer, failed swap penalty, Zen stats tracking (Session C)
-SceneFlowManager.cs  → + ModeSelect state (Session C)
-UIManager.cs         → + locked tile counter, Zen results screen, calm timer (Session D)
-MainMenuUI.cs        → + mode select buttons, per-mode high scores (Session D)
+SceneFlowManager.cs  → + Zen game state, navigation routing fix (Session C + D)
+UIManager.cs         → + locked tile counter, Zen results screen, calm timer, nav fixes (Session D)
+MainMenuUI.cs        → + per-mode high scores (Session D)
 ```
 
 **Updated singletons:**
