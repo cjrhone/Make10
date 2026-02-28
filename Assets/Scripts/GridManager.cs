@@ -281,16 +281,44 @@ public class GridManager : MonoBehaviour
     private void ShowHint()
     {
         if (matchChecker == null) return;
-        
+
         // Find a valid move
         currentHint = matchChecker.FindHintMove();
-        
+
         if (currentHint != null && currentHint.tile != null)
         {
             hintActive = true;
-            StartCoroutine(SpawnHintParticles(currentHint));
-            Debug.Log($"<color=yellow>HINT:</color> Swipe {currentHint.tile} {currentHint.direction}");
+
+            if (currentHint.targetTile != null)
+            {
+                // Zen: pulse both tiles to highlight the swap pair
+                StartCoroutine(PulseZenHintTiles(currentHint));
+                Debug.Log($"<color=yellow>HINT:</color> Swap {currentHint.tile} ↔ {currentHint.targetTile}");
+            }
+            else
+            {
+                // Arcade: directional particle trail
+                StartCoroutine(SpawnHintParticles(currentHint));
+                Debug.Log($"<color=yellow>HINT:</color> Swipe {currentHint.tile} {currentHint.direction}");
+            }
         }
+    }
+
+    /// <summary>
+    /// Zen hint: gentle scale pulse on both tiles in the hint pair.
+    /// Repeating pulses handled by the hint timer re-triggering ShowHint.
+    /// </summary>
+    private IEnumerator PulseZenHintTiles(HintMove hint)
+    {
+        if (hint.tile == null) yield break;
+
+        // Pulse first tile
+        AnimationUtilities.PunchScale(hint.tile.GetRectTransform(), 1.1f, 0.25f);
+        yield return new WaitForSeconds(0.12f);
+
+        // Pulse second tile (staggered for visual clarity)
+        if (hint.targetTile != null)
+            AnimationUtilities.PunchScale(hint.targetTile.GetRectTransform(), 1.1f, 0.25f);
     }
     
     private IEnumerator SpawnHintParticles(HintMove hint)
@@ -520,7 +548,18 @@ public class GridManager : MonoBehaviour
         }
         else
         {
-            if (!IsAdjacent(selectedTile, tile))
+            // Defensive: reject locked tiles as second selection
+            // (Tile.cs should block the event, but guard here too)
+            if (tile.IsLocked)
+            {
+                Debug.Log($"Second tile is locked — ignoring.");
+                return;
+            }
+
+            bool isZen = GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
+
+            // Arcade: must be adjacent. Zen: any two free tiles on the board.
+            if (!isZen && !IsAdjacent(selectedTile, tile))
             {
                 selectedTile.Deselect();
                 selectedTile = tile;
@@ -528,7 +567,7 @@ public class GridManager : MonoBehaviour
                 Debug.Log($"Not adjacent! Switched selection to: {tile}");
                 return;
             }
-            
+
             Tile firstTile = selectedTile;
             Tile secondTile = tile;
             selectedTile = null;
@@ -595,15 +634,24 @@ public class GridManager : MonoBehaviour
         StartCoroutine(AnimatedSwapCoroutine(tile, neighborTile));
     }
     
-    private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB)
+    /// <summary>
+    /// Animate two tiles swapping positions with an arc motion.
+    /// When isRevert is true, this is a failed-swap revert: no sound, no swap tracking,
+    /// no match processing afterwards — just the visual animation + grid state update.
+    /// </summary>
+    private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB, bool isRevert = false)
     {
         isProcessing = true;
-        ResetHintTimer();
-        AudioManager.Instance?.PlaySwapSound();
 
-        // MakeZen: track swapped tiles for merge position logic
-        lastSwappedFirst = tileA;
-        lastSwappedSecond = tileB;
+        if (!isRevert)
+        {
+            ResetHintTimer();
+            AudioManager.Instance?.PlaySwapSound();
+
+            // MakeZen: track swapped tiles for merge position logic
+            lastSwappedFirst = tileA;
+            lastSwappedSecond = tileB;
+        }
 
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
         Vector2 posB = tileB.GetRectTransform().anchoredPosition;
@@ -627,17 +675,21 @@ public class GridManager : MonoBehaviour
 
         tileA.GetRectTransform().anchoredPosition = posB;
         tileB.GetRectTransform().anchoredPosition = posA;
-        
+
         int axOld = tileA.GridX, ayOld = tileA.GridY;
         int bxOld = tileB.GridX, byOld = tileB.GridY;
-        
+
         grid[axOld, ayOld] = tileB;
         grid[bxOld, byOld] = tileA;
         tileA.GridX = bxOld; tileA.GridY = byOld;
         tileB.GridX = axOld; tileB.GridY = ayOld;
-        
+
         isProcessing = false;
-        StartCoroutine(ProcessMatchesCoroutine());
+
+        if (!isRevert)
+        {
+            StartCoroutine(ProcessMatchesCoroutine());
+        }
     }
 
     /// <summary>
@@ -702,6 +754,9 @@ public class GridManager : MonoBehaviour
     {
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
+
+        // Zen: no drag-to-swap — players must tap-select two tiles deliberately
+        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen) return;
 
         // Clear any click-selection
         if (selectedTile != null)
@@ -1178,7 +1233,17 @@ public class GridManager : MonoBehaviour
                     {
                         // Only treat as failed swap if this was triggered by an actual player swap.
                         // Skip on game start, post-reshuffle, and other non-swap entries.
-                        Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap.");
+                        Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap, reverting.");
+
+                        // Animate tiles back to their original positions before showing feedback
+                        Tile revertA = lastSwappedFirst;
+                        Tile revertB = lastSwappedSecond;
+                        yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
+
+                        // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
+                        // to prevent taps during feedback. Released at end of ProcessMatchesCoroutine.
+                        isProcessing = true;
+
                         PlayFailedSwapFeedback();
                         GameManager.Instance?.OnFailedSwap();
                     }

@@ -608,7 +608,11 @@ public class SceneFlowManager : MonoBehaviour
         yield return HidePanel(countdownPanel);
         CurrentState = targetState;
 
-        AudioManager.Instance?.PlayGameMusic();
+        // Play mode-appropriate music
+        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen)
+            AudioManager.Instance?.PlayZenMusic();
+        else
+            AudioManager.Instance?.PlayGameMusic();
         onComplete?.Invoke();
 
         Debug.Log($"Countdown sequence complete ({targetState})");
@@ -812,8 +816,8 @@ public class SceneFlowManager : MonoBehaviour
         FindFirstObjectByType<GridManager>()?.OnRoundStarted();
         FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
 
-        // Start game music
-        AudioManager.Instance?.PlayGameMusic();
+        // Start zen music
+        AudioManager.Instance?.PlayZenMusic();
 
         Debug.Log("Zen Mode started — no timer, no countdown");
     }

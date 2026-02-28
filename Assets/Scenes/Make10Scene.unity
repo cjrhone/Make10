@@ -885,7 +885,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &118860726
 RectTransform:
   m_ObjectHideFlags: 0
@@ -909,8 +909,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: -12}
-  m_SizeDelta: {x: -132.82, y: -1126.408}
+  m_AnchoredPosition: {x: 0, y: -75.39137}
+  m_SizeDelta: {x: -132.82, y: -785.0697}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &118860727
 MonoBehaviour:
@@ -1045,7 +1045,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &145499434
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1062,8 +1062,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -0.00012207031, y: 11.421631}
-  m_SizeDelta: {x: 574.88855, y: 186.55322}
+  m_AnchoredPosition: {x: 7.314392, y: 72.37491}
+  m_SizeDelta: {x: 160.40643, y: 805.838}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &145499435
 MonoBehaviour:
@@ -1078,7 +1078,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 0.4627451}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.53333336}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -2690,8 +2690,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 150, y: -275.417}
-  m_SizeDelta: {x: 220, y: 93.585}
+  m_AnchoredPosition: {x: 208.51515, y: -371}
+  m_SizeDelta: {x: 327, y: 166.73}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &288503518
 MonoBehaviour:
@@ -7523,10 +7523,10 @@ RectTransform:
   - {fileID: 1376408787}
   m_Father: {fileID: 1694822198}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 272.69922, y: -233.07}
-  m_SizeDelta: {x: -482.7152, y: -459.57}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: -238.2}
+  m_SizeDelta: {x: 805.952, y: 476.3956}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &731897466
 MonoBehaviour:
@@ -7541,7 +7541,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0.30489826, b: 0.6886792, a: 0.392}
+  m_Color: {r: 0, g: 0.3846481, b: 0.8679245, a: 0.9372549}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -11383,8 +11383,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -100, y: -275.417}
-  m_SizeDelta: {x: 220, y: 93.585}
+  m_AnchoredPosition: {x: -168.26765, y: -370.99887}
+  m_SizeDelta: {x: 356.5353, y: 166.7289}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1212490386
 MonoBehaviour:
@@ -12004,6 +12004,8 @@ MonoBehaviour:
   debugMode: 0
   debugStartingBP: 500
   uiManager: {fileID: 0}
+  zenGameDuration: 300
+  zenFailedSwapPenalty: 3
   zenMaxReshuffles: 3
   zenStar1Threshold: 500
   zenStar2Threshold: 1000
@@ -16405,12 +16407,12 @@ RectTransform:
   m_Children:
   - {fileID: 1087180759}
   - {fileID: 2097410333}
-  - {fileID: 731897465}
   - {fileID: 178623200}
   - {fileID: 1171771898}
   - {fileID: 1136515555}
   - {fileID: 1878202359}
   - {fileID: 880829726}
+  - {fileID: 731897465}
   m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -16783,6 +16785,7 @@ MonoBehaviour:
   voiceSlider: {fileID: 9742309}
   menuMusic: {fileID: 8300000, guid: 320006c8a44c748edb6a9644dd71db0a, type: 3}
   gameMusic: {fileID: 8300000, guid: 9e6f5ec7fcca546c8b289c1a22d434f9, type: 3}
+  zenMusic: {fileID: 8300000, guid: 538aad98765834c879c306d74f670908, type: 3}
   winMusic: {fileID: 8300000, guid: 8cf6ef0ba9a9d4cffb0103bec1327fb4, type: 3}
   loseMusic: {fileID: 8300000, guid: 2c9bea1fd1252477ca3357106aee9e92, type: 3}
   hotStreakMusic: {fileID: 8300000, guid: 0eeb7fec5995b4a50b7b0f60c46d8100, type: 3}

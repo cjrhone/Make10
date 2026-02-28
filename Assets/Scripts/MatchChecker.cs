@@ -145,12 +145,23 @@ public class MatchChecker : MonoBehaviour
     /// <summary>
     /// Find a swap that would create a match.
     /// Returns the tile to move and the direction to swipe, or null if no hint found.
+    /// In Zen mode, returns a two-tile hint (any pair of free tiles on the board).
     /// </summary>
     public HintMove FindHintMove()
     {
+        bool isZen = GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
+        if (isZen) return FindHintMoveZen();
+        return FindHintMoveArcade();
+    }
+
+    /// <summary>
+    /// Arcade hint: find an adjacent swap that creates a match.
+    /// </summary>
+    private HintMove FindHintMoveArcade()
+    {
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
-        
+
         // Try every possible adjacent swap (skip locked tiles — can't be swapped)
         for (int y = 0; y < gridSize.y; y++)
         {
@@ -190,6 +201,32 @@ public class MatchChecker : MonoBehaviour
         }
 
         return null; // No hint found
+    }
+
+    /// <summary>
+    /// Zen hint: find ANY two free tiles whose swap creates a match.
+    /// Brute-force all pairs — trivial on 5×5 (~300 pairs worst case).
+    /// </summary>
+    private HintMove FindHintMoveZen()
+    {
+        Tile[,] grid = gridManager.GetGrid();
+        Vector2Int gridSize = gridManager.GetGridSize();
+        List<Vector2Int> freeCells = GetFreeCells(grid, gridSize);
+
+        for (int i = 0; i < freeCells.Count; i++)
+        {
+            for (int j = i + 1; j < freeCells.Count; j++)
+            {
+                if (WouldCreateMatch(freeCells[i].x, freeCells[i].y, freeCells[j].x, freeCells[j].y))
+                {
+                    Tile tileA = grid[freeCells[i].x, freeCells[i].y];
+                    Tile tileB = grid[freeCells[j].x, freeCells[j].y];
+                    return new HintMove(tileA, tileB);
+                }
+            }
+        }
+
+        return null;
     }
     
     /// <summary>
@@ -246,14 +283,24 @@ public class MatchChecker : MonoBehaviour
     }
     
     /// <summary>
-    /// Check if any combination of tiles can sum to a multiple of 10 (10, 20, 30, or 40).
+    /// Check if any valid swap exists on the board.
+    /// Arcade: adjacent swaps only. Zen: any two free tiles.
     /// </summary>
     public bool HasValidMoves()
+    {
+        bool isZen = GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
+        if (isZen) return HasValidMovesZen();
+        return HasValidMovesArcade();
+    }
+
+    /// <summary>
+    /// Arcade: check adjacent swaps only (right + down to avoid duplicates).
+    /// </summary>
+    private bool HasValidMovesArcade()
     {
         Tile[,] grid = gridManager.GetGrid();
         Vector2Int gridSize = gridManager.GetGridSize();
 
-        // Check actual adjacent swaps (accounts for locked tiles that can't be swapped)
         for (int y = 0; y < gridSize.y; y++)
         {
             for (int x = 0; x < gridSize.x; x++)
@@ -274,6 +321,41 @@ public class MatchChecker : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Zen: check ALL pairs of free (non-locked) tiles.
+    /// Brute-force is fine — worst case ~300 pairs × 4 line checks = ~1200 sums on 5×5.
+    /// </summary>
+    private bool HasValidMovesZen()
+    {
+        Tile[,] grid = gridManager.GetGrid();
+        Vector2Int gridSize = gridManager.GetGridSize();
+        List<Vector2Int> freeCells = GetFreeCells(grid, gridSize);
+
+        for (int i = 0; i < freeCells.Count; i++)
+        {
+            for (int j = i + 1; j < freeCells.Count; j++)
+            {
+                if (WouldCreateMatch(freeCells[i].x, freeCells[i].y, freeCells[j].x, freeCells[j].y))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Collect all non-locked, non-null tile positions on the grid.
+    /// </summary>
+    private List<Vector2Int> GetFreeCells(Tile[,] grid, Vector2Int gridSize)
+    {
+        List<Vector2Int> free = new List<Vector2Int>();
+        for (int y = 0; y < gridSize.y; y++)
+            for (int x = 0; x < gridSize.x; x++)
+                if (grid[x, y] != null && !grid[x, y].IsLocked)
+                    free.Add(new Vector2Int(x, y));
+        return free;
     }
     
     private bool CanSum(List<int> values, int count, int target, int startIndex)
@@ -358,23 +440,35 @@ public class MatchChecker : MonoBehaviour
         Vector2Int gridSize = gridManager.GetGridSize();
         
         HintMove hint = FindHintMove();
-        
+
         if (hint == null)
         {
             Debug.Log("<color=red>NO HINT FOUND</color> - no single swap creates a match of 10");
             return;
         }
-        
+
         int x1 = hint.tile.GridX;
         int y1 = hint.tile.GridY;
-        int x2 = x1, y2 = y1;
-        
-        switch (hint.direction)
+        int x2, y2;
+
+        if (hint.targetTile != null)
         {
-            case SwipeDirection.Right: x2 = x1 + 1; break;
-            case SwipeDirection.Left: x2 = x1 - 1; break;
-            case SwipeDirection.Down: y2 = y1 + 1; break;
-            case SwipeDirection.Up: y2 = y1 - 1; break;
+            // Zen two-tile hint
+            x2 = hint.targetTile.GridX;
+            y2 = hint.targetTile.GridY;
+        }
+        else
+        {
+            // Arcade directional hint
+            x2 = x1;
+            y2 = y1;
+            switch (hint.direction)
+            {
+                case SwipeDirection.Right: x2 = x1 + 1; break;
+                case SwipeDirection.Left: x2 = x1 - 1; break;
+                case SwipeDirection.Down: y2 = y1 + 1; break;
+                case SwipeDirection.Up: y2 = y1 - 1; break;
+            }
         }
         
         int val1 = grid[x1, y1].Value;
@@ -493,18 +587,31 @@ public class MatchResult
 
 /// <summary>
 /// Represents a hint: which tile to move and in which direction.
+/// In Zen mode, targetTile is populated instead of direction (swap-any mechanic).
 /// </summary>
 public class HintMove
 {
     public Tile tile;
     public SwipeDirection direction;
-    
+    /// <summary>Second tile for Zen all-pairs hints. Null in Arcade mode.</summary>
+    public Tile targetTile;
+
+    /// <summary>Arcade constructor: tile + swipe direction.</summary>
     public HintMove(Tile tile, SwipeDirection direction)
     {
         this.tile = tile;
         this.direction = direction;
+        this.targetTile = null;
     }
-    
+
+    /// <summary>Zen constructor: two free tiles to swap (no direction needed).</summary>
+    public HintMove(Tile tileA, Tile tileB)
+    {
+        this.tile = tileA;
+        this.targetTile = tileB;
+        this.direction = SwipeDirection.Right; // Unused placeholder
+    }
+
     public Vector2 GetDirectionVector()
     {
         return direction switch

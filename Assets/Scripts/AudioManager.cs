@@ -28,6 +28,7 @@ public class AudioManager : MonoBehaviour
     [Header("Music Clips")]
     [SerializeField] private AudioClip menuMusic;
     [SerializeField] private AudioClip gameMusic;
+    [SerializeField] private AudioClip zenMusic;  // Separate track for MakeZen (falls back to gameMusic if null)
     [SerializeField] private AudioClip winMusic;
     [SerializeField] private AudioClip loseMusic;
     [SerializeField] private AudioClip hotStreakMusic;
@@ -175,6 +176,7 @@ public class AudioManager : MonoBehaviour
     
     public void PlayMenuMusic() => PlayMusic(menuMusic, loop: true);
     public void PlayGameMusic() => PlayMusic(gameMusic, loop: true);
+    public void PlayZenMusic() => PlayMusic(zenMusic != null ? zenMusic : gameMusic, loop: true);
     public void PlayWinMusic() => PlayMusic(winMusic, loop: false);
     public void PlayLoseMusic() => PlayMusic(loseMusic, loop: false);
     public void PlayHotStreakMusic() => PlayMusic(hotStreakMusic, loop: true);

@@ -869,8 +869,11 @@ public class UIManager : MonoBehaviour
         if (hotStreakTextObject != null)
             hotStreakTextObject.SetActive(false);
 
-        // Resume normal game music
-        AudioManager.Instance?.PlayGameMusic();
+        // Resume mode-appropriate music after hot streak
+        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen)
+            AudioManager.Instance?.PlayZenMusic();
+        else
+            AudioManager.Instance?.PlayGameMusic();
     }
 
     #endregion
