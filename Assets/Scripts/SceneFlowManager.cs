@@ -84,6 +84,9 @@ public class SceneFlowManager : MonoBehaviour
         RectTransform canvasRect = mainCanvas.GetComponent<RectTransform>();
         if (canvasRect == null) return;
 
+        // Guard against duplicate SafeArea containers (Awake can re-fire on scene reload)
+        if (canvasRect.Find("SafeAreaContainer") != null) return;
+
         // Create SafeArea container
         GameObject safeAreaGO = new GameObject("SafeAreaContainer");
         RectTransform safeAreaRect = safeAreaGO.AddComponent<RectTransform>();

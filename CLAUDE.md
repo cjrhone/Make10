@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Make10 is a number puzzle game where players swap tiles to create rows/columns summing to multiples of 10. Two modes: **Arcade** (60-second sprint) and **MakeZen** (5-minute focused session with locked tiles and board pressure). Originally created for Brainless Game Jam 2026. Converted from roguelike to arcade style in February 2026. MakeZen mode designed February 2026, prototyped in React (`MakeZen/make10zen_v6.jsx`), pending Unity port.
+Make10 is a number puzzle game where players swap tiles to create rows/columns summing to multiples of 10. Two modes: **Arcade** (60-second sprint) and **MakeZen** (5-minute focused session with locked tiles and board pressure). Originally created for Brainless Game Jam 2026. Converted from roguelike to arcade style in February 2026. MakeZen mode designed February 2026, prototyped in React (`MakeZen/make10zen_v6.jsx`), Unity implementation complete (Sessions A–E, February 2026).
 
 **Creator:** CJ Rhone / Wizard Bodega
 
@@ -81,7 +81,7 @@ Loading → MainMenu → ModeSelect → Arcade → Countdown → Game (60s) → 
                                                                                   Results → [Main Menu] → MainMenu
 ```
 
-### MakeZen Mode (In Development)
+### MakeZen Mode (✓ Implemented)
 ```
 Loading → MainMenu → ModeSelect → MakeZen → Game (300s, locked tiles) → Stillness → Results → [Again] → MakeZen
                                                                                      Results → [Main Menu] → MainMenu
@@ -217,21 +217,30 @@ All SFX share a single `sfxSource`. The time warning uses `sfxSource.Play()` wit
 
 ---
 
-## Completed Work (February 2026 Polish Sprint)
+## Completed Work
 
+### February 2026 Polish Sprint
 - ✓ **P0**: Shop removal, back button cleanup, results screen dual buttons
 - ✓ **P1**: Star rating system (3 tiers, animated diamonds, wired into results)
 - ✓ **Hint system**: Particle trails after 10s inactivity
 - ✓ **Tile number colors**: All 10 values with distinct colors
 
-**Still pending from old sprint (folded into Launch Sprint):**
-- Tile shadows (built but gated behind `isEnhanced`) → L1
-- Match VFX reorder (beam before "10") → L5
-- Beam opacity reduction → L5
-- Haptic feedback → L5
-- Credits/About section → L7
-- Leaderboard → L7
-- Tutorial popup click-outside bug → L7
+### MakeZen MVP (Sessions A–E, February 2026) ✓ COMPLETE
+- ✓ **Session A**: Locked tile foundation — `IsLocked` property, locked tile rendering/colors, glow/shadow ungating, interaction blocking, MatchChecker awareness
+- ✓ **Session A.1**: Extracted `TileWeightManager.cs` and `GridValidation.cs` from GridManager (~340 lines removed, 20 serialized fields moved)
+- ✓ **Session B**: Merge & gravity — `ProcessZenMatch()`, merge position logic, convergence animation, locked tile creation, Zen gravity, Zen reshuffle
+- ✓ **Session C**: Game flow wiring — 300s timer, 3s failed-swap penalty, Zen stats tracking, ModeSelect state, 7-tier difficulty ramp
+- ✓ **Session D**: UI & results — "Well Done." header, Zen stats breakdown, navigation fixes (vertical slide return), locked tile counter HUD, calm timer, per-mode high scores
+- ✓ **Session E**: Swap-any mechanic — any-two-free-tiles swapping in Zen, animated revert on failed swap, all-pairs move validation, screen shake + red flash on fail
+
+**Still pending from old sprint (folded into Sessions F–P):**
+- Tile shadows for regular tiles (locked tiles have shadows, regular don't) → Session J
+- Match VFX reorder (beam before "10") → Session L
+- Beam opacity reduction → Session L
+- Haptic feedback → Session L
+- Credits/About section → Session O
+- Leaderboard → Session O
+- Tutorial popup click-outside bug → Session O
 
 ---
 
@@ -323,170 +332,13 @@ Add `PunchScale(1.15f, 0.1f)` on first selection. Add `Handheld.Vibrate()` for h
 
 ---
 
-### L2 — MakeZen Mode (5-Minute Focused Sessions)
+### L2 — MakeZen Mode ✓ COMPLETE
 
-**Priority: HIGH — Structural change enabling extended, thoughtful play.**
+**Status:** Fully implemented across Sessions A–E. See "Completed Work" section for session-by-session summary.
 
-**Reference prototype:** `MakeZen/make10zen_v6.jsx` (complete React implementation — use as ground truth for edge cases)
+**What shipped:** 5-minute timer (300s), locked tile system (merge/gravity/convergence), swap-any mechanic with animated revert, 7-tier difficulty ramp, failed-swap penalties (-3s + multiplier reset), 3 reshuffles max, full UI/results ("Well Done." screen with Zen stats), per-mode high scores, ModeSelect flow.
 
-#### Game Design
-
-- **5-minute timer** (300s). Game ends when timer expires OR board has no valid moves and no reshuffles remain.
-- **Locked tiles** — the core new mechanic. When a row/col sums to a multiple of 10, tiles converge into a single immovable tile displaying the sum (10, 20, 30, etc.). Locked tiles can't be selected/swapped, participate in row/col sums (enabling 20→30→40+ chains), only move via gravity, and gradually fill the board creating pressure.
-- **Failed swap penalty** — no lives. Failed swaps shake the screen, revert the tiles, deduct 3 seconds from timer, and reset multiplier to ×1.
-- **Multiplier: No Drain, Manual Reset** — multiplier doesn't decay over time (unlike Arcade). Resets to ×1 on failed swap. Rewards thoughtful play, punishes random guessing.
-- **Reshuffles** — 3 max per session. When no valid moves exist, non-locked tiles reshuffle automatically. When reshuffles are exhausted and no moves remain, game ends early.
-- **Progressive difficulty** — 7-tier ramp based on match count (not time), matching prototype:
-  ```
-  0-7 matches:   tiles 0-4   "calm"
-  8-17 matches:  tiles 0-5   "gentle"
-  18-29 matches: tiles 0-6   "steady"
-  30-44 matches: tiles 0-7   "rising"
-  45-64 matches: tiles 0-8   "focused"
-  65-89 matches: tiles 0-9   "deep"
-  90+ matches:   tiles 1-9   "mastery" (no more 0s)
-  ```
-- **Session length target:** 5 min per round, 3 rounds = 15 min (research-backed cognitive training dose).
-
-#### Locked Tile System (NEW — Core Mechanic)
-
-**Tile.cs additions:**
-```
-bool IsLocked             — true when Value >= 10
-Color[] LockedTileColors  — tier-based colors matching prototype:
-  10: Gold (#f0d060)       40: Red (#ff6060)
-  20: Purple (#d090ff)     50: Orange (#ffa030)
-  30: Teal (#50e8d0)       60+: Blue (#60a0ff)
-```
-
-1. Add `IsLocked` property: `public bool IsLocked => Value >= 10;`
-2. In `SetValue()`: if locked, apply locked-tier color to number text, enable glow system (reuse existing `enhancedGlowImage` + `shadowText` — currently gated behind `isEnhanced` which is always false), set background to subtle tinted gradient
-3. Block selection: `HandleTileClicked` / `HandleTileSwiped` / drag handlers must early-return if `tile.IsLocked`
-4. Display: locked tiles show their sum value (10, 20, 30...) with smaller font, diamond marker (◆) in corner
-5. **Ungating the glow/shadow system**: Remove `isEnhanced = false` hardcoding in `UpdateEnhancedGlow()`. Instead: `isEnhanced = IsLocked;`. Shadow color derived from locked tier color.
-
-**Scope:** ~30-40 lines changed in Tile.cs. Glow/shadow infrastructure already built.
-
-#### Match → Merge → Gravity Flow (GridManager.cs)
-
-The current `ProcessMatchesCoroutine` flow is: detect match → animate → clear tiles → drop → spawn new. MakeZen changes the middle steps:
-
-**New flow for MakeZen matches:**
-```
-1. Detect match (existing MatchChecker — no changes needed for detection)
-2. Animate convergence: matched tiles shrink/slide toward merge position
-3. Create locked tile: at merge position, set Value = line sum (10, 20, 30...)
-4. Remove other tiles in the matched line (not the merge tile)
-5. Gravity: ALL tiles fall (including locked), filling gaps
-6. Spawn new tiles: only in empty cells, only non-locked values (from tile bag)
-7. Anti-cascade check: re-roll if new tile would complete a match
-8. Repeat from step 1 (chain detection — locked tiles participate in sums)
-```
-
-**Merge position logic** (from prototype `getMergePos()`):
-- Prefer the position where the second-tapped tile landed on the matching line
-- Fallback: position of first-tapped tile on the matching line
-- Final fallback: center of line (index 2)
-
-**Key implementation details:**
-- `ProcessMatchesCoroutine()`: Add `if (GameManager.Instance.CurrentMode == GameMode.Zen)` branch that calls new `ProcessZenMatch()` instead of `ClearMatchedTiles()` + `SpawnNewTilesCoroutine()`
-- `ProcessZenMatch(MatchResult, Tile firstSwapped, Tile secondSwapped)`: Handles convergence animation, locked tile creation, selective removal, gravity, and spawning
-- Gravity must move ALL tiles (locked included) — locked tiles are heavy but not anchored
-- `SpawnNewTilesCoroutine()` for Zen: skip cells occupied by locked tiles
-- `ResetGridSilent()` for Zen: only reshuffle non-locked tiles (preserve locked positions and values)
-
-**Scope:** Medium-large. ~150-200 new lines. Most complex single change.
-
-#### MatchChecker.cs Modifications
-
-1. `HasValidMoves()` / `FindHintMove()`: Skip locked tiles as swap candidates (can't select them), but include their values in row/col sum calculations
-2. Sum calculation already handles any tile value — no change needed for detecting 20/30/40 sums
-3. `FindAllSwaps()` (internal): Filter `getFreeCells()` equivalent — only iterate non-locked tiles
-
-**Scope:** ~20-30 lines changed.
-
-#### GameManager.cs Modifications
-
-**Already implemented (✓):**
-- ✓ `GameMode` enum (`Arcade`, `Zen`)
-- ✓ Timer gated behind `CurrentMode == GameMode.Arcade`
-- ✓ `OnFailedSwap()` — resets multiplier in Zen
-- ✓ `UseReshuffle()` / `zenReshufflesRemaining`
-- ✓ `ZenGameOver()` — fires when no moves + no reshuffles
-- ✓ Zen-specific high scores and star thresholds
-- ✓ Multiplier doesn't drain in Zen (already gated)
-
-**New for MakeZen:**
-1. Change `ActivateGame()`: Zen uses 300s (5 min) instead of 99999f
-2. `OnFailedSwap()`: Add 3-second time penalty (`TimeRemaining -= 3f`) alongside multiplier reset
-3. Add MakeZen stats tracking:
-   ```
-   int zenLockedTileCount      — total locked tiles created this session
-   int zenHighestLockedValue   — highest single locked tile (10, 20, 30...)
-   int zenChainCount           — total cascade chains
-   int zenMatchCount           — total matches (for difficulty ramp)
-   ```
-4. Expose `ZenMatchCount` for GridManager's difficulty ramp lookup
-5. Star thresholds for MakeZen: 500 / 1000 / 2000 BP (already set)
-
-**Scope:** ~40 lines. Mostly additive.
-
-#### SceneFlowManager.cs Modifications
-
-1. Add `GameState.ModeSelect` to enum
-2. Add ModeSelect panel reference
-3. Flow: MainMenu → ModeSelect → [Arcade] → Countdown → Game / [MakeZen] → Game (no countdown, starts immediately)
-4. `OnGameEnded()`: route to Results regardless of mode (already works)
-
-**Scope:** ~30 lines. Pattern matches existing panel transitions.
-
-#### UIManager.cs Modifications
-
-1. MakeZen timer display: same countdown but styled differently (calmer color, no danger-zone red flash until last 30s)
-2. Add locked tile counter display (small "◆ 7" indicator near score)
-3. Results screen for MakeZen:
-   - Header: "STILLNESS" (matching prototype) instead of "TIME'S UP"
-   - Stats: Score / Highest Tile / Matches / Chains / Reshuffles Used
-   - Star rating with Zen thresholds
-4. High scores: already mode-separated (✓)
-
-**Scope:** ~60 lines. Mostly conditional UI branching.
-
-#### MainMenuUI.cs Modifications
-
-- ModeSelect buttons: "ARCADE" and "MAKEZEN"
-- Separate high score display per mode (already persisted, just needs display)
-
-**Scope:** ~15 lines.
-
-#### Difficulty Ramp (TileWeightManager.cs)
-
-Extend existing solve-based ramp to match prototype's 7-tier system:
-
-```
-Current (Arcade):              New (MakeZen):
-  5s after 2 solves              5s after 8 matches (gentle)
-  6s after 5 solves              6s after 18 matches (steady)
-  7s after 8 solves              7s after 30 matches (rising)
-  Full ramp at 12               8s after 45 matches (focused)
-                                 9s after 65 matches (deep)
-                                 Drop 0s after 90 matches (mastery)
-```
-
-Add `GetZenDifficulty(int matchCount)` to TileWeightManager returning `(int minTile, int maxTile, string label)`. Gate behind mode check in `GetAdjustedWeights()`.
-
-**Scope:** ~30 lines. Parallel to existing ramp, not replacing it.
-
-#### What's Explicitly OUT of MVP (Playtest Build)
-
-- ❌ Dark color scheme from prototype (keep existing Unity visuals)
-- ❌ Difficulty label toasts ("calm", "gentle" popups)
-- ❌ Board pressure indicator bar
-- ❌ Locked tile glow animations (simple color tint for now, fancy glow in polish pass)
-- ❌ Convergence particle effects (use existing match VFX)
-- ❌ Any changes to Arcade mode behavior
-
-**Total scope estimate:** ~350-450 new/changed lines across 6 files. TileWeightManager.cs and GridValidation.cs already created (Session A.1). GridManager is ~1,920 lines (trimmed from 2,292).
+**Deferred to polish sessions:** Locked tile glow animations (Session N shader), difficulty label toasts, board pressure indicator bar, dark color scheme.
 
 ---
 
@@ -682,225 +534,208 @@ Rare:     1000-1500 BP (dedicated play)
 
 ---
 
-### Sprint Execution Order
+### Sprint Execution Order (Sessions F–P)
+
+All MakeZen MVP sessions (A–E) are complete. Remaining work: bug fixes, code hygiene, and Launch Sprint polish layers.
 
 ```
-Phase 1 — Foundation
-  1. L0: Easing overhaul
-  2. L1: Tile visual overhaul
+Track 1 — Stability (do first)
+  F  Bug fixes & guards              30 min
+  G  Dead code purge                 45 min
+  H  Constants & code quality        30 min
 
-Phase 2 — MakeZen MVP (5 implementation sessions)
-  Session A: Locked tile system (Tile.cs) + MatchChecker awareness ✓
-  Session A.1: Extract TileWeightManager + GridValidation from GridManager ✓
-  Session B: Merge/gravity flow (GridManager.cs — ProcessZenMatch)  ← NEXT
-  Session C: Game flow wiring (GameManager, SceneFlowManager, difficulty ramp)
-  Session D: UI + results + navigation fixes (UIManager, SceneFlowManager, MainMenuUI)
-  Session E: Zen swap-any mechanic + animated revert (Tile.cs, GridManager.cs, MatchChecker.cs)
+Track 2 — The Feel (makes both modes better)
+  I  L0: Easing overhaul             1.5 hr
+  J  L1: Tile visuals                1 hr
+  L  L5: Match VFX reorder           1 hr
+  M  L4: Ambient life                45 min
 
-Phase 3 — The Feel
-  5. L3: FMOD migration + adaptive audio
-  6. L5: Match VFX reorder + haptics
-  7. L4: Ambient life
+Track 3 — Audio (parallel when stems ready)
+  K  L3: FMOD + adaptive audio       2-3 hr
 
-Phase 4 — The Loop
-  8. L6: Shop system + cosmetics
-  9. L7b: Credits, leaderboard, final polish
+Track 4 — Visual Flair
+  N  Shaders                         1.5 hr
 
-Phase 5 — Music Production (parallel, CJ-driven)
+Track 5 — Ship Features
+  O  L7: Credits, leaderboard        1 hr
+  P  L6: Shop & cosmetics            3+ hr (blocked on art)
+
+Parallel — Music Production (CJ-driven)
   ∥ 4-stem ambient set (MakeZen)
   ∥ 4-stem upbeat set (Arcade)
   ∥ Tuned match SFX (or pitch-shift approach)
 ```
 
-**Phase 2 (MakeZen MVP) is the current priority.** Phases 1 can be done before or after — easing makes both modes feel better but isn't blocking. Phase 2 sessions are designed to be tackled one per sitting, each building on the last.
+**Total estimated time: ~13–15 hours across 11 sessions.**
 
-### MakeZen Implementation Sessions (Detailed)
-
-#### Session A — Locked Tile Foundation (~1-2 hours)
-**Files:** `Tile.cs`, `MatchChecker.cs`
-**Goal:** Tiles can be "locked" and the system recognizes them.
-
-1. Add `IsLocked` property to Tile (`Value >= 10`)
-2. Add `LockedTileColors` array (gold/purple/teal/red/orange/blue tiers)
-3. Modify `SetValue()`: if locked → apply tier color, enable glow/shadow, set tinted background
-4. Ungating: change `UpdateEnhancedGlow()` to activate for locked tiles
-5. Block interaction: guard `HandleTileClicked`, `HandleTileSwiped`, drag handlers
-6. MatchChecker: update `HasValidMoves()` and `FindHintMove()` to skip locked tiles as swap candidates
-7. **Test:** Manually set a tile to value 10 in the editor → verify it renders as locked, can't be selected, glow works
-
-#### Session A.1 — Extract TileWeightManager + GridValidation ✓ COMPLETE
-**Files:** `GridManager.cs` (extract from), `TileWeightManager.cs` (new), `GridValidation.cs` (new)
-**Goal:** Reduce GridManager complexity by extracting self-contained subsystems into dedicated managers.
-
-**What was extracted:**
-
-1. **TileWeightManager.cs** (new singleton) — tile value weights (weight0-7), progressive difficulty ramp (solvesFor5s/6s/7s, maxWeight5/6/7, solvesToFullRamp, baseTileReduction), Tetris-style tile bag system (GetWeightedRandomValue, RefillTileBag, GetAdjustedWeights, GetCurrentWeights). Public API: `GetWeightedRandomValue()`, `ClearBag()`.
-
-2. **GridValidation.cs** (new singleton) — consecutive 10s scaling (baseTenScale, tenScaleIncrement, maxTenScale, consecutiveResetTime), initial match prevention (EnsureNoInitialMatches, FindMatchingLines, ReRollTileToBreakMatch, CheckLineSum), anti-cascade checks (WouldTileCompleteMatch). Public API: `RegisterMatch()`, `GetTenScale(lineSum)`, `ConsecutiveCount`, `ResetConsecutive()`, `EnsureNoInitialMatches(grid, w, h, twm)`, `WouldTileCompleteMatch(grid, w, h, x, y, val)`.
-
-**GridManager.cs changes:** Removed ~340 lines and 20 serialized fields. Added `[SerializeField] private TileWeightManager tileWeightManager` and `[SerializeField] private GridValidation gridValidation` under a "Managers" header. All call sites updated to delegate through these managers.
-
-**🎮 Unity Editor setup (required for each new manager):**
-- Create GameObject, add component, copy serialized values, drag reference into GridManager Inspector.
-
-**Future: Session C will add `GetZenDifficulty()` to TileWeightManager.**
-
-#### Session B — Merge & Gravity (~2-3 hours, most complex)
-**Files:** `GridManager.cs` (primary), `GridValidation.cs` (anti-cascade calls already delegated)
-**Goal:** Matches create locked tiles instead of clearing the line.
-
-**Key context for Session B:**
-- `GridManager.cs` is now ~1,920 lines (down from 2,292 after A.1 extractions)
-- Anti-cascade check is `gridValidation.WouldTileCompleteMatch(grid, gridWidth, gridHeight, x, y, value)` — already wired
-- Tile spawning uses `tileWeightManager.GetWeightedRandomValue()` — already wired
-- Locked tile rendering (Tile.cs) and MatchChecker awareness already done in Session A
-- Reference prototype: `MakeZen/make10zen_v6.jsx` — use `getMergePos()` and `processMatches()` as ground truth
-
-**Steps:**
-1. Add `ProcessZenMatch(MatchResult, Tile firstSwapped, Tile secondSwapped)` method
-2. Implement merge position logic (from prototype's `getMergePos`)
-3. Convergence animation: matched tiles shrink/slide toward merge position
-4. At merge position: call `tile.SetValue(lineSum)` — tile becomes locked
-5. Remove other tiles in matched line (Destroy)
-6. Gravity: drop ALL tiles (including locked) to fill gaps
-7. Spawn new tiles only in empty cells, using tile bag (non-locked values only)
-8. Wire into `ProcessMatchesCoroutine`: mode branch → `ProcessZenMatch` for Zen
-9. Update `ResetGridSilent()`: only reshuffle non-locked tiles
-10. **Test:** Play in Zen mode → make a match → verify locked tile appears, gravity works, chains detect correctly
-
-#### Session C — Game Flow Wiring (~1-2 hours)
-**Files:** `GameManager.cs`, `SceneFlowManager.cs`, `TileWeightManager.cs`
-**Goal:** MakeZen is a playable mode from the menu.
-
-1. GameManager: Change Zen timer to 300s, add 3s penalty to `OnFailedSwap()`, add Zen stats tracking
-2. SceneFlowManager: Add `ModeSelect` state, wire panel transitions
-3. TileWeightManager: Add `GetZenDifficulty()` for 7-tier ramp, gate in `GetAdjustedWeights()`
-4. Wire ModeSelect → SetGameMode → ActivateGame flow
-5. **Test:** Launch game → select MakeZen → 5-min timer starts → failed swap costs 3s → game ends at 0:00
-
-#### Session D — UI, Results & Polish (~1-2 hours)
-**Files:** `UIManager.cs`, `SceneFlowManager.cs`, `MainMenuUI.cs`
-**Goal:** MakeZen has proper UI, correct navigation, and a satisfying results screen.
-
-1. **Results header**: Change Zen results title from "GAME OVER" to "Well Done." (line 944 in UIManager.cs)
-2. **Zen results breakdown**: Replace "Survival Time" line with Zen-specific stats:
-   - Highest Tile (GameManager.ZenHighestLockedValue)
-   - Matches (GameManager.ZenMatchCount)
-   - Chains (GameManager.ZenChainCount)
-   - Reshuffles Used (zenMaxReshuffles - ZenReshufflesRemaining)
-   Keep Score line and Total as-is (scoring math unchanged).
-3. **Navigation bug fix — Return to Main Menu**: `OnGameEnded()` sets state to `GameState.Results`, so `GoBack()` routes through Arcade return path (horizontal slide) instead of `ReturnToMainMenuFromZen()` (vertical slide). Fix: track originating mode in a field (e.g., `private GameManager.GameMode resultsOriginMode`) set in `OnGameEnded()`, then branch in `GoBack()` Results case.
-4. **Navigation bug fix — Play Again from Zen**: Currently calls `RestartWithCountdown()` (Arcade restart with countdown). For Zen: "Play Again" should return to MainMenu (vertical slide) so player can choose mode again. Branch in `UIManager.OnContinueButtonClicked()` based on mode.
-5. **Locked tile counter on HUD**: Small "◆ 7" indicator near score, only visible in Zen mode. GameManager already exposes `ZenLockedTileCount`. Create programmatically in UIManager like other HUD elements.
-6. **Calm timer verification**: `UpdateZenTimerDisplay()` already exists. Verify danger-zone red flash uses 30s threshold (not Arcade's 10s). Calmer color during normal play.
-7. **Per-mode high score on MainMenu**: High scores already persisted separately. Display Zen high score alongside Arcade high score (or show relevant one based on last-played mode).
-8. **Test:** Complete full MakeZen round → "Well Done." header → Zen stats display correctly → Return to Menu uses vertical slide → Play Again returns to MainMenu → high score saved per mode
-
-#### Session E — Zen Swap-Any Mechanic (~2-3 hours)
-**Files:** `Tile.cs`, `GridManager.cs`, `MatchChecker.cs`
-**Goal:** Zen mode uses a "swap any two free tiles" mechanic with animated revert on failed swaps.
-
-**Design:** In Zen mode, players can swap ANY two non-locked tiles on the board (not just adjacent). The swap always animates forward first. If the swap results in a match, normal match processing continues. If the swap does NOT result in a match, tiles animate back to their original positions with screen shake + red flash + existing 3s penalty + multiplier reset.
-
-This creates a more deliberate, strategic feel — players scan the whole board for combinations rather than frantically swapping neighbors.
-
-**Tile.cs — Input Changes:**
-1. Remove adjacency requirement for Zen mode. Currently tile selection validates that second-selected tile is adjacent to first. In Zen: any non-locked tile is a valid second selection.
-2. Selection flow stays the same: tap tile 1 → tap tile 2 → attempt swap.
-3. Guard: both tiles must have `!IsLocked`. Already implemented for first selection; ensure second selection also checks.
-4. Visual feedback: first selected tile stays highlighted while player picks second tile (already works).
-
-**GridManager.cs — Swap System Changes:**
-1. **`AttemptSwap()` or equivalent**: Currently validates adjacency, then calls swap animation. For Zen:
-   - Skip adjacency check (mode-gated)
-   - Animate swap (tiles travel to each other's grid positions — may need longer duration for distant tiles, or keep constant)
-   - After swap animation completes: run match detection on the new board state
-   - If match found → proceed to `ProcessMatchesCoroutine()` as normal
-   - If NO match found → call new `RevertSwapCoroutine(tileA, tileB)`:
-     a. Animate tiles back to original positions (reverse the swap animation)
-     b. Trigger screen shake (existing `GridVFX.Instance?.TriggerScreenShake()`)
-     c. Red flash on grid background (brief Color.Lerp to red, 0.15s)
-     d. Call `GameManager.Instance.OnFailedSwap()` (already handles 3s penalty + multiplier reset)
-   - Reset grid array to pre-swap state before revert animation
-2. **Swap animation for non-adjacent tiles**: Current arc animation (`yOffset = Mathf.Sin(t * Mathf.PI) * 8f`) works for adjacent. For distant tiles, consider:
-   - Same arc but scaled to distance
-   - Or straight-line path (simpler, still reads clearly)
-   - Duration: fixed 0.2s regardless of distance (keeps game feel snappy)
-3. **Mode gating**: All changes behind `GameManager.Instance.CurrentMode == GameManager.GameMode.Zen`. Arcade swap behavior unchanged.
-
-**MatchChecker.cs — Validation Changes:**
-1. **`HasValidMoves()` for Zen**: Must check ALL pairs of free (non-locked) tiles, not just adjacent pairs. For a 5×5 grid with N free tiles, that's N*(N-1)/2 pairs (worst case ~300). For each pair: simulate swap → check all 10 lines (5 rows + 5 cols) for multiples of 10 → undo swap. This is more expensive but still trivial for a 5×5 grid.
-2. **`FindHintMove()` for Zen**: Same — iterate all free tile pairs, return first valid swap. Consider caching or early-exit optimization.
-3. **`FindAllSwaps()` internal**: Same expansion for Zen mode.
-4. **Performance note**: Even brute-force all-pairs on 5×5 is <300 checks × 10 lines = 3000 sum checks. Negligible.
-
-**Existing infrastructure to reuse:**
-- `GameManager.OnFailedSwap()` — already handles 3s penalty + multiplier reset (✓)
-- `GridVFX.Instance.TriggerScreenShake()` — already exists (✓)
-- Screen shake already fires on failed swap in current code (verify)
-- Swap animation coroutine in GridManager — extend rather than rewrite
-
-**Key edge cases:**
-- Player taps same tile twice → deselect (already handled)
-- Player taps locked tile as second selection → ignore, keep first selection active
-- Swap creates multiple matches simultaneously → process all (existing cascade system handles this)
-- Swap animation interrupted by game-over timer → cancel gracefully
-
-**What's explicitly NOT in this session:**
-- ❌ Changing Arcade swap behavior (stays adjacent-only)
-- ❌ Visual indicator showing valid swap targets (highlight possible pairs) — future polish
-- ❌ Drag-to-swap for distant tiles (tap-tap only for non-adjacent)
-
-**Scope estimate:** ~150-200 new/changed lines across 3 files. Primary complexity is in GridManager swap flow and MatchChecker all-pairs validation.
+Track 1 (F/G/H) is ~1.5 hours and should be done first — it prevents bugs from compounding and makes every subsequent session cleaner. Track 2 (I/J/L/M) is the core polish that transforms how the game *feels*. Tracks 3–5 can be interleaved based on asset readiness.
 
 ---
 
-### Post-Sprint State (After MakeZen MVP)
+### Session F — Critical Bug Fixes & Guards ✓ COMPLETE
 
-**New scripts (already created):**
-- `TileWeightManager.cs` — extracted from GridManager: tile weights, bag system, difficulty ramp (Session A.1)
-- `GridValidation.cs` — extracted from GridManager: match prevention, anti-cascade, consecutive match tracking (Session A.1)
+1. ~~**Fix `StartNewGame()` crash**~~ — Already resolved. `ResetGame()` exists in GridManager (line 2424).
+2. ✓ **Double game-over guard** — Added `if (!IsGameActive) return;` at top of `TimeUp()` in GameManager.cs. Prevents double-fire when `OnFailedSwap()` and `Update()` both trigger in the same frame.
+3. ✓ **SafeArea duplication** — Added `if (canvasRect.Find("SafeAreaContainer") != null) return;` in `SetupSafeArea()` in SceneFlowManager.cs. Prevents duplicate containers on Awake re-fire.
+4. ~~**Hint particle cleanup**~~ — Already safe. Coroutines self-terminate and null-check before accessing destroyed GameObjects.
 
-**Future sprint scripts:** CosmeticData.cs, CosmeticInventory.cs, ShopManager.cs, ShopCard.cs (L6)
+**Files touched:** GameManager.cs, SceneFlowManager.cs
 
-**Modified scripts (MakeZen MVP):**
-```
-Tile.cs              → + IsLocked, locked tile rendering, glow ungating, interaction blocking (Session A ✓)
-MatchChecker.cs      → + locked tile awareness in move validation (Session A ✓)
-GridManager.cs       → - tile weights, match prevention, consecutive tracking (extracted A.1 ✓)
-                       + ProcessZenMatch(), merge logic, Zen gravity, Zen reshuffle (Session B)
-                       + Swap-any mechanic, animated revert on failed swap (Session E)
-MatchChecker.cs      → + locked tile awareness in move validation (Session A ✓)
-                       + All-pairs swap validation for Zen (Session E)
-TileWeightManager.cs → NEW ✓, + 7-tier Zen difficulty ramp (Session C)
-GridValidation.cs    → NEW ✓ (no further MakeZen changes expected)
-GameManager.cs       → + 5-min timer, failed swap penalty, Zen stats tracking (Session C)
-SceneFlowManager.cs  → + Zen game state, navigation routing fix (Session C + D)
-UIManager.cs         → + locked tile counter, Zen results screen, calm timer, nav fixes (Session D)
-MainMenuUI.cs        → + per-mode high scores (Session D)
-```
+---
 
-**Updated singletons:**
-```
-GameManager.Instance        → + MakeZen timer (300s), failed swap penalty, Zen stats
-TileWeightManager.Instance  → NEW ✓ (tile weights, bag, progressive ramp)
-GridValidation.Instance     → NEW ✓ (match prevention, consecutive tracking)
-```
+### Session G — Dead Code Purge (~45 min)
 
-**Updated game flow:**
-```
-Loading → MainMenu → ModeSelect → [Arcade]  → Countdown → Game (60s) → Time's Up → Results
-                                → [MakeZen] → Game (300s, locked tiles) → Stillness → Results
-                   → Options → MainMenu
-```
+**Why next:** Removing ~1,150 lines of noise makes every future session cleaner and reduces cognitive load.
 
-**Updated game states:**
-```
-Loading, MainMenu, ModeSelect, Tutorial1, Tutorial2, Countdown,
-Game, Results, Options, Quit
-```
+**Delete entire files (12 files):**
+- `PlayerInventory.cs`, `CampaignManager.cs`, `RunManager.cs`, `DataLoader.cs`
+- `DebugUpgradePanel.cs`, `ShopCard.cs` *(L6 Shop will rebuild from scratch)*
+- `UI/ExampleWindow.cs`, `UI/UpgradeConfirmWindow.cs`
+- `Data/ArtifactData.cs`, `Data/SnackData.cs`, `Data/UpgradeData.cs`, `Data/UpgradeType.cs`
 
-**Post-L6 additions (future):**
+**Remove dead methods from active files:**
+- **GameManager.cs:** `CalculateEnhancedNumberBonus()`, `CalculateZeroTimeBonus()`, `ApplyPostScoringBonuses()`, `CalculateCommonBonuses()`, `GetCurrentWeights()`, `GetCurrentGridSize()`, unused events `OnEnhancedNumberBonus` / `OnTimeBonus`, field `postWinDelay`
+- **GridManager.cs:** `tileFallDelay`, `postClearDelay`
+- **Tile.cs:** `numberPulseSpeed`, `numberPulseMinScale`, `numberPulseMaxScale`, `numberBrightenAmount`
+- **MatchChecker.cs:** `targetSum` (never read)
+
+**Cleanup:** Grep all `.cs` for references to deleted classes, remove orphaned `.meta` files.
+
+**Files touched:** 16+ files (mostly deletions)
+
+---
+
+### Session H — Constants & Code Quality (~30 min)
+
+**Why:** Makes the codebase readable and prevents magic-number drift during polish sessions.
+
+1. **Extract magic numbers into named constants:**
+   - GameManager: `MultiplierDrainRate`, `SpeedBonusThreshold`, `TimeBonusPerMatch`, `ZenFailedSwapPenalty`, `ZenMaxReshuffles`, `HotStreakMultiplier`, `HotStreakDuration`
+   - GridManager: `TileFallSpeed`, `HintDelay`, `HintRepeatInterval`
+   - Tile: `TileBackgroundGrey`, `LockedTileThreshold`
+2. **Add mode helper:** `public bool IsZenMode => CurrentMode == GameMode.Zen;` to GameManager. Replace all 8+ inline checks.
+3. **Consistent null checking:** Audit UIManager init methods, add null guards for all serialized panel references.
+
+**Files touched:** GameManager.cs, GridManager.cs, Tile.cs, UIManager.cs
+
+---
+
+### Session I — L0: Easing & Motion Overhaul (~1.5 hours)
+
+**Why:** Every animation currently uses linear Lerp. Single highest-impact polish change.
+
+**Part 1: Easing Library** (AnimationUtilities.cs) — Add 5 static functions: `EaseOutCubic`, `EaseInOutCubic`, `EaseOutBack`, `EaseOutElastic`, `EaseInCubic`.
+
+**Part 2: Thread through existing methods** — `PunchScale` (EaseOutBack/Cubic), `PopIn` (EaseOutBack/Cubic), `FloatAndFade` (Cubic), `ScaleIn` (EaseOutBack), `ScaleOut` (EaseInCubic), `DropIn` (EaseOutElastic).
+
+**Part 3: Tile motion** — Tile fall: time-based (0.25s) with EaseOutCubic + landing bounce. Tile swap: EaseInOutCubic + shallow arc. Countdown pop: EaseOutBack/"GO!" EaseOutElastic. Menu title: replace 3 sine waves with single EaseInOutCubic bob.
+
+**Files touched:** AnimationUtilities.cs, GridManager.cs, SceneFlowManager.cs, MainMenuUI.cs
+
+---
+
+### Session J — L1: Tile Visual Overhaul (~1 hour)
+
+1. **Shadows** — Ungated for locked tiles (Session A), but regular tiles still don't have shadows. Remove gate for ALL tiles. Shadow color: `Color.Lerp(NumberColors[value], Color.black, 0.65f)`.
+2. **Tinted backgrounds** — `Color.Lerp(Color.white, NumberColors[value], 0.12f)` replacing uniform grey.
+3. **Rounded corners** — White 64×64 rounded-rect PNG (~12px radius), 9-slice, assign to tile prefab. *(Unity Editor.)*
+4. **Selection feedback** — `PunchScale(1.15f, 0.1f)` on selection. `Handheld.Vibrate()`. Animate deselection.
+
+**Files touched:** Tile.cs (+ Unity Editor for rounded-rect sprite)
+
+---
+
+### Session K — L3: FMOD Migration + Adaptive Audio (~2–3 hours)
+
+**Part 1: FMOD Setup** — Install plugin, create FMOD Studio project, migrate SFX, replace AudioManager internals (keep public API), set up buses (Master/Music/SFX/Voice).
+
+**Part 2: Adaptive Music** — Single multi-track event with parameters: `Intensity` (0→1), `Inactivity` (0→1), `GameMode` (0/1). Layer triggers: Base (always), Rhythm (mult ≥ 1.5), Melody (mult ≥ 2.0), Intensity (hot streak).
+
+**Part 3: Tuned Match SFX** — Pitch via FMOD parameter: 10→root, 20→major 3rd, 30→perfect 5th. Cascade pitch: level 1→1.0, level 2→1.12, level 3→1.25, level 4→1.5.
+
+**Dependency:** Music stems (4 per mode) are CJ-driven parallel work.
+
+**Files touched:** AudioManager.cs, GameManager.cs, FMOD Studio project (new)
+
+---
+
+### Session L — L5: Match VFX Reorder + Haptics (~1 hour)
+
+1. **Reorder sequence:** convergence → "10" popup (PunchScale EaseOutBack) → 0.12s hold → beam (reduced opacity) → particles → avatar → screen shake → haptic
+2. **Beam opacity reduction:** glow 0.6→0.35, core 1.0→0.7, sparkles 0.9→0.6
+3. **"10" popup enhancement:** overshoot 1.2→1.4, screen shake on pop, scale by match sum (20→1.2×, 30→1.5×)
+4. **Haptics:** `Handheld.Vibrate()` on tile selection, match clear, hot streak trigger, game over
+
+**Files touched:** GridManager.cs, GridVFX.cs
+
+---
+
+### Session M — L4: Ambient Life (~45 min)
+
+1. **Ambient particles:** 15–20 particles, 0.12–0.15 alpha, size variation, tinted to board. Hot streak: 30+, warm. Zen: slower drift (12 px/s), cooler.
+2. **Idle tile breathing:** `1.0 + sin(Time.time * 0.5 + tileIndex * 0.3) * 0.008` wave across grid, gated behind `!IsSelected && !isAnimating`.
+3. **Score environment feedback:** micro-punch ripple on match, all-tiles flash on hot streak start, particles 2× speed on multiplier increase.
+
+**Files touched:** GridVFX.cs, Tile.cs
+
+---
+
+### Session N — Custom Shaders (~1.5 hours)
+
+**Why:** Zero custom shaders currently. Highest visual-bang-for-buck additions.
+
+1. **Locked Tile Glow** — Animated outer glow with tier-based color. Properties: `_GlowColor`, `_GlowIntensity`, `_PulseSpeed`, `_CornerRadius`. Sinusoidal pulse.
+2. **Beam Flash** — Single-quad gold gradient beam with UV scrolling. Replace multi-sprite approach.
+3. **Hot Streak Overlay** — Fullscreen heat shimmer/wave distortion. Properties: `_Intensity`, `_DistortionAmount`, `_ColorTint`.
+
+All shaders: built-in pipeline, unlit, UI-compatible (`Overlay` or `Transparent` queue).
+
+**Files touched:** New shader files in Assets/Shaders/, GridVFX.cs, Tile.cs, HotStreakEffect.cs
+
+---
+
+### Session O — L7: Credits, Leaderboard, Tutorial (~1 hour)
+
+1. **Credits:** MainMenuUI button → PopupWindow scrollbar mode. "Make10 by CJ Rhone / Wizard Bodega" + attributions.
+2. **Leaderboard:** Top 10 per mode, PlayerPrefs JSON, PopupWindow display.
+3. **Tutorial:** Add MakeZen explanation slide. Fix click-outside-to-dismiss bug in PopupWindow.
+
+**Files touched:** MainMenuUI.cs, PopupWindow.cs, UIManager.cs
+
+---
+
+### Session P — L6: Shop System & Cosmetics (~3+ hours, largest session)
+
+**Blocker:** Sprite art (~84 images). Can build the system and wire it up with placeholder sprites.
+
+1. **Data model:** `CosmeticData.cs` (ScriptableObject), `CosmeticInventory.cs` (singleton, PlayerPrefs JSON)
+2. **Avatar architecture:** Layered UI Image stack replacing single-image AvatarManager
+3. **Shop UI:** Category tabs, scrollable grid, locked/owned/equipped states, live preview
+4. **BP persistence:** `RunManager.cs` rebuild with `TotalBP` / `SpendableBP` / `SpendBP()`
+5. **Pricing:** Common 200–400, Uncommon 500–800, Rare 1000–1500
+
+**Files touched:** New files (CosmeticData.cs, CosmeticInventory.cs, ShopManager.cs, ShopCard.cs), AvatarManager.cs, RunManager.cs (rebuilt), MainMenuUI.cs, SceneFlowManager.cs
+
+---
+
+### Current Codebase State (Post-MakeZen MVP)
+
+**Scripts added during MakeZen:**
+- `TileWeightManager.cs` — tile weights, bag system, 7-tier Zen difficulty ramp
+- `GridValidation.cs` — match prevention, anti-cascade, consecutive match tracking
+
+**Scripts modified during MakeZen:**
+- `Tile.cs` — IsLocked, locked tile rendering, glow ungating, interaction blocking, swap-any input
+- `MatchChecker.cs` — locked tile awareness, all-pairs swap validation for Zen
+- `GridManager.cs` — ProcessZenMatch(), merge logic, Zen gravity/reshuffle, swap-any + animated revert
+- `GameManager.cs` — 5-min timer, failed swap penalty, Zen stats, mode enum
+- `SceneFlowManager.cs` — ModeSelect state, Zen navigation routing
+- `UIManager.cs` — locked tile counter, Zen results screen, calm timer, nav fixes
+- `MainMenuUI.cs` — per-mode high scores
+
+**Future scripts (L6 Shop):** CosmeticData.cs, CosmeticInventory.cs, ShopManager.cs, ShopCard.cs
+
+**Post-L6 game state additions:**
 ```
 + Shop, Leaderboard, Credits states
 + CosmeticInventory.Instance, ShopManager.Instance singletons

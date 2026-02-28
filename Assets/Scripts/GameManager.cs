@@ -730,6 +730,9 @@ public class GameManager : MonoBehaviour
     
     private void TimeUp()
     {
+        // Guard against double game-over (OnFailedSwap + Update can both trigger in same frame)
+        if (!IsGameActive) return;
+
         // Freeze session duration before deactivating
         lastSessionDuration = Time.time - sessionStartTime;
         IsGameActive = false;
