@@ -347,6 +347,12 @@ public class UIManager : MonoBehaviour
 
     private void HandleTimeChanged(float timeRemaining)
     {
+        // In Zen mode, show solve count instead of timer
+        if (gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen)
+        {
+            UpdateZenTimerDisplay();
+            return;
+        }
         UpdateTimerDisplay(timeRemaining);
     }
 
@@ -416,6 +422,12 @@ public class UIManager : MonoBehaviour
 
     private void UpdateTimerDisplay(float timeRemaining)
     {
+        // Re-enable timer elements in case they were hidden by Zen mode
+        if (timerSlider != null && !timerSlider.gameObject.activeSelf)
+            timerSlider.gameObject.SetActive(true);
+        if (timerFillImage != null && !timerFillImage.gameObject.activeSelf)
+            timerFillImage.gameObject.SetActive(true);
+
         int seconds = Mathf.CeilToInt(timeRemaining);
 
         // Determine state
@@ -456,6 +468,35 @@ public class UIManager : MonoBehaviour
             if (useTimerFillColorChange)
                 timerFillImage.color = stateColor;
         }
+    }
+
+    /// <summary>
+    /// In Zen mode, replace the timer with a solve counter and reshuffles remaining.
+    /// </summary>
+    private void UpdateZenTimerDisplay()
+    {
+        if (timerText != null)
+        {
+            int solves = gameManager != null ? gameManager.SolveCount : 0;
+            timerText.text = solves.ToString();
+            timerText.color = new Color(0.5f, 0.8f, 1f); // Calm blue
+        }
+
+        if (timerShadowText != null)
+        {
+            int solves = gameManager != null ? gameManager.SolveCount : 0;
+            timerShadowText.text = solves.ToString();
+        }
+
+        // Hide the timer slider/fill in Zen mode
+        if (timerSlider != null)
+            timerSlider.gameObject.SetActive(false);
+        if (timerFillImage != null)
+            timerFillImage.gameObject.SetActive(false);
+
+        // No pulse or warning sounds in Zen
+        StopPulse(ref timerPulseCoroutine, timerText?.transform);
+        StopTimeWarningSound();
     }
 
     private void UpdateMultiplierBar(bool active, float multiplier, float timer)
@@ -831,7 +872,10 @@ public class UIManager : MonoBehaviour
         // Small initial delay after win screen appears
         yield return new WaitForSeconds(0.3f);
 
-        // Title header — "ROUND COMPLETE"
+        // Title header — mode-dependent
+        bool isZen = gameManager.CurrentMode == GameManager.GameMode.Zen;
+        string resultsTitle = isZen ? "GAME OVER" : "ROUND COMPLETE";
+
         Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
         if (breakdownContainer != null && resultsTitleObj == null)
         {
@@ -843,7 +887,7 @@ public class UIManager : MonoBehaviour
             titleRT.sizeDelta = new Vector2(0, 58f);
 
             TMP_Text titleText = resultsTitleObj.AddComponent<TextMeshProUGUI>();
-            titleText.text = "ROUND COMPLETE";
+            titleText.text = resultsTitle;
             titleText.fontSize = 52f;
             titleText.fontStyle = FontStyles.Bold;
             titleText.alignment = TextAlignmentOptions.Center;
@@ -870,11 +914,11 @@ public class UIManager : MonoBehaviour
 
         yield return new WaitForSeconds(breakdownLineDelay);
 
-        // Line 2: Session Time - counts up as BP
+        // Line 2: Session Time - counts up as BP (label varies by mode)
         if (sessionTimeLabelText != null && sessionTimeValueText != null)
         {
             sessionTimeLabelText.transform.parent.gameObject.SetActive(true);
-            sessionTimeLabelText.text = "Session Time";
+            sessionTimeLabelText.text = isZen ? "Survival Time" : "Session Time";
             AudioManager.Instance?.PlayButtonClick();
             yield return StartCoroutine(AnimationUtilities.CountUp(sessionTimeValueText, 0, sessionTimeBonus, countUpDuration, "+ {0} BP"));
         }

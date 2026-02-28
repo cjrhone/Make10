@@ -1190,7 +1190,11 @@ public class GridManager : MonoBehaviour
                 if (cascadeCount > 0)
                     Debug.Log($"Cascade complete! {cascadeCount} chain(s)");
                 else
+                {
                     Debug.Log("No matches found.");
+                    // Zen mode: reset multiplier on failed swap (no match from player action)
+                    GameManager.Instance?.OnFailedSwap();
+                }
                 break;
             }
 
@@ -1231,11 +1235,33 @@ public class GridManager : MonoBehaviour
         
         if (matchChecker != null && !matchChecker.HasValidMoves())
         {
-            Debug.Log("<color=red>GRID UNSOLVABLE!</color> No valid moves available. Resetting...");
-            OnGridUnsolvable?.Invoke();
-            yield return new WaitForSeconds(unsolvableResetDelay);
-            ResetGridSilent();
-            yield break;
+            // Zen mode: use a reshuffle if available, otherwise game over
+            if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen)
+            {
+                if (GameManager.Instance.UseReshuffle())
+                {
+                    Debug.Log($"<color=cyan>ZEN RESHUFFLE!</color> {GameManager.Instance.ZenReshufflesRemaining} left.");
+                    OnGridUnsolvable?.Invoke();
+                    yield return new WaitForSeconds(unsolvableResetDelay);
+                    ResetGridSilent();
+                    yield break;
+                }
+                else
+                {
+                    Debug.Log("<color=red>ZEN GAME OVER!</color> No reshuffles remaining.");
+                    GameManager.Instance.ZenGameOver();
+                    yield break;
+                }
+            }
+            else
+            {
+                // Arcade mode: always reshuffle
+                Debug.Log("<color=red>GRID UNSOLVABLE!</color> No valid moves available. Resetting...");
+                OnGridUnsolvable?.Invoke();
+                yield return new WaitForSeconds(unsolvableResetDelay);
+                ResetGridSilent();
+                yield break;
+            }
         }
         
         isProcessing = false;

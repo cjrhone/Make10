@@ -67,12 +67,22 @@ public class MainMenuUI : MonoBehaviour
     {
         if (highScoreDisplayText == null) return;
 
-        int highScore = PlayerPrefs.GetInt("Make10_HighScore", 0);
-        int totalGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
+        int arcadeHighScore = PlayerPrefs.GetInt("Make10_HighScore", 0);
+        int arcadeGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
+        int zenHighScore = PlayerPrefs.GetInt("Make10_ZenHighScore", 0);
+        int zenGames = PlayerPrefs.GetInt("Make10_ZenTotalGames", 0);
 
-        if (totalGames > 0)
+        if (arcadeGames > 0 || zenGames > 0)
         {
-            highScoreDisplayText.text = $"Best: {highScore} pts";
+            string display = "";
+            if (arcadeGames > 0)
+                display += $"Arcade Best: {arcadeHighScore}";
+            if (zenGames > 0)
+            {
+                if (display.Length > 0) display += "  |  ";
+                display += $"Zen Best: {zenHighScore}";
+            }
+            highScoreDisplayText.text = display;
             highScoreDisplayText.gameObject.SetActive(true);
         }
         else

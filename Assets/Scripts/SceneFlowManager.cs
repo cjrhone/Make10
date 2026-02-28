@@ -785,6 +785,9 @@ public class SceneFlowManager : MonoBehaviour
         CampaignManager.Instance?.StartNewCampaign();
         RunManager.Instance?.StartNewRun();
 
+        // Reset game panel X position (it starts off-screen right from InitializePanels)
+        SetPanelPosition(gamePanel, 0);
+
         // Vertical slide: main menu scrolls up, game panel enters from below
         yield return VerticalSlideTransition(mainMenuPanel, gamePanel, slideUp: false);
 

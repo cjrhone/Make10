@@ -94,10 +94,24 @@ public class GameManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private UIManager uiManager;
 
+    [Header("Zen Mode Settings")]
+    [SerializeField] private int zenMaxReshuffles = 3;
+    [SerializeField] private int zenStar1Threshold = 500;
+    [SerializeField] private int zenStar2Threshold = 1000;
+    [SerializeField] private int zenStar3Threshold = 2000;
+
     // High Score persistence keys
     private const string HIGH_SCORE_KEY = "Make10_HighScore";
     private const string HIGH_SCORE_BP_KEY = "Make10_HighScoreBP";
     private const string TOTAL_GAMES_KEY = "Make10_TotalGames";
+    private const string ZEN_HIGH_SCORE_KEY = "Make10_ZenHighScore";
+    private const string ZEN_HIGH_SCORE_BP_KEY = "Make10_ZenHighScoreBP";
+    private const string ZEN_TOTAL_GAMES_KEY = "Make10_ZenTotalGames";
+
+    // Zen mode tracking
+    private int zenReshufflesRemaining;
+    public int ZenReshufflesRemaining => zenReshufflesRemaining;
+    public int ZenMaxReshuffles => zenMaxReshuffles;
 
     // Current state
     public int Score { get; private set; }
@@ -107,26 +121,33 @@ public class GameManager : MonoBehaviour
     public bool IsProcessing { get; set; }
     public bool IsSolveAnimationPlaying { get; set; }
 
-    // High score tracking
-    public int HighScore => PlayerPrefs.GetInt(HIGH_SCORE_KEY, 0);
-    public int HighScoreBP => PlayerPrefs.GetInt(HIGH_SCORE_BP_KEY, 0);
-    public int TotalGamesPlayed => PlayerPrefs.GetInt(TOTAL_GAMES_KEY, 0);
+    // High score tracking (mode-aware)
+    public int HighScore => PlayerPrefs.GetInt(
+        CurrentMode == GameMode.Zen ? ZEN_HIGH_SCORE_KEY : HIGH_SCORE_KEY, 0);
+    public int HighScoreBP => PlayerPrefs.GetInt(
+        CurrentMode == GameMode.Zen ? ZEN_HIGH_SCORE_BP_KEY : HIGH_SCORE_BP_KEY, 0);
+    public int TotalGamesPlayed => PlayerPrefs.GetInt(
+        CurrentMode == GameMode.Zen ? ZEN_TOTAL_GAMES_KEY : TOTAL_GAMES_KEY, 0);
     public bool IsNewHighScore { get; private set; }
 
     /// <summary>
     /// Calculate star rating (0-3) based on total BP earned this round.
+    /// Zen mode uses higher thresholds (longer sessions = more BP).
     /// </summary>
     public int GetStarRating(int totalBP)
     {
-        if (totalBP >= star3Threshold) return 3;
-        if (totalBP >= star2Threshold) return 2;
-        if (totalBP >= star1Threshold) return 1;
+        int t1 = CurrentMode == GameMode.Zen ? zenStar1Threshold : star1Threshold;
+        int t2 = CurrentMode == GameMode.Zen ? zenStar2Threshold : star2Threshold;
+        int t3 = CurrentMode == GameMode.Zen ? zenStar3Threshold : star3Threshold;
+        if (totalBP >= t3) return 3;
+        if (totalBP >= t2) return 2;
+        if (totalBP >= t1) return 1;
         return 0;
     }
 
-    public int Star1Threshold => star1Threshold;
-    public int Star2Threshold => star2Threshold;
-    public int Star3Threshold => star3Threshold;
+    public int Star1Threshold => CurrentMode == GameMode.Zen ? zenStar1Threshold : star1Threshold;
+    public int Star2Threshold => CurrentMode == GameMode.Zen ? zenStar2Threshold : star2Threshold;
+    public int Star3Threshold => CurrentMode == GameMode.Zen ? zenStar3Threshold : star3Threshold;
 
     // Multiplier state (SolveCount exposed for performance-based tile weight ramp)
     private int solveCount = 0;
@@ -229,7 +250,8 @@ public class GameManager : MonoBehaviour
             DrainTime(Time.deltaTime);
         }
 
-        if (multiplierActive && !IsProcessing)
+        // Zen mode: multiplier doesn't drain on a timer (resets on failed swap instead)
+        if (multiplierActive && !IsProcessing && CurrentMode == GameMode.Arcade)
         {
             DrainMultiplierTimer(Time.deltaTime);
         }
@@ -296,6 +318,9 @@ public class GameManager : MonoBehaviour
         lastPlayerSolveTime = -999f;
         sessionStartTime = Time.time;
         lastSessionDuration = 0f;
+
+        // Zen mode: initialize reshuffles
+        zenReshufflesRemaining = zenMaxReshuffles;
 
         // Reset avatar to default state
         AvatarManager.Instance?.ResetToDefault();
@@ -722,14 +747,84 @@ public class GameManager : MonoBehaviour
     /// </summary>
     public void CheckAndSaveBPHighScore(int totalBP)
     {
-        if (totalBP > HighScoreBP)
+        string key = CurrentMode == GameMode.Zen ? ZEN_HIGH_SCORE_BP_KEY : HIGH_SCORE_BP_KEY;
+        int currentBest = PlayerPrefs.GetInt(key, 0);
+        if (totalBP > currentBest)
         {
-            PlayerPrefs.SetInt(HIGH_SCORE_BP_KEY, totalBP);
+            PlayerPrefs.SetInt(key, totalBP);
             PlayerPrefs.Save();
-            Debug.Log($"<color=yellow>*** NEW BP HIGH SCORE: {totalBP}! ***</color>");
+            Debug.Log($"<color=yellow>*** NEW BP HIGH SCORE ({CurrentMode}): {totalBP}! ***</color>");
         }
     }
-    
-    
+
+
+    #endregion
+
+    #region Zen Mode
+
+    /// <summary>
+    /// Use one reshuffle in Zen mode. Returns true if reshuffle was available.
+    /// Called by GridManager when board has no valid moves.
+    /// </summary>
+    public bool UseReshuffle()
+    {
+        if (CurrentMode != GameMode.Zen) return false;
+        if (zenReshufflesRemaining <= 0) return false;
+
+        zenReshufflesRemaining--;
+        Debug.Log($"<color=cyan>Zen reshuffle used! {zenReshufflesRemaining} remaining.</color>");
+        return true;
+    }
+
+    /// <summary>
+    /// Called when a swap produces no match (failed swap).
+    /// In Zen mode, this resets the multiplier — punishes random guessing.
+    /// </summary>
+    public void OnFailedSwap()
+    {
+        if (CurrentMode != GameMode.Zen) return;
+        if (!multiplierActive) return;
+
+        Debug.Log("<color=red>[Zen] Failed swap — multiplier reset!</color>");
+        DeactivateMultiplierBar();
+    }
+
+    /// <summary>
+    /// Zen mode game over — no valid moves and no reshuffles remaining.
+    /// </summary>
+    public void ZenGameOver()
+    {
+        if (!IsGameActive) return;
+
+        Debug.Log("<color=cyan>*** ZEN GAME OVER — No valid moves remaining! ***</color>");
+
+        // Freeze session duration
+        lastSessionDuration = Time.time - sessionStartTime;
+        IsGameActive = false;
+
+        // Freeze the grid
+        GridManager gm = FindFirstObjectByType<GridManager>();
+        gm?.FreezeGrid();
+
+        // Track total games
+        string gamesKey = ZEN_TOTAL_GAMES_KEY;
+        int gamesPlayed = PlayerPrefs.GetInt(gamesKey, 0) + 1;
+        PlayerPrefs.SetInt(gamesKey, gamesPlayed);
+
+        // Check for new high score
+        string hsKey = ZEN_HIGH_SCORE_KEY;
+        IsNewHighScore = Score > PlayerPrefs.GetInt(hsKey, 0);
+        if (IsNewHighScore)
+        {
+            PlayerPrefs.SetInt(hsKey, Score);
+            Debug.Log($"<color=yellow>*** NEW ZEN HIGH SCORE: {Score}! ***</color>");
+        }
+
+        PlayerPrefs.Save();
+
+        SceneFlowManager.Instance?.OnGameEnded();
+        OnGameWon?.Invoke();
+    }
+
     #endregion
 }
