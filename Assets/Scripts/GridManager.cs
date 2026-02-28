@@ -408,7 +408,12 @@ public class GridManager : MonoBehaviour
         
         ClearGrid();
         ResetHintTimer();
-        
+
+        // Clear swap refs so the first ProcessMatchesCoroutine call
+        // (from StartMatchProcessing) doesn't fire OnFailedSwap
+        lastSwappedFirst = null;
+        lastSwappedSecond = null;
+
         float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
         float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
         float startX = -totalWidth / 2f + tileSize / 2f;
@@ -1110,11 +1115,19 @@ public class GridManager : MonoBehaviour
                 if (zenMatch == null)
                 {
                     if (cascadeCount > 0)
+                    {
                         Debug.Log($"<color=cyan>[Zen]</color> Cascade complete! {cascadeCount} chain(s)");
+                    }
+                    else if (lastSwappedFirst != null || lastSwappedSecond != null)
+                    {
+                        // Only treat as failed swap if this was triggered by an actual player swap.
+                        // Skip on game start, post-reshuffle, and other non-swap entries.
+                        Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap.");
+                        GameManager.Instance?.OnFailedSwap();
+                    }
                     else
                     {
-                        Debug.Log("<color=cyan>[Zen]</color> No matches found.");
-                        GameManager.Instance?.OnFailedSwap();
+                        Debug.Log("<color=cyan>[Zen]</color> No matches (startup/reshuffle check) — not a failed swap.");
                     }
                     break;
                 }
@@ -1201,6 +1214,10 @@ public class GridManager : MonoBehaviour
                 if (GameManager.Instance.UseReshuffle())
                 {
                     Debug.Log($"<color=cyan>ZEN RESHUFFLE!</color> {GameManager.Instance.ZenReshufflesRemaining} left.");
+                    // Clear swap refs so the post-reshuffle ProcessMatchesCoroutine
+                    // doesn't treat the "no matches" result as a failed player swap
+                    lastSwappedFirst = null;
+                    lastSwappedSecond = null;
                     OnGridUnsolvable?.Invoke();
                     yield return new WaitForSeconds(unsolvableResetDelay);
                     ResetGridSilent();
