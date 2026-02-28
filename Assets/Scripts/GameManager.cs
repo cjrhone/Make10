@@ -54,10 +54,6 @@ public class GameManager : MonoBehaviour
 
     public int WinScore => gameSettings.winScore;
     [SerializeField] private float gameDuration = 60f;
-    #pragma warning disable CS0414
-    [SerializeField] private float postWinDelay = 0.5f;
-    #pragma warning restore CS0414
-
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
 
@@ -207,10 +203,6 @@ public class GameManager : MonoBehaviour
     public event Action OnHotStreakStarted;
     public event Action<float> OnHotStreakTimerChanged; // passes remaining time
     public event Action OnHotStreakEnded;
-    #pragma warning disable CS0067 // Reserved for future use (Zen mode / upgrades)
-    public event Action<int> OnEnhancedNumberBonus; // bonus BP from enhanced numbers
-    public event Action<float> OnTimeBonus; // time added from snacks/upgrades
-    #pragma warning restore CS0067
     
     private void Awake()
     {

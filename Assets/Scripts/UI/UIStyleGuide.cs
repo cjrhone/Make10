@@ -190,43 +190,6 @@ public static class UIStyleGuide
     public const float ButtonAnimDuration = 0.1f;
 
     // ═══════════════════════════════════════════════════════════════════
-    // COLORS - UPGRADE TYPES (single source of truth)
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Get the canonical color for an upgrade type.
-    /// Color coding philosophy:
-    /// - Warm colors (gold, orange, red) for offensive/scoring upgrades
-    /// - Cool colors (blue, cyan, purple) for defensive/utility upgrades
-    /// - Neutral (green) for growth/spawning
-    /// </summary>
-    public static Color GetUpgradeTypeColor(UpgradeType type)
-    {
-        return type switch
-        {
-            UpgradeType.EnhancedNumber => new Color(1f, 0.85f, 0.2f, 1f),    // Gold - ties to BP/value
-            UpgradeType.Multiplier => new Color(0.7f, 0.3f, 0.9f, 1f),       // Purple - premium/powerful
-            UpgradeType.Time => new Color(0.3f, 0.85f, 0.95f, 1f),           // Cyan - clock/time
-            UpgradeType.TileWeight => new Color(0.3f, 0.8f, 0.4f, 1f),       // Green - growth/spawning
-            UpgradeType.Combo => new Color(1f, 0.5f, 0.15f, 1f),             // Orange - energy/chains
-            UpgradeType.RiskReward => new Color(0.95f, 0.25f, 0.25f, 1f),    // Red - danger/gambling
-            UpgradeType.Information => new Color(0.5f, 0.7f, 0.95f, 1f),     // Light blue - knowledge
-            UpgradeType.Defensive => new Color(0.4f, 0.65f, 0.5f, 1f),       // Teal - protection
-            UpgradeType.BossFight => new Color(0.7f, 0.15f, 0.2f, 1f),       // Crimson - boss combat
-            UpgradeType.Special => new Color(0.95f, 0.4f, 0.7f, 1f),         // Pink/Magenta - unique
-            _ => ColorTextMuted
-        };
-    }
-
-    /// <summary>
-    /// Get the color for snack-type items (consistent teal/mint for consumables).
-    /// </summary>
-    public static Color GetSnackColor()
-    {
-        return new Color(0.2f, 0.75f, 0.65f, 1f); // Teal/Mint - refreshing/consumable
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
     // HELPER METHODS
     // ═══════════════════════════════════════════════════════════════════
 

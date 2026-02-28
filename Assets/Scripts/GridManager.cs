@@ -34,10 +34,6 @@ public class GridManager : MonoBehaviour
     
     [Header("Animation Settings")]
     [SerializeField] private float tileFallSpeed = 1600f;
-    #pragma warning disable CS0414 // Inspector-assigned, may be used in future tuning
-    [SerializeField] private float tileFallDelay = 0.02f;
-    [SerializeField] private float postClearDelay = 0.05f;
-    #pragma warning restore CS0414
     [SerializeField] private float tileSwapDuration = 0.15f;
     [SerializeField] private float unsolvableResetDelay = 1f;
     

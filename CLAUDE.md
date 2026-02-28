@@ -24,13 +24,12 @@ MakeZen is a 5-minute math meditation. Where Arcade is a sprint (frantic, adrena
 | `GridValidation.cs` | Initial match prevention, anti-cascade checks, consecutive match tracking/scaling |
 | `Tile.cs` | Individual tile behavior, click/swipe input, selection state |
 | `MatchChecker.cs` | Match detection, row/column sum validation, solvability checks |
-| `CampaignManager.cs` | Lightweight round counter (arcade mode shell) |
 
 ### Scene Flow & UI
 | Script | Purpose |
 |--------|---------|
 | `SceneFlowManager.cs` | Master scene controller, panel transitions (9 game states) |
-| `RunManager.cs` | Persistent run state: BP currency, round progression |
+| `RunManager.cs` | Persistent run state: BP currency, round progression (to be rebuilt in L6 Shop) |
 | `UIManager.cs` | Score, timer, multiplier display, results screen, Balatro-style breakdown |
 | `MainMenuUI.cs` | Main menu button handlers |
 | `PopupWindow.cs` | Reusable popup system with scrollbar and auto-size modes |
@@ -51,7 +50,6 @@ MakeZen is a 5-minute math meditation. Where Arcade is a sprint (frantic, adrena
 | `AnimationUtilities.cs` | Static animation library (PunchScale, PopIn, CountUp, etc.) — all linear Lerp except CountUp |
 | `GlowTextureGenerator.cs` | Procedural soft glow texture generation (circular & diamond) |
 | `UIStyleGuide.cs` | Centralized UI styling constants and window sizes |
-| `PlayerInventory.cs` | Minimal shell (singleton + ClearInventory). No upgrades in arcade mode. |
 
 ---
 
@@ -62,8 +60,7 @@ GameManager.Instance        → Game state, scoring, multiplier, hot streak
 SceneFlowManager.Instance   → Scene transitions, 9 game states
 UIManager.Instance          → UI updates, results screen
 AudioManager.Instance       → Audio playback, volume control
-RunManager.Instance         → BP currency, round progression
-CampaignManager.Instance    → Lightweight round counter
+RunManager.Instance         → BP currency, round progression (to be rebuilt in L6 Shop)
 AvatarManager.Instance      → Avatar state machine
 TenExplosionVFX.Instance    → Particle effects
 GridVFX.Instance            → Line sweeps, ambient particles, screen shake
@@ -583,25 +580,26 @@ Track 1 (F/G/H) is ~1.5 hours and should be done first — it prevents bugs from
 
 ---
 
-### Session G — Dead Code Purge (~45 min)
+### Session G — Dead Code Purge ✓ COMPLETE
 
-**Why next:** Removing ~1,150 lines of noise makes every future session cleaner and reduces cognitive load.
-
-**Delete entire files (12 files):**
-- `PlayerInventory.cs`, `CampaignManager.cs`, `RunManager.cs`, `DataLoader.cs`
-- `DebugUpgradePanel.cs`, `ShopCard.cs` *(L6 Shop will rebuild from scratch)*
+**Deleted 12 files** (~1,100 lines removed):
+- `PlayerInventory.cs`, `CampaignManager.cs`, `DataLoader.cs`, `DebugUpgradePanel.cs`, `ShopCard.cs`
 - `UI/ExampleWindow.cs`, `UI/UpgradeConfirmWindow.cs`
 - `Data/ArtifactData.cs`, `Data/SnackData.cs`, `Data/UpgradeData.cs`, `Data/UpgradeType.cs`
+- `Editor/UpgradeAssetCreator.cs` (additional find — referenced deleted Data types)
 
-**Remove dead methods from active files:**
-- **GameManager.cs:** `CalculateEnhancedNumberBonus()`, `CalculateZeroTimeBonus()`, `ApplyPostScoringBonuses()`, `CalculateCommonBonuses()`, `GetCurrentWeights()`, `GetCurrentGridSize()`, unused events `OnEnhancedNumberBonus` / `OnTimeBonus`, field `postWinDelay`
-- **GridManager.cs:** `tileFallDelay`, `postClearDelay`
-- **Tile.cs:** `numberPulseSpeed`, `numberPulseMinScale`, `numberPulseMaxScale`, `numberBrightenAmount`
-- **MatchChecker.cs:** `targetSum` (never read)
+**RunManager.cs preserved** — still referenced by UIManager + SceneFlowManager (~20 call sites). Will be rebuilt in Session P (L6 Shop).
 
-**Cleanup:** Grep all `.cs` for references to deleted classes, remove orphaned `.meta` files.
+**Removed dead declarations from active files:**
+- ✓ GameManager.cs: `postWinDelay`, events `OnEnhancedNumberBonus` / `OnTimeBonus`
+- ✓ GridManager.cs: `tileFallDelay`, `postClearDelay`
+- ✓ MatchChecker.cs: `targetSum`
+- ✓ UIStyleGuide.cs: `GetUpgradeTypeColor()`, `GetSnackColor()` (referenced deleted UpgradeType enum)
+- ✓ SceneFlowManager.cs: removed CampaignManager.Instance calls (lines 555, 803)
 
-**Files touched:** 16+ files (mostly deletions)
+**Corrected from original plan:** GameManager methods `CalculateCommonBonuses()`, `ApplyPostScoringBonuses()`, `GetCurrentWeights()`, `GetCurrentGridSize()` are actively called — kept. Tile.cs fields `numberPulseSpeed`, `numberPulseMinScale`, `numberPulseMaxScale`, `numberBrightenAmount` drive idle animation — kept.
+
+**Files touched:** GameManager.cs, GridManager.cs, MatchChecker.cs, SceneFlowManager.cs, UIStyleGuide.cs + 12 deleted files
 
 ---
 

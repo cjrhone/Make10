@@ -11,9 +11,6 @@ public class MatchChecker : MonoBehaviour
     [SerializeField] private GridManager gridManager;
     
     [Header("Settings")]
-    #pragma warning disable CS0414
-    [SerializeField] private int targetSum = 10;
-    #pragma warning restore CS0414
     
     [Header("Debug")]
     [SerializeField] private bool logMatches = true;

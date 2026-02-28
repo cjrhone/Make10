@@ -551,8 +551,6 @@ public class SceneFlowManager : MonoBehaviour
         // Stop menu music
         AudioManager.Instance?.StopMusic();
 
-        // Start a new campaign and run
-        CampaignManager.Instance?.StartNewCampaign();
         RunManager.Instance?.StartNewRun();
 
         // Transition to game panel
@@ -799,8 +797,6 @@ public class SceneFlowManager : MonoBehaviour
         // Set game mode to Zen
         GameManager.Instance?.SetGameMode(GameManager.GameMode.Zen);
 
-        // Start campaign/run tracking
-        CampaignManager.Instance?.StartNewCampaign();
         RunManager.Instance?.StartNewRun();
 
         // Reset game panel X position (it starts off-screen right from InitializePanels)
