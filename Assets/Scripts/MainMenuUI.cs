@@ -173,18 +173,20 @@ public class MainMenuUI : MonoBehaviour
     {
         if (shopButton == null) return;
 
-        shopButton.interactable = false;
+        // Keep tappable so the popup can show, but style it as muted
+        shopButton.interactable = true;
 
-        // Grey out the button visuals
         ColorBlock colors = shopButton.colors;
-        colors.disabledColor = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        colors.normalColor = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        colors.highlightedColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+        colors.pressedColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
         shopButton.colors = colors;
 
         // Add "Coming Soon" label if the button has a text child
         TMP_Text buttonText = shopButton.GetComponentInChildren<TMP_Text>();
         if (buttonText != null)
         {
-            buttonText.text = "Shop - Coming Soon";
+            buttonText.text = "Shop";
             buttonText.color = new Color(0.6f, 0.6f, 0.6f, 0.7f);
         }
     }
@@ -205,24 +207,33 @@ public class MainMenuUI : MonoBehaviour
     }
     
     /// <summary>
-    /// Continuous smooth bob animation for the title.
-    /// Single EaseInOutCubic oscillation — no rotation wobble, no scale pulse.
+    /// Gentle idle animation for the title card.
+    /// Subtle vertical float + soft breathing scale on offset sine waves.
     /// </summary>
     private IEnumerator AnimateTitle()
     {
+        // Subtle parameters — barely perceptible, keeps the menu feeling alive
+        const float floatAmount = 6f;       // pixels of vertical drift (was 20)
+        const float floatSpeed = 1.2f;      // slow, meditative pace
+        const float breatheAmount = 0.012f; // 1.2% scale variation
+        const float breatheSpeed = 0.8f;    // slightly slower than float for organic feel
+
         while (true)
         {
             if (titleCard != null)
             {
-                // Map sine wave through EaseInOutCubic for smooth acceleration/deceleration
-                float rawT = (Mathf.Sin(Time.time * bounceSpeed) + 1f) / 2f; // 0→1 oscillation
-                float easedT = AnimationUtilities.EaseInOutCubic(rawT);
-                float yOffset = Mathf.Lerp(-bounceHeight, bounceHeight, easedT);
+                // Vertical float — eased sine for smooth turnaround at peaks
+                float floatT = (Mathf.Sin(Time.time * floatSpeed) + 1f) / 2f;
+                float easedFloat = AnimationUtilities.EaseInOutCubic(floatT);
+                float yOffset = Mathf.Lerp(-floatAmount, floatAmount, easedFloat);
                 titleCard.anchoredPosition = titleStartPos + new Vector2(0, yOffset);
 
-                // Clean: no rotation, no scale pulse
+                // Breathing scale — offset phase so it doesn't sync with float
+                float breatheT = (Mathf.Sin(Time.time * breatheSpeed + 1.5f) + 1f) / 2f;
+                float scale = 1f + Mathf.Lerp(-breatheAmount, breatheAmount, breatheT);
+                titleCard.localScale = new Vector3(scale, scale, 1f);
+
                 titleCard.localEulerAngles = Vector3.zero;
-                titleCard.localScale = Vector3.one;
             }
 
             yield return null;

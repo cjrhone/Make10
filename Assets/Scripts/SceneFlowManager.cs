@@ -935,8 +935,41 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log($"OnShopPressed called! CurrentState = {CurrentState}");
         if (CurrentState != GameState.MainMenu) return;
         AudioManager.Instance?.PlayButtonClick();
-        // Shop is greyed out — this is a safety fallback if somehow clicked
-        Debug.Log("Shop coming soon!");
+        ShowShopComingSoonPopup();
+    }
+
+    /// <summary>
+    /// Show a "Coming Soon" popup for the shop.
+    /// </summary>
+    private void ShowShopComingSoonPopup()
+    {
+        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
+        if (popup == null)
+        {
+            GameObject popupObj = new GameObject("ShopComingSoonPopup");
+            popupObj.transform.SetParent(mainCanvas.transform, false);
+            popup = popupObj.AddComponent<PopupWindow>();
+        }
+
+        popup.SetTitle("Shop");
+        popup.ClearContent();
+        popup.SetAutoSizeMode(800f, 300f, 600f, false);
+
+        popup.AddSpacer(20f);
+        popup.AddText("Coming Soon!", UIStyleGuide.FontSizeHeadline, UIStyleGuide.ColorTextAccent,
+            TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddSpacer(10f);
+        popup.AddText("Unlock avatar cosmetics\nwith your earned BP.", UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextSecondary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(20f);
+
+        popup.AddButton("OK", () =>
+        {
+            AudioManager.Instance?.PlayButtonClick();
+            popup.Close();
+        }, UIStyleGuide.ColorButtonPrimary);
+
+        popup.Open();
     }
 
     /// <summary>

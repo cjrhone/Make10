@@ -1176,6 +1176,14 @@ public class UIManager : MonoBehaviour
         }
 
         EnsureResultsButtonsActive();
+
+        // Confetti celebration for arcade mode (Zen stays calm)
+        bool isZen = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen;
+        if (!isZen && winScreen != null)
+        {
+            SpawnConfetti(winScreen.transform, 60, 4f);
+        }
+
         // Start the animated score breakdown
         StartCoroutine(ShowWinScreenBreakdown());
     }
@@ -1934,6 +1942,9 @@ public class UIManager : MonoBehaviour
         // Hide breakdown elements
         HideBreakdownElements();
 
+        // Clean up confetti
+        ClearConfetti();
+
         // Clean up any active effects
         StopPulse(ref timerPulseCoroutine, timerText?.transform);
         StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
@@ -2140,6 +2151,161 @@ public class UIManager : MonoBehaviour
         hotStreakActive = false;
 
         Debug.Log("<color=gray>Hot streak ended.</color>");
+    }
+
+    #endregion
+
+    #region Confetti Celebration
+
+    private readonly List<GameObject> activeConfetti = new List<GameObject>();
+    private Coroutine confettiCoroutine;
+
+    // Confetti color palette — festive and vibrant
+    private static readonly Color[] confettiColors = new Color[]
+    {
+        new Color(1f, 0.3f, 0.35f),    // Red
+        new Color(1f, 0.85f, 0.2f),     // Gold
+        new Color(0.3f, 0.85f, 0.4f),   // Green
+        new Color(0.35f, 0.6f, 1f),     // Blue
+        new Color(0.9f, 0.4f, 0.9f),    // Pink
+        new Color(1f, 0.6f, 0.15f),     // Orange
+        new Color(0.5f, 0.85f, 1f),     // Cyan
+        new Color(0.85f, 0.7f, 1f),     // Lavender
+    };
+
+    /// <summary>
+    /// Spawn a burst of UI confetti pieces that fall and spin across the results screen.
+    /// </summary>
+    private void SpawnConfetti(Transform parent, int count = 60, float duration = 4f)
+    {
+        if (confettiCoroutine != null)
+            StopCoroutine(confettiCoroutine);
+
+        // Clean up any leftover confetti
+        ClearConfetti();
+
+        confettiCoroutine = StartCoroutine(ConfettiRoutine(parent, count, duration));
+    }
+
+    private IEnumerator ConfettiRoutine(Transform parent, int count, float duration)
+    {
+        RectTransform parentRect = parent.GetComponent<RectTransform>();
+        if (parentRect == null) yield break;
+
+        float parentWidth = parentRect.rect.width;
+        float parentHeight = parentRect.rect.height;
+
+        // Spawn confetti in a quick burst (staggered slightly for a natural feel)
+        for (int i = 0; i < count; i++)
+        {
+            SpawnConfettiPiece(parent, parentWidth, parentHeight, duration);
+
+            // Stagger spawns: first 20 come fast, rest trickle in
+            if (i < 20)
+                yield return null; // 1 frame between
+            else if (i % 3 == 0)
+                yield return new WaitForSeconds(0.03f);
+        }
+
+        // Auto-destroy after 20 seconds as a hard safety ceiling
+        yield return new WaitForSeconds(20f);
+
+        ClearConfetti();
+    }
+
+    private void SpawnConfettiPiece(Transform parent, float parentWidth, float parentHeight, float duration)
+    {
+        GameObject piece = new GameObject("Confetti");
+        piece.transform.SetParent(parent, false);
+
+        RectTransform rt = piece.AddComponent<RectTransform>();
+
+        // Random confetti size — mix of small rectangles and squares
+        bool isSquare = Random.value > 0.6f;
+        float w = Random.Range(12f, 24f);
+        float h = isSquare ? w : Random.Range(20f, 40f);
+        rt.sizeDelta = new Vector2(w, h);
+
+        // Start position: spread across top, slightly above the screen
+        float startX = Random.Range(-parentWidth * 0.5f, parentWidth * 0.5f);
+        float startY = parentHeight * 0.5f + Random.Range(20f, 120f);
+        rt.anchoredPosition = new Vector2(startX, startY);
+
+        Image img = piece.AddComponent<Image>();
+        img.color = confettiColors[Random.Range(0, confettiColors.Length)];
+        img.raycastTarget = false;
+
+        activeConfetti.Add(piece);
+
+        StartCoroutine(AnimateConfettiPiece(rt, img, parentWidth, parentHeight, duration));
+    }
+
+    private IEnumerator AnimateConfettiPiece(RectTransform rt, Image img,
+        float parentWidth, float parentHeight, float duration)
+    {
+        float elapsed = 0f;
+        float pieceDuration = duration * Random.Range(0.7f, 1.0f);
+
+        // Per-piece randomized physics
+        float fallSpeed = Random.Range(400f, 700f);    // pixels/sec downward
+        float swayAmount = Random.Range(40f, 100f);     // horizontal sway amplitude
+        float swaySpeed = Random.Range(1.5f, 3.5f);     // sway oscillation speed
+        float spinSpeed = Random.Range(180f, 540f);      // degrees/sec
+        float spinAxis = Random.value;                    // determines which axis to spin on
+        float phaseOffset = Random.Range(0f, Mathf.PI * 2f); // desync sway between pieces
+        float drift = Random.Range(-60f, 60f);           // gentle horizontal drift
+
+        Vector2 startPos = rt.anchoredPosition;
+        float fadeStart = pieceDuration * 0.7f; // start fading at 70% through
+
+        while (elapsed < pieceDuration)
+        {
+            if (rt == null) yield break;
+
+            elapsed += Time.deltaTime;
+            float t = elapsed / pieceDuration;
+
+            // Vertical: accelerating fall (gravity feel)
+            float y = startPos.y - fallSpeed * elapsed * (1f + t * 0.3f);
+
+            // Horizontal: sine sway + drift
+            float x = startPos.x + Mathf.Sin(elapsed * swaySpeed + phaseOffset) * swayAmount + drift * t;
+
+            rt.anchoredPosition = new Vector2(x, y);
+
+            // Rotation: continuous spin with flutter
+            float angle = spinSpeed * elapsed;
+            rt.localEulerAngles = new Vector3(0, 0, angle);
+
+            // Simulate tumbling by squashing on one axis via scale
+            float tumble = Mathf.Sin(elapsed * spinSpeed * 0.02f + phaseOffset);
+            float scaleX = Mathf.Lerp(0.3f, 1f, Mathf.Abs(tumble));
+            rt.localScale = new Vector3(scaleX, 1f, 1f);
+
+            // Fade out in the last 30%
+            if (elapsed > fadeStart)
+            {
+                float fadeT = (elapsed - fadeStart) / (pieceDuration - fadeStart);
+                Color c = img.color;
+                c.a = Mathf.Lerp(1f, 0f, fadeT);
+                img.color = c;
+            }
+
+            yield return null;
+        }
+
+        if (rt != null)
+            rt.gameObject.SetActive(false);
+    }
+
+    private void ClearConfetti()
+    {
+        foreach (var piece in activeConfetti)
+        {
+            if (piece != null)
+                Destroy(piece);
+        }
+        activeConfetti.Clear();
     }
 
     #endregion
