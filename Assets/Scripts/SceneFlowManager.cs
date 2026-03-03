@@ -883,12 +883,12 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log($"OnOptionsPressed called! CurrentState = {CurrentState}");
         HandleButton(GameState.MainMenu, () =>
         {
-            StartCoroutine(FadeTransition(optionsPanel, fadeIn: true));
-            CurrentState = GameState.Options;
+            AudioManager.Instance?.PlayButtonClick();
+            ShowOptionsPopup();
         });
     }
-    
-    // Legacy method - now calls GoBack()
+
+    // Legacy method - kept for backward compatibility
     public void OnOptionsClosePressed() => GoBack();
     
     public void OnQuitPressed()
@@ -1007,7 +1007,7 @@ public class SceneFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Options button pressed from pause menu — opens options overlay.
+    /// Options button pressed from pause menu — opens options popup overlay.
     /// </summary>
     public void OnPauseOptionsPressed()
     {
@@ -1015,20 +1015,17 @@ public class SceneFlowManager : MonoBehaviour
 
         Debug.Log("Opening options from pause menu");
         AudioManager.Instance?.PlayButtonClick();
-
-        // Show options panel as overlay (time stays paused)
-        StartCoroutine(FadeTransition(optionsPanel, fadeIn: true));
-        // Note: we stay in Paused state, options is just an overlay on top
+        ShowOptionsPopup();
     }
 
     /// <summary>
     /// Close options panel and return to pause menu (when opened from pause).
+    /// Legacy — the PopupWindow now handles its own close.
     /// </summary>
     public void OnPauseOptionsClosePressed()
     {
         Debug.Log("Closing options, returning to pause menu");
         AudioManager.Instance?.PlayButtonClick();
-        StartCoroutine(FadeTransition(optionsPanel, fadeIn: false));
     }
     
     public void OnTutorial1OkPressed()
@@ -1122,8 +1119,62 @@ public class SceneFlowManager : MonoBehaviour
 
     #endregion
 
+    #region Options
+
+    /// <summary>
+    /// Show the options popup using PopupWindow system.
+    /// Works from both main menu and pause menu — popup is self-contained.
+    /// </summary>
+    private void ShowOptionsPopup()
+    {
+        // Create a fresh PopupWindow each time (same pattern as credits)
+        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
+        if (popup == null)
+        {
+            GameObject popupObj = new GameObject("OptionsPopup");
+            popupObj.transform.SetParent(mainCanvas.transform, false);
+            popup = popupObj.AddComponent<PopupWindow>();
+        }
+
+        popup.SetTitle("Options");
+        popup.ClearContent();
+        popup.SetAutoSizeMode(900f, 400f, 1000f, false);
+
+        popup.AddSpacer(10f);
+
+        // --- Music Volume ---
+        float currentMusic = AudioManager.Instance != null ? AudioManager.Instance.MusicVolume : 0.7f;
+        popup.AddSlider("Music", currentMusic, (val) =>
+        {
+            AudioManager.Instance?.SetMusicVolume(val);
+        }, UIStyleGuide.ColorButtonSecondary);
+
+        popup.AddSpacer(10f);
+
+        // --- SFX Volume ---
+        float currentSFX = AudioManager.Instance != null ? AudioManager.Instance.SFXVolume : 1f;
+        popup.AddSlider("Sound Effects", currentSFX, (val) =>
+        {
+            AudioManager.Instance?.SetSFXVolume(val);
+        }, UIStyleGuide.ColorButtonPrimary);
+
+        popup.AddSpacer(20f);
+        popup.AddDivider();
+        popup.AddSpacer(15f);
+
+        popup.AddButton("Done", () =>
+        {
+            AudioManager.Instance?.PlayButtonClick();
+            popup.Close();
+        }, UIStyleGuide.ColorButtonPrimary);
+
+        popup.Open();
+    }
+
+    #endregion
+
     #region Public Utilities
-    
+
     /// <summary>
     /// Return to main menu from anywhere (legacy method, use GoBack() instead).
     /// </summary>

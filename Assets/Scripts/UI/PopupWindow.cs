@@ -338,6 +338,139 @@ public class PopupWindow : MonoBehaviour
         img.color = color ?? new Color(1f, 1f, 1f, 0.2f);
     }
 
+    /// <summary>
+    /// Add a labeled slider with a percentage readout.
+    /// Returns the Slider component so callers can read its value.
+    /// </summary>
+    public Slider AddSlider(string label, float initialValue, Action<float> onValueChanged,
+        Color? fillColor = null, float min = 0f, float max = 1f)
+    {
+        Color sliderFill = fillColor ?? UIStyleGuide.ColorButtonSecondary;
+
+        // Container for label row + slider
+        GameObject container = CreateContentElement(label + "_SliderGroup");
+        LayoutElement containerLe = container.AddComponent<LayoutElement>();
+        containerLe.minHeight = 120f;
+        containerLe.preferredHeight = 120f;
+        containerLe.flexibleWidth = 1;
+
+        VerticalLayoutGroup vlg = container.AddComponent<VerticalLayoutGroup>();
+        vlg.childControlWidth = true;
+        vlg.childControlHeight = true;
+        vlg.childForceExpandWidth = true;
+        vlg.childForceExpandHeight = false;
+        vlg.spacing = 8f;
+
+        // --- Label row (label left, percentage right) ---
+        GameObject labelRow = CreateUIElement("LabelRow", container.transform);
+        LayoutElement labelRowLe = labelRow.AddComponent<LayoutElement>();
+        labelRowLe.minHeight = 40f;
+        labelRowLe.preferredHeight = 40f;
+        labelRowLe.flexibleWidth = 1;
+
+        // Label text (left-aligned)
+        GameObject labelObj = CreateUIElement("Label", labelRow.transform);
+        RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0, 0);
+        labelRect.anchorMax = new Vector2(0.7f, 1);
+        labelRect.sizeDelta = Vector2.zero;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI labelTmp = labelObj.AddComponent<TextMeshProUGUI>();
+        labelTmp.text = label;
+        labelTmp.fontSize = UIStyleGuide.FontSizeBody;
+        labelTmp.color = UIStyleGuide.ColorTextPrimary;
+        labelTmp.alignment = TextAlignmentOptions.MidlineLeft;
+
+        // Value text (right-aligned percentage)
+        GameObject valueObj = CreateUIElement("Value", labelRow.transform);
+        RectTransform valueRect = valueObj.GetComponent<RectTransform>();
+        valueRect.anchorMin = new Vector2(0.7f, 0);
+        valueRect.anchorMax = new Vector2(1, 1);
+        valueRect.sizeDelta = Vector2.zero;
+        valueRect.offsetMin = Vector2.zero;
+        valueRect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI valueTmp = valueObj.AddComponent<TextMeshProUGUI>();
+        valueTmp.text = $"{Mathf.RoundToInt(initialValue / max * 100)}%";
+        valueTmp.fontSize = UIStyleGuide.FontSizeBody;
+        valueTmp.color = UIStyleGuide.ColorTextAccent;
+        valueTmp.alignment = TextAlignmentOptions.MidlineRight;
+
+        // --- Slider ---
+        GameObject sliderObj = CreateUIElement("Slider", container.transform);
+        LayoutElement sliderLe = sliderObj.AddComponent<LayoutElement>();
+        sliderLe.minHeight = 60f;
+        sliderLe.preferredHeight = 60f;
+        sliderLe.flexibleWidth = 1;
+
+        // Track background
+        GameObject trackObj = CreateUIElement("Track", sliderObj.transform);
+        RectTransform trackRect = trackObj.GetComponent<RectTransform>();
+        trackRect.anchorMin = new Vector2(0, 0.3f);
+        trackRect.anchorMax = new Vector2(1, 0.7f);
+        trackRect.sizeDelta = Vector2.zero;
+        trackRect.offsetMin = Vector2.zero;
+        trackRect.offsetMax = Vector2.zero;
+        Image trackImg = trackObj.AddComponent<Image>();
+        trackImg.color = new Color(0.15f, 0.15f, 0.2f, 1f);
+
+        // Fill area
+        GameObject fillAreaObj = CreateUIElement("FillArea", sliderObj.transform);
+        RectTransform fillAreaRect = fillAreaObj.GetComponent<RectTransform>();
+        fillAreaRect.anchorMin = new Vector2(0, 0.3f);
+        fillAreaRect.anchorMax = new Vector2(1, 0.7f);
+        fillAreaRect.sizeDelta = Vector2.zero;
+        fillAreaRect.offsetMin = Vector2.zero;
+        fillAreaRect.offsetMax = Vector2.zero;
+
+        // Fill
+        GameObject fillObj = CreateUIElement("Fill", fillAreaObj.transform);
+        RectTransform fillRect = fillObj.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.sizeDelta = Vector2.zero;
+        Image fillImg = fillObj.AddComponent<Image>();
+        fillImg.color = sliderFill;
+
+        // Handle slide area
+        GameObject handleAreaObj = CreateUIElement("HandleArea", sliderObj.transform);
+        RectTransform handleAreaRect = handleAreaObj.GetComponent<RectTransform>();
+        handleAreaRect.anchorMin = Vector2.zero;
+        handleAreaRect.anchorMax = Vector2.one;
+        handleAreaRect.sizeDelta = Vector2.zero;
+        handleAreaRect.offsetMin = Vector2.zero;
+        handleAreaRect.offsetMax = Vector2.zero;
+
+        // Handle
+        GameObject handleObj = CreateUIElement("Handle", handleAreaObj.transform);
+        RectTransform handleRect = handleObj.GetComponent<RectTransform>();
+        handleRect.sizeDelta = new Vector2(50f, 50f);
+        Image handleImg = handleObj.AddComponent<Image>();
+        handleImg.color = Color.white;
+
+        // Wire up Slider component
+        Slider slider = sliderObj.AddComponent<Slider>();
+        slider.minValue = min;
+        slider.maxValue = max;
+        slider.wholeNumbers = false;
+        slider.targetGraphic = handleImg;
+        slider.fillRect = fillRect;
+        slider.handleRect = handleRect;
+        slider.value = initialValue;
+
+        // Update percentage text + invoke callback on change
+        float capturedMax = max;
+        slider.onValueChanged.AddListener((val) =>
+        {
+            valueTmp.text = $"{Mathf.RoundToInt(val / capturedMax * 100)}%";
+            onValueChanged?.Invoke(val);
+        });
+
+        return slider;
+    }
+
     /// <summary>Add a single button</summary>
     public Button AddButton(string label, Action onClick, Color? buttonColor = null, bool isSmall = false)
     {

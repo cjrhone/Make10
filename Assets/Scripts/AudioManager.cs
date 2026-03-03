@@ -52,10 +52,13 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip comboMergeSFX;           // 2-4 line combo merge sound
     [SerializeField] private AudioClip ultraComboSFX;           // 5-line ultra combo (very rare)
 
-    // Volume state
+    // Volume state (public read for UI, private write via setters)
     private float musicVolume;
     private float sfxVolume;
     private float voiceVolume;
+
+    public float MusicVolume => musicVolume;
+    public float SFXVolume => sfxVolume;
     
     // PlayerPrefs keys
     private const string MUSIC_VOL_KEY = "MusicVolume";
