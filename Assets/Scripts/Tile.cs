@@ -35,6 +35,11 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     [SerializeField] private float floatAmount = 8f; // How much the tile floats up/down
     [SerializeField] private float floatSpeed = 3f; // Speed of floating animation
 
+    [Header("Shine Overlay")]
+    [SerializeField] private Sprite shineSprite; // Assign tile_shine_overlay in Inspector
+    [SerializeField] [Range(0f, 1f)] private float shineOpacity = 0.5f; // Crank to 1.0 to debug visibility
+    private Image shineImage;
+
     [Header("Enhanced Glow Settings")]
     [SerializeField] private float glowPulseSpeed = 2f;
     [SerializeField] private float glowMinAlpha = 0.3f;
@@ -149,6 +154,13 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             backgroundImage = GetComponent<Image>();
         }
 
+        // Add Mask so child overlays (shine, glow) clip to the rounded tile shape
+        if (GetComponent<Mask>() == null)
+        {
+            Mask mask = gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = true; // Still render the background image itself
+        }
+
         if (numberText == null)
         {
             numberText = GetComponentInChildren<TMP_Text>(true);
@@ -169,11 +181,45 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
             CreateEnhancedGlow();
         }
 
+        // Create shine overlay (above background, below number)
+        if (shineImage == null)
+        {
+            CreateShineOverlay();
+        }
+
         // Create shadow text for enhanced numbers
         if (shadowText == null && numberText != null)
         {
             CreateShadowText();
         }
+    }
+
+    /// <summary>
+    /// Creates a procedural shine overlay — a gloss gradient covering the top
+    /// portion of the tile, drawn above the background but below the number text.
+    /// Uses GlowTextureGenerator so there's no external sprite dependency.
+    /// </summary>
+    private void CreateShineOverlay()
+    {
+        GameObject shineObj = new GameObject("ShineOverlay");
+        shineObj.transform.SetParent(transform, false);
+
+        // Place it after the glow but before shadow/number text
+        shineObj.transform.SetSiblingIndex(enhancedGlowImage != null
+            ? enhancedGlowImage.transform.GetSiblingIndex() + 1 : 0);
+
+        RectTransform shineRT = shineObj.AddComponent<RectTransform>();
+        // Stretch to fill the entire tile
+        shineRT.anchorMin = Vector2.zero;
+        shineRT.anchorMax = Vector2.one;
+        shineRT.offsetMin = Vector2.zero;
+        shineRT.offsetMax = Vector2.zero;
+
+        shineImage = shineObj.AddComponent<Image>();
+        // Procedural shine: top-half gloss gradient, no external sprite needed
+        GlowTextureGenerator.ApplyShine(shineImage, 64, 0.45f);
+        shineImage.color = new Color(1f, 1f, 1f, shineOpacity);
+        shineImage.raycastTarget = false;
     }
 
     /// <summary>
@@ -465,6 +511,23 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
         if (shadowText != null)
         {
             shadowText.transform.localScale = Vector3.one * numberScale;
+        }
+    }
+
+    /// <summary>
+    /// Fades all overlay child images (shine, glow) by a 0–1 factor.
+    /// Call during convergence/destroy animations so overlays don't linger.
+    /// Does NOT touch backgroundImage or numberText (caller handles those).
+    /// Factor of 1 = full original opacity, 0 = fully transparent.
+    /// </summary>
+    public void SetOverlayAlpha(float factor)
+    {
+        if (shineImage != null)
+            shineImage.color = new Color(shineImage.color.r, shineImage.color.g, shineImage.color.b, shineOpacity * factor);
+        if (enhancedGlowImage != null && enhancedGlowImage.gameObject.activeSelf)
+        {
+            Color c = enhancedGlowImage.color;
+            enhancedGlowImage.color = new Color(c.r, c.g, c.b, factor);
         }
     }
 

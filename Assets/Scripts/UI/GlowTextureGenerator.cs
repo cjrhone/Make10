@@ -177,6 +177,92 @@ public static class GlowTextureGenerator
         image.preserveAspect = true;
     }
 
+    // ==========================================
+    // TILE SHINE (top-half gloss gradient)
+    // ==========================================
+
+    private static Dictionary<int, Sprite> cachedShineSprites = new Dictionary<int, Sprite>();
+
+    /// <summary>
+    /// Get or create a tile shine sprite — a horizontal gloss band across the
+    /// top portion of the tile that fades to transparent below the midpoint.
+    /// Gives tiles a classic Nintendo / candy-tile glossy look.
+    /// </summary>
+    /// <param name="width">Texture width in pixels</param>
+    /// <param name="height">Texture height in pixels</param>
+    /// <param name="coverage">How far down the tile the shine extends (0.0–1.0, default 0.45)</param>
+    public static Sprite GetShineSprite(int width = 64, int height = 64, float coverage = 0.45f)
+    {
+        int cacheKey = width * 10000 + height * 10 + (int)(coverage * 100);
+        if (cachedShineSprites.TryGetValue(cacheKey, out Sprite cached))
+            return cached;
+
+        Texture2D texture = CreateShineTexture(width, height, coverage);
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0, 0, width, height),
+            new Vector2(0.5f, 0.5f),
+            100f
+        );
+        sprite.name = $"TileShine_{width}x{height}_{coverage:F2}";
+        cachedShineSprites[cacheKey] = sprite;
+        return sprite;
+    }
+
+    /// <summary>
+    /// Creates a top-to-bottom gloss gradient texture.
+    /// Full white at the very top, fading smoothly to fully transparent
+    /// at the coverage boundary. Below coverage = fully transparent.
+    /// </summary>
+    private static Texture2D CreateShineTexture(int width, int height, float coverage)
+    {
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[width * height];
+
+        for (int y = 0; y < height; y++)
+        {
+            // UV: y=0 is bottom of texture, y=height-1 is top
+            float normalizedY = (float)y / (height - 1); // 0 = bottom, 1 = top
+
+            float alpha;
+            if (normalizedY >= (1f - coverage))
+            {
+                // In the shine zone (top portion of tile)
+                // Map from coverage boundary to top: 0→1
+                float t = (normalizedY - (1f - coverage)) / coverage;
+                // Smooth cubic falloff: strongest at top, fading toward boundary
+                alpha = t * t * (3f - 2f * t); // smoothstep
+            }
+            else
+            {
+                alpha = 0f;
+            }
+
+            for (int x = 0; x < width; x++)
+            {
+                pixels[y * width + x] = new Color(1f, 1f, 1f, alpha);
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return texture;
+    }
+
+    /// <summary>
+    /// Apply a shine sprite to an Image component.
+    /// </summary>
+    public static void ApplyShine(Image image, int textureSize = 64, float coverage = 0.45f)
+    {
+        if (image == null) return;
+        image.sprite = GetShineSprite(textureSize, textureSize, coverage);
+        image.type = Image.Type.Simple;
+        image.preserveAspect = false; // Stretch to fill tile
+    }
+
     /// <summary>
     /// Clear the texture cache (call on scene unload if needed).
     /// </summary>
@@ -201,5 +287,15 @@ public static class GlowTextureGenerator
             }
         }
         cachedDiamondGlowSprites.Clear();
+
+        foreach (var sprite in cachedShineSprites.Values)
+        {
+            if (sprite != null && sprite.texture != null)
+            {
+                Object.Destroy(sprite.texture);
+                Object.Destroy(sprite);
+            }
+        }
+        cachedShineSprites.Clear();
     }
 }

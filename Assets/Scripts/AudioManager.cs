@@ -12,8 +12,15 @@ public class AudioManager : MonoBehaviour
     
     [Header("Audio Sources")]
     [SerializeField] private AudioSource musicSource;
-    [SerializeField] private AudioSource sfxSource;
+    [SerializeField] private AudioSource sfxSource; // Kept for Inspector wiring — seeds sfxPool[0]
     [SerializeField] private AudioSource voiceSource;
+    private AudioSource timeWarningSource; // Dedicated source so looping warning doesn't block SFX
+
+    // SFX pool: round-robin to avoid pitch contamination and polyphony stacking
+    private const int SFX_POOL_SIZE = 4;
+    private AudioSource[] sfxPool;
+    private int sfxPoolIndex = 0;
+
     
     [Header("Volume Defaults")]
     [Range(0f, 1f)] [SerializeField] private float defaultMusicVolume = 0.7f;
@@ -75,6 +82,20 @@ public class AudioManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Create dedicated AudioSource for time warning so it never blocks SFX
+        timeWarningSource = gameObject.AddComponent<AudioSource>();
+        timeWarningSource.playOnAwake = false;
+
+        // Build SFX pool: slot 0 is the Inspector-wired sfxSource, rest are cloned
+        sfxPool = new AudioSource[SFX_POOL_SIZE];
+        sfxPool[0] = sfxSource;
+        for (int i = 1; i < SFX_POOL_SIZE; i++)
+        {
+            sfxPool[i] = gameObject.AddComponent<AudioSource>();
+            sfxPool[i].playOnAwake = false;
+        }
+
         LoadVolumeSettings();
     }
     
@@ -113,8 +134,18 @@ public class AudioManager : MonoBehaviour
     private void ApplyVolumeSettings()
     {
         if (musicSource != null) musicSource.volume = musicVolume;
-        if (sfxSource != null) sfxSource.volume = sfxVolume;
+        ApplySFXPoolVolume(sfxVolume);
+        if (timeWarningSource != null) timeWarningSource.volume = sfxVolume;
         if (voiceSource != null) voiceSource.volume = voiceVolume;
+    }
+
+    private void ApplySFXPoolVolume(float volume)
+    {
+        if (sfxPool == null) return;
+        for (int i = 0; i < sfxPool.Length; i++)
+        {
+            if (sfxPool[i] != null) sfxPool[i].volume = volume;
+        }
     }
     
     private void SetupSliders()
@@ -161,7 +192,8 @@ public class AudioManager : MonoBehaviour
     public void SetSFXVolume(float volume)
     {
         sfxVolume = volume;
-        if (sfxSource != null) sfxSource.volume = volume;
+        ApplySFXPoolVolume(volume);
+        if (timeWarningSource != null) timeWarningSource.volume = volume;
         SaveVolumeSettings();
         PlayButtonClick(); // Test sound
     }
@@ -211,16 +243,27 @@ public class AudioManager : MonoBehaviour
     #endregion
     
     #region SFX Playback
-    
+
+    /// <summary>
+    /// Get the next AudioSource from the round-robin pool.
+    /// Each concurrent sound gets its own source, preventing pitch contamination.
+    /// </summary>
+    private AudioSource GetNextSFXSource()
+    {
+        sfxPoolIndex = (sfxPoolIndex + 1) % SFX_POOL_SIZE;
+        return sfxPool[sfxPoolIndex];
+    }
+
     private void PlaySFX(AudioClip clip)
     {
-        if (sfxSource != null && clip != null)
-        {
-            sfxSource.pitch = 1f; // Reset pitch so normal SFX aren't affected by chain pitch shifts
-            sfxSource.PlayOneShot(clip, sfxVolume);
-        }
+        if (clip == null) return;
+        AudioSource source = GetNextSFXSource();
+        if (source == null) return;
+
+        source.pitch = 1f;
+        source.PlayOneShot(clip, sfxVolume);
     }
-    
+
     // One-liner SFX methods
     public void PlayButtonClick() => PlaySFX(buttonClickSFX);
     public void PlayConvergenceSound() => PlaySFX(convergenceSFX);
@@ -230,16 +273,17 @@ public class AudioManager : MonoBehaviour
     /// <summary>
     /// Play the "10" pop sound with pitch shifting for cascade chains.
     /// chainCount 1 = normal pitch, 2+ = incrementally higher (capped at 1.5).
+    /// Each call gets its own pooled AudioSource so pitch doesn't bleed.
     /// </summary>
     public void PlayTenPopSound(int chainCount)
     {
-        if (sfxSource != null && tenPopSFX != null)
-        {
-            // Pitch ramp: 1.0 base, +0.08 per cascade level, capped at 1.5
-            float pitch = Mathf.Min(1.0f + (chainCount - 1) * 0.08f, 1.5f);
-            sfxSource.pitch = pitch;
-            sfxSource.PlayOneShot(tenPopSFX, sfxVolume);
-        }
+        if (tenPopSFX == null) return;
+        AudioSource source = GetNextSFXSource();
+        if (source == null) return;
+
+        float pitch = Mathf.Min(1.0f + (chainCount - 1) * 0.08f, 1.5f);
+        source.pitch = pitch;
+        source.PlayOneShot(tenPopSFX, sfxVolume);
     }
     public void PlaySwapSound() => PlaySFX(swapSFX);
     public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);
@@ -248,8 +292,10 @@ public class AudioManager : MonoBehaviour
     public void PlayTileSelect() => PlaySFX(tileSelectSFX);
     public void PlayFinishSound() => PlaySFX(finishSFX);
     public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
+
     public void PlayScoreTickSmall() => PlaySFX(scoreTickSmallSFX);
     public void PlayScoreTickBig() => PlaySFX(scoreTickBigSFX);
+
     public void PlayComboSound() => PlaySFX(comboMergeSFX);
     public void PlayUltraComboSound() => PlaySFX(ultraComboSFX);
 
@@ -259,20 +305,21 @@ public class AudioManager : MonoBehaviour
     
     public void StartTimeWarning()
     {
-        if (sfxSource == null || timeWarningSFX == null || sfxSource.isPlaying) return;
-        
-        sfxSource.clip = timeWarningSFX;
-        sfxSource.loop = true;
-        sfxSource.Play();
+        if (timeWarningSource == null || timeWarningSFX == null || timeWarningSource.isPlaying) return;
+
+        timeWarningSource.clip = timeWarningSFX;
+        timeWarningSource.loop = true;
+        timeWarningSource.volume = sfxVolume;
+        timeWarningSource.Play();
     }
-    
+
     public void StopTimeWarning()
     {
-        if (sfxSource == null || sfxSource.clip != timeWarningSFX) return;
-        
-        sfxSource.Stop();
-        sfxSource.loop = false;
-        sfxSource.clip = null;
+        if (timeWarningSource == null || timeWarningSource.clip != timeWarningSFX) return;
+
+        timeWarningSource.Stop();
+        timeWarningSource.loop = false;
+        timeWarningSource.clip = null;
     }
     
     #endregion

@@ -1115,10 +1115,11 @@ public class GridManager : MonoBehaviour
                 tile.transform.localScale = Vector3.one * scale;
                 tile.transform.localEulerAngles = new Vector3(0, 0, easedT * 180f);
 
-                // Fade tile background
+                // Fade tile background and overlays (shine, glow)
                 Image img = tile.GetComponent<Image>();
                 if (img != null)
                     img.color = new Color(0.85f, 0.85f, 0.85f, 1f - easedT);
+                tile.SetOverlayAlpha(1f - easedT);
             }
 
             // Merge tile: subtle grow pulse during convergence
@@ -1434,6 +1435,7 @@ public class GridManager : MonoBehaviour
 
                     rt.anchoredPosition = originalPos + new Vector2(shake, -fallDistance);
 
+                    // Fade tile background and overlays (shine, glow)
                     Image img = tile.GetComponent<Image>();
                     if (img != null)
                     {
@@ -1441,6 +1443,7 @@ public class GridManager : MonoBehaviour
                         c.a = 1f - t;
                         img.color = c;
                     }
+                    tile.SetOverlayAlpha(1f - t);
 
                     tile.transform.localScale = Vector3.one * (1f - t * 0.3f);
                 }
@@ -1603,10 +1606,12 @@ public class GridManager : MonoBehaviour
                     tile.transform.localScale = Vector3.one * scale;
                     tile.transform.localEulerAngles = new Vector3(0, 0, easedT * 180f);
                     
+                    // Fade tile background and overlays (shine, glow)
                     Image img = tile.GetComponent<Image>();
                     if (img != null)
                         img.color = new Color(0.85f, 0.85f, 0.85f, 1f - easedT);
-                    
+                    tile.SetOverlayAlpha(1f - easedT);
+
                     TMPro.TMP_Text numText = tile.GetComponentInChildren<TMPro.TMP_Text>();
                     if (numText != null && originalTextColors.ContainsKey(tile))
                     {

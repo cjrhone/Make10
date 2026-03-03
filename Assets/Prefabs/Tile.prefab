@@ -98,6 +98,8 @@ MonoBehaviour:
   pulseSpeed: 4
   floatAmount: 8
   floatSpeed: 3
+  shineSprite: {fileID: 0}
+  shineOpacity: 0.45
   glowPulseSpeed: 2
   glowMinAlpha: 0.3
   glowMaxAlpha: 0.7
