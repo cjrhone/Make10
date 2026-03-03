@@ -248,10 +248,18 @@ public class UIManager : MonoBehaviour
         SetActiveIfNotNull(winScreen, false);
         SetActiveIfNotNull(finishTextObject, false);
         SetActiveIfNotNull(unsolvablePopup, false);
-        SetActiveIfNotNull(multiplierPanel, true);
+        // Zen mode: hide multiplier panel and label entirely (flat scoring, no multiplier)
+        bool isZen = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen;
+        SetActiveIfNotNull(multiplierPanel, !isZen);
+        // Also hide the "Multiplier" label (sibling of multiplierPanel on StatsPanelBG)
+        if (isZen && multiplierPanel != null && multiplierPanel.transform.parent != null)
+        {
+            Transform label = multiplierPanel.transform.parent.Find("Multiplier");
+            if (label != null) label.gameObject.SetActive(false);
+        }
 
-        // Initialize multiplier display to x1.00
-        if (multiplierValueText != null)
+        // Initialize multiplier display to x1.00 (Arcade only)
+        if (!isZen && multiplierValueText != null)
         {
             multiplierValueText.text = "x1.00";
             multiplierValueText.transform.localScale = Vector3.one;
@@ -282,20 +290,11 @@ public class UIManager : MonoBehaviour
                 timerSlider.value = gameManager.GameDuration;
             }
 
-            if (multiplierSlider != null)
+            // Arcade: initialize multiplier slider (Zen has no multiplier panel)
+            if (!isZen && multiplierSlider != null)
             {
-                if (gameManager.CurrentMode == GameManager.GameMode.Arcade)
-                {
-                    // Arcade: bar fills UP from 0 to barMax (100)
-                    multiplierSlider.maxValue = gameManager.MultiplierBarMax;
-                    multiplierSlider.value = 0f;
-                }
-                else
-                {
-                    // Zen: legacy drain-down timer
-                    multiplierSlider.maxValue = gameManager.MultiplierDuration;
-                    multiplierSlider.value = gameManager.MultiplierDuration;
-                }
+                multiplierSlider.maxValue = gameManager.MultiplierBarMax;
+                multiplierSlider.value = 0f;
             }
         }
 
@@ -481,7 +480,7 @@ public class UIManager : MonoBehaviour
             UIStyleGuide.ColorButtonSecondary, startY - (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             () => SceneFlowManager.Instance?.OnPauseOptionsPressed());
 
-        CreatePauseButton(contentContainer.transform, "MainMenuButton", "Main Menu",
+        CreatePauseButton(contentContainer.transform, "MainMenuButton", "Save & Quit",
             UIStyleGuide.ColorButtonDanger, startY - 2 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
             () => SceneFlowManager.Instance?.OnPauseMainMenuPressed());
 
@@ -851,6 +850,9 @@ public class UIManager : MonoBehaviour
     {
         if (multiplierPanel == null) return;
 
+        // Zen mode: multiplier panel is hidden, skip all updates
+        if (gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen) return;
+
         if (active)
         {
             if (!multiplierPanel.activeSelf)
@@ -893,32 +895,17 @@ public class UIManager : MonoBehaviour
                 lastMultiplierValue = multiplier;
             }
 
-            // Timer text: show bar value in Arcade, seconds in Zen
+            // Timer text: show bar value (Arcade only — Zen early-returns above)
             if (multiplierTimerText != null)
             {
-                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
-                if (isArcade)
-                    multiplierTimerText.text = $"{Mathf.RoundToInt(barOrTimer)}";
-                else
-                    multiplierTimerText.text = $"{barOrTimer:F1}s";
+                multiplierTimerText.text = $"{Mathf.RoundToInt(barOrTimer)}";
             }
 
-            // Fill color: ramp based on bar fill (Arcade) or timer remaining (Zen)
+            // Fill color: cool→hot based on bar fill percentage (Arcade only)
             if (multiplierFillImage != null && !enableHotStreak)
             {
-                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
-                if (isArcade)
-                {
-                    // Cool→hot based on bar fill percentage
-                    float fillPct = barOrTimer / (gameManager?.MultiplierBarMax ?? 100f);
-                    multiplierFillImage.color = Color.Lerp(multiplierLowColor, multiplierFullColor, fillPct);
-                }
-                else
-                {
-                    multiplierFillImage.color = barOrTimer <= multiplierLowThreshold
-                        ? Color.Lerp(multiplierLowColor, multiplierFullColor, barOrTimer / multiplierLowThreshold)
-                        : multiplierFullColor;
-                }
+                float fillPct = barOrTimer / (gameManager?.MultiplierBarMax ?? 100f);
+                multiplierFillImage.color = Color.Lerp(multiplierLowColor, multiplierFullColor, fillPct);
             }
 
             // Update hot streak intensity as multiplier grows
@@ -938,12 +925,10 @@ public class UIManager : MonoBehaviour
                 multiplierValueText.color = multiplierTextCoolColor;
             }
 
-            // Reset slider to 0 in Arcade (bar empty), keep as-is in Zen
+            // Reset slider to 0 (bar empty) — Arcade only, Zen early-returns above
             if (multiplierSlider != null)
             {
-                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
-                if (isArcade)
-                    multiplierSlider.value = 0f;
+                multiplierSlider.value = 0f;
             }
 
             lastMultiplierValue = 1f;
@@ -2106,9 +2091,16 @@ public class UIManager : MonoBehaviour
         DeactivateHotStreak();
         CleanupHotStreakMode();
 
-        // Reset multiplier display to x1.00 (keep panel visible)
-        SetActiveIfNotNull(multiplierPanel, true);
-        if (multiplierValueText != null)
+        // Reset multiplier display (Zen: hidden, Arcade: show x1.00)
+        bool isZen = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Zen;
+        SetActiveIfNotNull(multiplierPanel, !isZen);
+        // Hide "Multiplier" label in Zen
+        if (isZen && multiplierPanel != null && multiplierPanel.transform.parent != null)
+        {
+            Transform label = multiplierPanel.transform.parent.Find("Multiplier");
+            if (label != null) label.gameObject.SetActive(false);
+        }
+        if (!isZen && multiplierValueText != null)
         {
             multiplierValueText.text = "x1.00";
             multiplierValueText.transform.localScale = Vector3.one;

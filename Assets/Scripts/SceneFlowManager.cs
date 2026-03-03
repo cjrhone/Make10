@@ -1210,7 +1210,7 @@ public class SceneFlowManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Main Menu button pressed from pause menu — quits current game.
+    /// "Save & Quit" button pressed from pause menu — saves Zen state and returns to main menu.
     /// </summary>
     public void OnPauseMainMenuPressed()
     {

@@ -192,18 +192,18 @@ public class TutorialBuilder : MonoBehaviour
         tutorial2Popup.AddDivider(UIStyleGuide.ColorBorder);
         tutorial2Popup.AddSpacer(8);
 
-        // Multiplier section
+        // Multiplier section (Arcade)
         tutorial2Popup.AddSubheading("MULTIPLIER", UIStyleGuide.ColorTextAccent);
         tutorial2Popup.AddSpacer(5);
-        tutorial2Popup.AddBody("Chain solves to build your multiplier\nfrom \u00d71.25 up to \u00d73.00");
+        tutorial2Popup.AddBody("Solve quickly to fill the multiplier bar\nand boost your score up to \u00d75!");
 
         tutorial2Popup.AddSpacer(10);
 
-        // Hot Streak section
+        // Hot Streak section (Arcade)
         Color hotStreakColor = new Color(1f, 0.5f, 0.15f); // Orange
         tutorial2Popup.AddSubheading("HOT STREAK", hotStreakColor);
         tutorial2Popup.AddSpacer(5);
-        tutorial2Popup.AddBody("Push past \u00d73 to trigger Hot Streak!\n10 seconds of \u00d75 scoring");
+        tutorial2Popup.AddBody("Fill the bar to trigger Hot Streak!\n15 seconds of \u00d75 scoring");
 
         tutorial2Popup.AddSpacer(10);
 
