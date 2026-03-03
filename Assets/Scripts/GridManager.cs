@@ -1304,7 +1304,7 @@ public class GridManager : MonoBehaviour
                     tileValues.Add(tile.Value);
             }
 
-            yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result));
+            yield return StartCoroutine(AnimateSolveSequence(result.allMatchedTiles, result, cascadeCount));
 
             ClearMatchedTiles(result.allMatchedTiles);
 
@@ -1532,17 +1532,26 @@ public class GridManager : MonoBehaviour
         StartCoroutine(ProcessMatchesCoroutine());
     }
     
-    private IEnumerator AnimateSolveSequence(HashSet<Tile> tiles, MatchResult result)
+    private IEnumerator AnimateSolveSequence(HashSet<Tile> tiles, MatchResult result, int cascadeCount = 1)
     {
         if (GameManager.Instance != null)
             GameManager.Instance.IsSolveAnimationPlaying = true;
-        
+
+        // Arcade cascade speed ramp: each cascade level plays faster (floor at 60% of original)
+        float speedScale = 1f;
+        if (cascadeCount >= 2 && GameManager.Instance != null
+            && GameManager.Instance.CurrentMode == GameManager.GameMode.Arcade)
+        {
+            // cascadeCount 2 = 0.85x, 3 = 0.72x, 4 = 0.61x, 5+ = 0.60x (floor)
+            speedScale = Mathf.Max(0.60f, Mathf.Pow(0.85f, cascadeCount - 1));
+        }
+
         // Fire beam flash (non-blocking — animates on its own, overlaps with convergence)
         if (GridVFX.Instance != null)
             StartCoroutine(GridVFX.Instance.PlayLineSweeps(result, tileSize, tileSpacing));
 
         // Brief pause so the beam burst registers visually before convergence starts
-        yield return new WaitForSeconds(0.08f);
+        yield return new WaitForSeconds(0.08f * speedScale);
 
         // Trigger avatar solve animation immediately when converge starts
         AvatarManager.Instance?.OnSolve();
@@ -1564,12 +1573,13 @@ public class GridManager : MonoBehaviour
                     originalTextColors[tile] = numText.color;
             }
         }
-        
+
+        float scaledConvergeDuration = solveConvergeDuration * speedScale;
         float elapsed = 0f;
-        while (elapsed < solveConvergeDuration)
+        while (elapsed < scaledConvergeDuration)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / solveConvergeDuration;
+            float t = elapsed / scaledConvergeDuration;
             float easedT = t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
             
             foreach (Tile tile in tiles)
@@ -1614,11 +1624,21 @@ public class GridManager : MonoBehaviour
         // === Chain tracking, SFX, and shake — done ONCE regardless of match count ===
         int consecutiveCount = gridValidation.RegisterMatch();
 
-        AudioManager.Instance?.PlayTenPopSound(consecutiveCount);
+        // Pass cascadeCount for pitch shifting (ramps up during cascade chains)
+        AudioManager.Instance?.PlayTenPopSound(cascadeCount);
         if (GridVFX.Instance != null)
         {
             GridVFX.Instance.TriggerShake(consecutiveCount);
             GridVFX.Instance.PulseAmbientParticles();
+        }
+
+        // Compute cascade BP for popup display (Arcade cascades only)
+        // NextCascadeBP reads the counter before it increments in OnMatchCleared
+        int cascadeBP = 0;
+        if (cascadeCount >= 2 && GameManager.Instance != null
+            && GameManager.Instance.CurrentMode == GameManager.GameMode.Arcade)
+        {
+            cascadeBP = GameManager.Instance.NextCascadeBP;
         }
 
         // Spawn popup + explosion for matched lines, with per-line sums
@@ -1627,14 +1647,14 @@ public class GridManager : MonoBehaviour
         {
             // Single match — full "10" popup animation at convergence center
             int singleSum = lineData.Count > 0 ? lineData[0].sum : 10;
-            yield return StartCoroutine(ShowTenEffectSpectacular(centerPos, singleSum));
+            yield return StartCoroutine(ShowTenEffectSpectacular(centerPos, singleSum, cascadeBP));
         }
         else
         {
             // Multiple simultaneous matches — skip individual popups, go straight to combo merge.
             // PlayComboMerge handles everything: spawning numbers, flying them inward,
             // showing the combined total, and particle explosions — all within ~0.55s
-            yield return StartCoroutine(PlayComboMerge(lineData));
+            yield return StartCoroutine(PlayComboMerge(lineData, cascadeBP));
         }
 
         if (GameManager.Instance != null)
@@ -1711,7 +1731,7 @@ public class GridManager : MonoBehaviour
         return data;
     }
     
-    private IEnumerator ShowTenEffectSpectacular(Vector2 position, int lineSum = 10)
+    private IEnumerator ShowTenEffectSpectacular(Vector2 position, int lineSum = 10, int cascadeBP = 0)
     {
         // Chain tracking, SFX, and shake are handled in AnimateSolveSequence (once per cascade).
         // This method now only handles the visual popup + particle explosion per position.
@@ -1726,6 +1746,11 @@ public class GridManager : MonoBehaviour
 
         List<GameObject> effectObjects = new List<GameObject>();
 
+        // Cascade mode: show "+N" instead of the line sum (e.g. "+1", "+2")
+        bool isCascadePopup = cascadeBP > 0;
+        string displayText = isCascadePopup ? $"+{cascadeBP}" : lineSum.ToString();
+        float fontScale = isCascadePopup ? 0.6f : 1f; // Smaller text for cascade BP
+
         GameObject tenObj = new GameObject("TenEffect_Main");
         tenObj.transform.SetParent(gridContainer, false);
         effectObjects.Add(tenObj);
@@ -1735,22 +1760,25 @@ public class GridManager : MonoBehaviour
         tenRT.sizeDelta = new Vector2(280f * scaleFactor * tenScale, 170f * scaleFactor * tenScale);
 
         TMPro.TMP_Text tenText = tenObj.AddComponent<TMPro.TextMeshProUGUI>();
-        tenText.text = lineSum.ToString();
-        tenText.fontSize = 120 * scaleFactor * tenScale;
+        tenText.text = displayText;
+        tenText.fontSize = 120 * scaleFactor * tenScale * fontScale;
         tenText.fontStyle = TMPro.FontStyles.Bold;
         tenText.alignment = TMPro.TextAlignmentOptions.Center;
 
-        // Color tinting based on sum value
-        Color sumColor = GetSumColor(lineSum);
+        // Color tinting: cascade uses white, normal uses sum-based color
+        Color sumColor = isCascadePopup ? new Color(1f, 1f, 1f, 0.95f) : GetSumColor(lineSum);
         tenText.color = sumColor;
-        tenText.enableVertexGradient = true;
-        Color sumColorLight = Color.Lerp(sumColor, Color.white, 0.5f);
-        tenText.colorGradient = new TMPro.VertexGradient(
-            sumColorLight,
-            sumColorLight,
-            sumColor,
-            sumColor
-        );
+        if (!isCascadePopup)
+        {
+            tenText.enableVertexGradient = true;
+            Color sumColorLight = Color.Lerp(sumColor, Color.white, 0.5f);
+            tenText.colorGradient = new TMPro.VertexGradient(
+                sumColorLight,
+                sumColorLight,
+                sumColor,
+                sumColor
+            );
+        }
 
         GameObject glowObj = new GameObject("TenEffect_Glow");
         glowObj.transform.SetParent(gridContainer, false);
@@ -1762,10 +1790,10 @@ public class GridManager : MonoBehaviour
         glowRT.sizeDelta = new Vector2(280f * scaleFactor * tenScale, 170f * scaleFactor * tenScale);
 
         TMPro.TMP_Text glowText = glowObj.AddComponent<TMPro.TextMeshProUGUI>();
-        glowText.text = lineSum.ToString();
-        glowText.fontSize = 130 * scaleFactor * tenScale;
+        glowText.text = displayText;
+        glowText.fontSize = 130 * scaleFactor * tenScale * fontScale;
         glowText.fontStyle = TMPro.FontStyles.Bold;
-        Color glowColor = GetSumColor(lineSum);
+        Color glowColor = isCascadePopup ? Color.white : GetSumColor(lineSum);
         glowText.color = new Color(glowColor.r, glowColor.g, glowColor.b, 0.4f);
         glowText.alignment = TMPro.TextAlignmentOptions.Center;
         
@@ -1819,23 +1847,23 @@ public class GridManager : MonoBehaviour
         
         tenObj.transform.localScale = Vector3.zero;
         glowObj.transform.localScale = Vector3.zero;
-        
+
         float popDuration = 0.12f;
         float elapsed = 0f;
-        
+
         while (elapsed < popDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / popDuration;
             float overshoot = 1f + Mathf.Sin(t * Mathf.PI) * 0.3f;
             float scale = Mathf.Lerp(0f, 1f, t) * overshoot;
-            
+
             tenObj.transform.localScale = Vector3.one * scale;
             glowObj.transform.localScale = Vector3.one * scale * 1.3f;
-            
+
             yield return null;
         }
-        
+
         tenObj.transform.localScale = Vector3.one;
         glowObj.transform.localScale = Vector3.one * 1.2f;
         
@@ -1867,7 +1895,7 @@ public class GridManager : MonoBehaviour
             
             float textAlpha = t < 0.6f ? 1f : Mathf.Lerp(1f, 0f, (t - 0.6f) / 0.4f);
             tenText.color = new Color(startColor.r, startColor.g, startColor.b, textAlpha);
-            
+
             foreach (var (sRT, sImg, vel, rotSpd) in sparkles)
             {
                 if (sRT == null) continue;
@@ -1948,7 +1976,7 @@ public class GridManager : MonoBehaviour
     /// shows the merged total, and fires particle explosions. Total duration ~0.55s (matching single match).
     /// For 5+ line ultra combos, timing is slightly extended with extra VFX.
     /// </summary>
-    private IEnumerator PlayComboMerge(List<(Vector2 center, int sum)> lineData)
+    private IEnumerator PlayComboMerge(List<(Vector2 center, int sum)> lineData, int cascadeBP = 0)
     {
         int lineCount = lineData.Count;
         int totalSum = 0;
@@ -1956,7 +1984,21 @@ public class GridManager : MonoBehaviour
             totalSum += sum;
 
         bool isUltraCombo = lineCount >= 5;
-        string displayText = isUltraCombo ? "1000" : totalSum.ToString();
+        bool isCascadeCombo = cascadeBP > 0 && !isUltraCombo;
+
+        // Cascade combo: show total cascade BP for all lines in this step
+        string displayText;
+        if (isCascadeCombo)
+        {
+            int totalCascadeBP = 0;
+            for (int i = 0; i < lineCount; i++)
+                totalCascadeBP += cascadeBP + i;
+            displayText = $"+{totalCascadeBP}";
+        }
+        else
+        {
+            displayText = isUltraCombo ? "1000" : totalSum.ToString();
+        }
 
         // Play combo sound immediately
         if (isUltraCombo)
@@ -2039,16 +2081,21 @@ public class GridManager : MonoBehaviour
 
         TMPro.TMP_Text finalTxt = finalObj.AddComponent<TMPro.TextMeshProUGUI>();
         finalTxt.text = displayText;
-        float finalFontSize = isUltraCombo ? 160f : 130f;
+        float finalFontSize = isCascadeCombo ? 80f : (isUltraCombo ? 160f : 130f);
         finalTxt.fontSize = finalFontSize * scaleFactor;
         finalTxt.fontStyle = TMPro.FontStyles.Bold;
         finalTxt.alignment = TMPro.TextAlignmentOptions.Center;
 
-        Color comboColor = isUltraCombo ? new Color(1f, 0.15f, 0.15f, 1f) : GetComboColor(lineCount);
+        Color comboColor = isCascadeCombo
+            ? new Color(1f, 1f, 1f, 0.95f)
+            : (isUltraCombo ? new Color(1f, 0.15f, 0.15f, 1f) : GetComboColor(lineCount));
         finalTxt.color = comboColor;
-        finalTxt.enableVertexGradient = true;
-        Color comboLight = Color.Lerp(comboColor, Color.white, 0.5f);
-        finalTxt.colorGradient = new TMPro.VertexGradient(comboLight, comboLight, comboColor, comboColor);
+        if (!isCascadeCombo)
+        {
+            finalTxt.enableVertexGradient = true;
+            Color comboLight = Color.Lerp(comboColor, Color.white, 0.5f);
+            finalTxt.colorGradient = new TMPro.VertexGradient(comboLight, comboLight, comboColor, comboColor);
+        }
 
         // Glow behind merged number
         GameObject finalGlow = new GameObject("ComboMergedGlow");

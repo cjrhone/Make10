@@ -228,11 +228,18 @@ public class AudioManager : MonoBehaviour
     public void PlayMatchSound() => PlayTenPopSound(1); // Legacy alias for compatibility
 
     /// <summary>
-    /// Play the "10" pop sound. Chain count accepted for API compatibility but pitch is fixed at 1.0.
+    /// Play the "10" pop sound with pitch shifting for cascade chains.
+    /// chainCount 1 = normal pitch, 2+ = incrementally higher (capped at 1.5).
     /// </summary>
     public void PlayTenPopSound(int chainCount)
     {
-        PlaySFX(tenPopSFX);
+        if (sfxSource != null && tenPopSFX != null)
+        {
+            // Pitch ramp: 1.0 base, +0.08 per cascade level, capped at 1.5
+            float pitch = Mathf.Min(1.0f + (chainCount - 1) * 0.08f, 1.5f);
+            sfxSource.pitch = pitch;
+            sfxSource.PlayOneShot(tenPopSFX, sfxVolume);
+        }
     }
     public void PlaySwapSound() => PlaySFX(swapSFX);
     public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);

@@ -183,6 +183,11 @@ public class GameManager : MonoBehaviour
     // Speed bonus tracking
     private float lastPlayerSolveTime = -999f;
 
+    // Arcade cascade scoring: increments per line cleared during a cascade chain
+    private int cascadeLineCounter = 0;
+    /// <summary>Next cascade line BP that will be awarded (counter + 1, since it hasn't incremented yet).</summary>
+    public int NextCascadeBP => cascadeLineCounter + 1;
+
     // Session time tracking (wall-clock, independent of countdown timer)
     private float sessionStartTime;
     private float lastSessionDuration;
@@ -488,6 +493,7 @@ public class GameManager : MonoBehaviour
     public void OnCascadeStart()
     {
         IsProcessing = true;
+        cascadeLineCounter = 0; // Reset cascade line counter at start of each chain
     }
     
     public void OnCascadeEnd()
@@ -571,15 +577,27 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Process a cascade solve — flat base BP, no multiplier/time interaction.
-    /// Still increments SolveCount for progressive difficulty ramp.
+    /// Process a cascade solve — no multiplier/time interaction.
+    /// Arcade: incrementing BP per line (+1, +2, +3...) resets each cascade chain.
+    /// Zen: flat lineBaseScore (unchanged).
     /// </summary>
     private void ProcessCascadeSolve(int lineBaseScore)
     {
-        Debug.Log($"<color=grey>[CASCADE]</color> +{lineBaseScore} BP (flat, no multiplier)");
-        CommitScore(lineBaseScore);
+        if (CurrentMode == GameMode.Arcade)
+        {
+            // Arcade cascade overhaul: +1, +2, +3... BP per line cleared in the chain
+            cascadeLineCounter++;
+            int cascadeBP = cascadeLineCounter;
+            Debug.Log($"<color=grey>[CASCADE]</color> +{cascadeBP} BP (chain line #{cascadeLineCounter})");
+            CommitScore(cascadeBP);
+        }
+        else
+        {
+            // Zen: flat lineBaseScore (original behavior)
+            Debug.Log($"<color=grey>[CASCADE]</color> +{lineBaseScore} BP (flat, no multiplier)");
+            CommitScore(lineBaseScore);
+        }
         // Note: does NOT increment solveCount, touch multiplier, or trigger hot streak
-        // SolveCount used for tile weight ramp still comes from solveCount (player solves only)
     }
 
     /// <summary>
