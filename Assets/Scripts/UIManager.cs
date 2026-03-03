@@ -127,6 +127,7 @@ public class UIManager : MonoBehaviour
     private Coroutine multiplierPulseCoroutine;
     private Coroutine multiplierGlowCoroutine;
     private Coroutine hotStreakTextPulseCoroutine;
+    private Coroutine hotStreakRainbowCoroutine;
     private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
     private bool hotStreakActive = false;
@@ -140,6 +141,11 @@ public class UIManager : MonoBehaviour
     // Hot Streak UI elements (created via code)
     private GameObject hotStreakTextObject;
     private TMPro.TMP_Text hotStreakText;
+
+    // Hot Streak countdown bar (avatar region)
+    private GameObject hotStreakCountdownBarObj;
+    private Image hotStreakCountdownFillImage;
+    private float hotStreakCountdownMax;
 
     // Multiplier text animation
     private float lastMultiplierValue = 1f;
@@ -195,6 +201,7 @@ public class UIManager : MonoBehaviour
         gameManager.OnGameWon += HandleGameWon;
         gameManager.OnHotStreakStarted += HandleHotStreakStarted;
         gameManager.OnHotStreakEnded += HandleHotStreakEnded;
+        gameManager.OnHotStreakTimerChanged += HandleHotStreakTimerChanged;
 
         if (gridManager == null)
             gridManager = FindFirstObjectByType<GridManager>();
@@ -222,6 +229,7 @@ public class UIManager : MonoBehaviour
             gameManager.OnGameWon -= HandleGameWon;
             gameManager.OnHotStreakStarted -= HandleHotStreakStarted;
             gameManager.OnHotStreakEnded -= HandleHotStreakEnded;
+            gameManager.OnHotStreakTimerChanged -= HandleHotStreakTimerChanged;
         }
 
         if (gridManager != null)
@@ -276,8 +284,18 @@ public class UIManager : MonoBehaviour
 
             if (multiplierSlider != null)
             {
-                multiplierSlider.maxValue = gameManager.MultiplierDuration;
-                multiplierSlider.value = gameManager.MultiplierDuration;
+                if (gameManager.CurrentMode == GameManager.GameMode.Arcade)
+                {
+                    // Arcade: bar fills UP from 0 to barMax (100)
+                    multiplierSlider.maxValue = gameManager.MultiplierBarMax;
+                    multiplierSlider.value = 0f;
+                }
+                else
+                {
+                    // Zen: legacy drain-down timer
+                    multiplierSlider.maxValue = gameManager.MultiplierDuration;
+                    multiplierSlider.value = gameManager.MultiplierDuration;
+                }
             }
         }
 
@@ -822,7 +840,7 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    private void UpdateMultiplierBar(bool active, float multiplier, float timer)
+    private void UpdateMultiplierBar(bool active, float multiplier, float barOrTimer)
     {
         if (multiplierPanel == null) return;
 
@@ -839,7 +857,7 @@ public class UIManager : MonoBehaviour
             }
 
             if (multiplierSlider != null)
-                multiplierSlider.value = timer;
+                multiplierSlider.value = barOrTimer;
 
             if (multiplierValueText != null)
             {
@@ -868,15 +886,32 @@ public class UIManager : MonoBehaviour
                 lastMultiplierValue = multiplier;
             }
 
+            // Timer text: show bar value in Arcade, seconds in Zen
             if (multiplierTimerText != null)
-                multiplierTimerText.text = $"{timer:F1}s";
+            {
+                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
+                if (isArcade)
+                    multiplierTimerText.text = $"{Mathf.RoundToInt(barOrTimer)}";
+                else
+                    multiplierTimerText.text = $"{barOrTimer:F1}s";
+            }
 
-            // Color based on timer (only if hot streak not overriding)
+            // Fill color: ramp based on bar fill (Arcade) or timer remaining (Zen)
             if (multiplierFillImage != null && !enableHotStreak)
             {
-                multiplierFillImage.color = timer <= multiplierLowThreshold
-                    ? Color.Lerp(multiplierLowColor, multiplierFullColor, timer / multiplierLowThreshold)
-                    : multiplierFullColor;
+                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
+                if (isArcade)
+                {
+                    // Cool→hot based on bar fill percentage
+                    float fillPct = barOrTimer / (gameManager?.MultiplierBarMax ?? 100f);
+                    multiplierFillImage.color = Color.Lerp(multiplierLowColor, multiplierFullColor, fillPct);
+                }
+                else
+                {
+                    multiplierFillImage.color = barOrTimer <= multiplierLowThreshold
+                        ? Color.Lerp(multiplierLowColor, multiplierFullColor, barOrTimer / multiplierLowThreshold)
+                        : multiplierFullColor;
+                }
             }
 
             // Update hot streak intensity as multiplier grows
@@ -894,6 +929,14 @@ public class UIManager : MonoBehaviour
                 multiplierValueText.text = "x1.00";
                 multiplierValueText.transform.localScale = Vector3.one;
                 multiplierValueText.color = multiplierTextCoolColor;
+            }
+
+            // Reset slider to 0 in Arcade (bar empty), keep as-is in Zen
+            if (multiplierSlider != null)
+            {
+                bool isArcade = gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade;
+                if (isArcade)
+                    multiplierSlider.value = 0f;
             }
 
             lastMultiplierValue = 1f;
@@ -991,6 +1034,13 @@ public class UIManager : MonoBehaviour
         if (hotStreakBackground != null)
             hotStreakBackground.SetActive(true);
 
+        // Start rainbow bar effect in Arcade mode
+        if (gameManager != null && gameManager.CurrentMode == GameManager.GameMode.Arcade)
+        {
+            StartRainbowBar();
+            CreateHotStreakCountdownBar();
+        }
+
         // Show HOT-STREAK text with slide-in animation
         if (hotStreakTextObject != null)
         {
@@ -1084,6 +1134,9 @@ public class UIManager : MonoBehaviour
             multiplierValueText.transform.localScale = Vector3.one;
         }
 
+        // Stop rainbow bar effect
+        StopRainbowBar();
+
         // Hide hot streak background
         if (hotStreakBackground != null)
             hotStreakBackground.SetActive(false);
@@ -1097,6 +1150,100 @@ public class UIManager : MonoBehaviour
             AudioManager.Instance?.PlayZenMusic();
         else
             AudioManager.Instance?.PlayGameMusic();
+
+        // Destroy countdown bar
+        DestroyHotStreakCountdownBar();
+    }
+
+    /// <summary>
+    /// Creates a Hot Streak countdown bar in the avatar region (upper area).
+    /// Shows remaining duration as a draining bar with rainbow fill.
+    /// </summary>
+    private void CreateHotStreakCountdownBar()
+    {
+        DestroyHotStreakCountdownBar();
+
+        if (gameManager == null) return;
+        hotStreakCountdownMax = gameManager.HotStreakDuration;
+
+        // Find the AvatarManager's transform to position bar near it
+        Transform avatarParent = AvatarManager.Instance != null
+            ? AvatarManager.Instance.transform.parent
+            : null;
+
+        if (avatarParent == null)
+        {
+            Debug.LogWarning("UIManager: No avatar parent found for Hot Streak countdown bar.");
+            return;
+        }
+
+        // Create container
+        hotStreakCountdownBarObj = new GameObject("HotStreakCountdownBar");
+        hotStreakCountdownBarObj.transform.SetParent(avatarParent, false);
+
+        RectTransform barRect = hotStreakCountdownBarObj.AddComponent<RectTransform>();
+        // Position below the avatar — anchor to bottom of avatar area
+        barRect.anchorMin = new Vector2(0f, 0f);
+        barRect.anchorMax = new Vector2(1f, 0f);
+        barRect.pivot = new Vector2(0.5f, 1f);
+        barRect.anchoredPosition = new Vector2(0f, -8f);
+        barRect.sizeDelta = new Vector2(0f, 14f);
+
+        // Background (dark)
+        Image bgImage = hotStreakCountdownBarObj.AddComponent<Image>();
+        bgImage.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+
+        // Fill bar child
+        GameObject fillObj = new GameObject("Fill");
+        fillObj.transform.SetParent(hotStreakCountdownBarObj.transform, false);
+
+        RectTransform fillRect = fillObj.AddComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(2f, 2f);
+        fillRect.offsetMax = new Vector2(-2f, -2f);
+        fillRect.pivot = new Vector2(0f, 0.5f);
+
+        hotStreakCountdownFillImage = fillObj.AddComponent<Image>();
+        hotStreakCountdownFillImage.color = new Color(1f, 0.5f, 0.1f); // Orange start
+
+        // Start full
+        fillRect.anchorMax = new Vector2(1f, 1f);
+
+        Debug.Log("<color=orange>UIManager: Hot Streak countdown bar created.</color>");
+    }
+
+    private void UpdateHotStreakCountdownBar(float remainingTime)
+    {
+        if (hotStreakCountdownFillImage == null || hotStreakCountdownMax <= 0f) return;
+
+        float fill = Mathf.Clamp01(remainingTime / hotStreakCountdownMax);
+
+        // Scale the fill by adjusting anchorMax.x
+        RectTransform fillRect = hotStreakCountdownFillImage.GetComponent<RectTransform>();
+        if (fillRect != null)
+        {
+            fillRect.anchorMax = new Vector2(fill, 1f);
+        }
+
+        // Rainbow color cycling (matches the main multiplier bar rainbow)
+        float hue = (Time.time * 0.5f) % 1f;
+        hotStreakCountdownFillImage.color = Color.HSVToRGB(hue, 0.85f, 1f);
+    }
+
+    private void DestroyHotStreakCountdownBar()
+    {
+        if (hotStreakCountdownBarObj != null)
+        {
+            Destroy(hotStreakCountdownBarObj);
+            hotStreakCountdownBarObj = null;
+            hotStreakCountdownFillImage = null;
+        }
+    }
+
+    private void HandleHotStreakTimerChanged(float remainingTime)
+    {
+        UpdateHotStreakCountdownBar(remainingTime);
     }
 
     #endregion
@@ -2150,7 +2297,63 @@ public class UIManager : MonoBehaviour
         hotStreakEffect.Deactivate();
         hotStreakActive = false;
 
+        StopRainbowBar();
+        DestroyHotStreakCountdownBar();
+
         Debug.Log("<color=gray>Hot streak ended.</color>");
+    }
+
+    /// <summary>
+    /// Start rainbow color cycling on the multiplier bar fill image.
+    /// Called when Hot Streak activates in Arcade mode.
+    /// </summary>
+    private void StartRainbowBar()
+    {
+        StopRainbowBar();
+        if (multiplierFillImage != null)
+        {
+            hotStreakRainbowCoroutine = StartCoroutine(RainbowBarCycle());
+        }
+    }
+
+    /// <summary>
+    /// Stop rainbow cycling and reset fill image color.
+    /// </summary>
+    private void StopRainbowBar()
+    {
+        if (hotStreakRainbowCoroutine != null)
+        {
+            StopCoroutine(hotStreakRainbowCoroutine);
+            hotStreakRainbowCoroutine = null;
+        }
+
+        // Reset fill color to default
+        if (multiplierFillImage != null)
+        {
+            multiplierFillImage.color = multiplierFullColor;
+        }
+    }
+
+    /// <summary>
+    /// Continuously cycles the multiplier bar fill image through rainbow colors.
+    /// Runs as a coroutine during Hot Streak in Arcade mode.
+    /// </summary>
+    private IEnumerator RainbowBarCycle()
+    {
+        float hue = 0f;
+        float cycleSpeed = 0.5f; // Full cycle every 2 seconds
+
+        while (true)
+        {
+            hue += cycleSpeed * Time.deltaTime;
+            if (hue > 1f) hue -= 1f;
+
+            // HSV with full saturation and brightness for vivid rainbow
+            Color rainbowColor = Color.HSVToRGB(hue, 0.85f, 1f);
+            multiplierFillImage.color = rainbowColor;
+
+            yield return null;
+        }
     }
 
     #endregion

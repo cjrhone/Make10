@@ -57,7 +57,12 @@ public class GameManager : MonoBehaviour
     [Header("Scoring")]
     [SerializeField] private int baseMatchScore = 10;
 
-    [Header("Multiplier Settings")]
+    [Header("Multiplier Bar (Arcade)")]
+    [SerializeField] private float barMax = 100f;
+    [SerializeField] private float barGainPerSolve = 10f;
+    [SerializeField] private float barDrainPerSecond = 1f;
+
+    [Header("Multiplier Settings (Zen — legacy per-solve system)")]
     [SerializeField] private float multiplierDuration = 10f;
     [SerializeField] private float multiplierDrainRate = 1f;
     [SerializeField] private float multiplierIncrement = 0.25f;
@@ -69,7 +74,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float timeBonusPerMatch = 1.5f;
 
     [Header("Hot Streak Mode")]
-    [SerializeField] private float hotStreakDuration = 10f;
+    [SerializeField] private float hotStreakDuration = 15f;
     [SerializeField] private float hotStreakMultiplier = 5f;
 
     [Header("Speed Bonus")]
@@ -161,10 +166,15 @@ public class GameManager : MonoBehaviour
     private int solveCount = 0;
     public int SolveCount => solveCount;
     private float currentMultiplier = 1f;
+    private float maxMultiplierReached = 1f;
+
+    // Arcade multiplier bar state (0–100, fills on solve, drains over time)
+    private float multiplierBar = 0f;
+
+    // Zen multiplier state (legacy per-solve system)
     private float multiplierTimer = 0f;
     private bool multiplierActive = false;
     private float timeSinceLastSolve = 0f;
-    private float maxMultiplierReached = 1f;
 
     // Hot Streak state
     private bool hotStreakActive = false;
@@ -185,10 +195,12 @@ public class GameManager : MonoBehaviour
     private float effectiveMultiplierIncrement;
 
     // Public accessors for UI
-    public bool IsMultiplierActive => multiplierActive;
+    public bool IsMultiplierActive => CurrentMode == GameMode.Arcade ? multiplierBar > 0f : multiplierActive;
     public float CurrentMultiplier => currentMultiplier;
-    public float MultiplierTimer => multiplierTimer;
-    public float MultiplierDuration => multiplierDuration;
+    public float MultiplierBar => multiplierBar;
+    public float MultiplierBarMax => barMax;
+    public float MultiplierTimer => multiplierTimer;       // Zen only
+    public float MultiplierDuration => multiplierDuration; // Zen only
     public bool IsHotStreakActive => hotStreakActive;
     public float HotStreakTimer => hotStreakTimer;
     public float HotStreakDuration => hotStreakDuration;
@@ -235,6 +247,67 @@ public class GameManager : MonoBehaviour
         if (!IsGameActive) return;
         if (IsSolveAnimationPlaying) return;
 
+        if (CurrentMode == GameMode.Arcade)
+        {
+            UpdateArcade();
+        }
+        else
+        {
+            UpdateZen();
+        }
+    }
+
+    /// <summary>
+    /// Arcade Update: bar-based multiplier system.
+    /// Bar drains at 1/sec (freezes during cascades). Hot Streak has grace period.
+    /// </summary>
+    private void UpdateArcade()
+    {
+        // Drain game timer (freeze during cascades)
+        if (!IsProcessing)
+        {
+            DrainTime(Time.deltaTime);
+        }
+
+        // Hot Streak: fixed 15s duration, bar frozen at 100 visually
+        if (hotStreakActive)
+        {
+            hotStreakTimer -= Time.deltaTime;
+            OnHotStreakTimerChanged?.Invoke(hotStreakTimer);
+
+            if (hotStreakTimer <= 0f)
+            {
+                EndHotStreak();
+            }
+
+            // During Hot Streak, pass barMax so slider stays full
+            OnMultiplierChanged?.Invoke(true, currentMultiplier, barMax);
+            return;
+        }
+
+        // Drain multiplier bar (freeze during cascades)
+        if (!IsProcessing && multiplierBar > 0f)
+        {
+            multiplierBar -= barDrainPerSecond * Time.deltaTime;
+            multiplierBar = Mathf.Max(0f, multiplierBar);
+        }
+
+        // Derive multiplier from bar level
+        float newMultiplier = GetMultiplierForBar(multiplierBar);
+        if (Mathf.Abs(newMultiplier - currentMultiplier) > 0.01f)
+        {
+            currentMultiplier = newMultiplier;
+            maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
+        }
+
+        OnMultiplierChanged?.Invoke(multiplierBar > 0f, currentMultiplier, multiplierBar);
+    }
+
+    /// <summary>
+    /// Zen Update: legacy per-solve multiplier system (unchanged).
+    /// </summary>
+    private void UpdateZen()
+    {
         // Hot Streak mode - pause main timer, run hot streak timer
         if (hotStreakActive)
         {
@@ -248,18 +321,15 @@ public class GameManager : MonoBehaviour
             return; // Skip normal timer drain during hot streak
         }
 
-        // Drain timer in both modes (Arcade: 60s, Zen: 300s)
+        // Drain timer
         if (!IsProcessing)
         {
             DrainTime(Time.deltaTime);
         }
 
-        // Zen mode: multiplier doesn't drain on a timer (resets on failed swap instead)
-        if (multiplierActive && !IsProcessing && CurrentMode == GameMode.Arcade)
-        {
-            DrainMultiplierTimer(Time.deltaTime);
-        }
-        else if (solveCount > 0)
+        // Zen multiplier doesn't drain on a timer (resets on failed swap instead)
+        // But track inactivity for streak timeout
+        if (solveCount > 0)
         {
             timeSinceLastSolve += Time.deltaTime;
             if (timeSinceLastSolve >= streakTimeout)
@@ -296,6 +366,19 @@ public class GameManager : MonoBehaviour
         effectiveMultiplierIncrement = multiplierIncrement;
     }
 
+    /// <summary>
+    /// Derive multiplier tier from bar level (Arcade mode).
+    /// Tiers: 0–24 = x1, 25–49 = x1.5, 50–74 = x2, 75–99 = x2.5, 100 = x5 (Hot Streak).
+    /// </summary>
+    private float GetMultiplierForBar(float bar)
+    {
+        if (bar >= barMax) return hotStreakMultiplier; // x5
+        if (bar >= 75f) return 2.5f;
+        if (bar >= 50f) return 2f;
+        if (bar >= 25f) return 1.5f;
+        return 1f;
+    }
+
     #endregion
     
     #region Game Flow
@@ -313,15 +396,22 @@ public class GameManager : MonoBehaviour
 
         solveCount = 0;
         currentMultiplier = 1f;
-        multiplierTimer = 0f;
-        multiplierActive = false;
-        timeSinceLastSolve = 0f;
-        hotStreakActive = false;
-        hotStreakTimer = 0f;
         maxMultiplierReached = 1f;
         lastPlayerSolveTime = -999f;
         sessionStartTime = Time.time;
         lastSessionDuration = 0f;
+
+        // Arcade bar state
+        multiplierBar = 0f;
+
+        // Zen legacy multiplier state
+        multiplierTimer = 0f;
+        multiplierActive = false;
+        timeSinceLastSolve = 0f;
+
+        // Shared hot streak state
+        hotStreakActive = false;
+        hotStreakTimer = 0f;
 
         // Zen mode: initialize reshuffles and stats
         zenReshufflesRemaining = zenMaxReshuffles;
@@ -341,7 +431,9 @@ public class GameManager : MonoBehaviour
     {
         OnScoreChanged?.Invoke(Score, 0);
         OnTimeChanged?.Invoke(TimeRemaining);
-        OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
+        float barOrTimer = CurrentMode == GameMode.Arcade ? multiplierBar : multiplierTimer;
+        bool active = CurrentMode == GameMode.Arcade ? multiplierBar > 0f : multiplierActive;
+        OnMultiplierChanged?.Invoke(active, currentMultiplier, barOrTimer);
     }
 
     /// <summary>
@@ -432,6 +524,28 @@ public class GameManager : MonoBehaviour
                 AddTime(timeBonusPerMatch * linesCleared);
             }
 
+            // Arcade: fill bar once per swap (not per line), check Hot Streak trigger
+            if (CurrentMode == GameMode.Arcade)
+            {
+                float barBefore = multiplierBar;
+                multiplierBar = Mathf.Min(multiplierBar + barGainPerSolve, barMax);
+                currentMultiplier = GetMultiplierForBar(multiplierBar);
+                maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
+
+                Debug.Log($"<color=yellow>Bar: {barBefore:F0} → {multiplierBar:F0} | x{currentMultiplier:F2}</color>");
+
+                // Check Hot Streak trigger
+                if (multiplierBar >= barMax && !hotStreakActive)
+                {
+                    StartCoroutine(TriggerHotStreak());
+                }
+
+                OnMultiplierChanged?.Invoke(multiplierBar > 0f, currentMultiplier, multiplierBar);
+            }
+
+            // Increment solveCount once per swap (used for TileWeightManager difficulty ramp)
+            solveCount++;
+
             for (int i = 0; i < linesCleared; i++)
             {
                 int lineBaseScore = (matchResult != null) ? matchResult.GetLineSumByIndex(i) : baseMatchScore;
@@ -484,23 +598,60 @@ public class GameManager : MonoBehaviour
     #region Scoring
 
     /// <summary>
-    /// Process a single solve, applying all upgrade and snack bonuses.
-    /// lineBaseScore is the actual sum of the matched line (10, 20, 30, or 40).
+    /// Process a single line solve. Called once per matched line.
+    /// Arcade: multiplier derived from bar level (bar fill handled in OnMatchCleared).
+    /// Zen: legacy per-solve multiplier system.
     /// </summary>
     private void ProcessSingleSolve(List<int> tileValues = null, int lineBaseScore = 10)
     {
-        // During Hot Streak, use special scoring
+        // During Hot Streak, use special scoring (both modes)
         if (hotStreakActive)
         {
             ProcessHotStreakSolve(tileValues, lineBaseScore);
             return;
         }
 
+        if (CurrentMode == GameMode.Arcade)
+        {
+            ProcessArcadeSolve(tileValues, lineBaseScore);
+        }
+        else
+        {
+            ProcessZenSolve(tileValues, lineBaseScore);
+        }
+    }
+
+    /// <summary>
+    /// Arcade solve: score = lineBaseScore × bar-derived multiplier. No solveCount branching.
+    /// Bar fill and solveCount increment already handled in OnMatchCleared.
+    /// </summary>
+    private void ProcessArcadeSolve(List<int> tileValues, int lineBaseScore)
+    {
+        int multipliedScore = Mathf.RoundToInt(lineBaseScore * currentMultiplier);
+        Debug.Log($"<color=green>[Arcade]</color> {lineBaseScore} × {currentMultiplier:F2} = <color=cyan>+{multipliedScore} pts</color> (bar: {multiplierBar:F0})");
+
+        // Speed bonus: reward fast consecutive player solves
+        int speedBonus = 0;
+        float timeSinceLastPlayerSolve = Time.time - lastPlayerSolveTime;
+        if (lastPlayerSolveTime > 0f && timeSinceLastPlayerSolve <= speedBonusThreshold)
+        {
+            speedBonus = speedBonusAmount;
+            Debug.Log($"<color=magenta>⚡ SPEED BONUS! +{speedBonus} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
+        }
+        lastPlayerSolveTime = Time.time;
+
+        CommitScore(multipliedScore + speedBonus);
+    }
+
+    /// <summary>
+    /// Zen solve: legacy per-solve multiplier system (unchanged from original).
+    /// </summary>
+    private void ProcessZenSolve(List<int> tileValues, int lineBaseScore)
+    {
         solveCount++;
         timeSinceLastSolve = 0f;
 
         var (effectiveBaseScore, enhancedBonus) = CalculateCommonBonuses(tileValues);
-        // Override base score with the line's actual sum
         effectiveBaseScore = lineBaseScore;
 
         int pointsAwarded = 0;
@@ -527,21 +678,18 @@ public class GameManager : MonoBehaviour
             currentMultiplier += effectiveMultiplierIncrement;
             maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
 
-            // Check if we've hit the hot streak threshold
             if (currentMultiplier > effectiveHotStreakThreshold)
             {
                 StartCoroutine(TriggerHotStreak());
-                return; // Don't process normal scoring, hot streak handles it
+                return;
             }
 
-            // Cap at max multiplier
             currentMultiplier = Mathf.Min(currentMultiplier, effectiveMaxMultiplier);
-
             multiplierTimer = multiplierDuration;
             OnMultiplierChanged?.Invoke(multiplierActive, currentMultiplier, multiplierTimer);
         }
 
-        // Speed bonus: reward fast consecutive player solves
+        // Speed bonus
         int speedBonus = 0;
         float timeSinceLastPlayerSolve = Time.time - lastPlayerSolveTime;
         if (lastPlayerSolveTime > 0f && timeSinceLastPlayerSolve <= speedBonusThreshold)
@@ -612,27 +760,36 @@ public class GameManager : MonoBehaviour
     
     private IEnumerator TriggerHotStreak()
     {
-        Debug.Log($"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{effectiveHotStreakMultiplier} for {effectiveHotStreakDuration}s)");
+        if (CurrentMode == GameMode.Arcade)
+        {
+            Debug.Log($"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{hotStreakMultiplier} for {hotStreakDuration}s)");
 
-        // Set hot streak state using cached effective values
-        hotStreakActive = true;
-        hotStreakTimer = effectiveHotStreakDuration;
+            hotStreakActive = true;
+            hotStreakTimer = hotStreakDuration;
+            currentMultiplier = hotStreakMultiplier;
+            maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
 
-        // Set multiplier to hot streak value (with Red Bull bonus)
-        currentMultiplier = effectiveHotStreakMultiplier;
-        multiplierTimer = effectiveHotStreakDuration; // Sync with hot streak duration
-        maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
+            OnHotStreakStarted?.Invoke();
+            AvatarManager.Instance?.OnHotStreakStart();
+            OnMultiplierChanged?.Invoke(true, currentMultiplier, barMax);
+        }
+        else
+        {
+            // Zen: legacy hot streak with fixed duration
+            Debug.Log($"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{effectiveHotStreakMultiplier} for {effectiveHotStreakDuration}s)");
 
-        // Fire event for UI to show intro
-        OnHotStreakStarted?.Invoke();
+            hotStreakActive = true;
+            hotStreakTimer = effectiveHotStreakDuration;
+            currentMultiplier = effectiveHotStreakMultiplier;
+            multiplierTimer = effectiveHotStreakDuration;
+            maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
 
-        // Trigger avatar hot streak mode
-        AvatarManager.Instance?.OnHotStreakStart();
+            OnHotStreakStarted?.Invoke();
+            AvatarManager.Instance?.OnHotStreakStart();
+            OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
+        }
 
-        // Also update multiplier display
-        OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierTimer);
-
-        yield return null; // Hot streak intro handled by UIManager
+        yield return null;
     }
 
     private void EndHotStreak()
@@ -640,15 +797,23 @@ public class GameManager : MonoBehaviour
         Debug.Log("<color=gray>Hot Streak ended!</color>");
 
         hotStreakActive = false;
-        hotStreakTimer = 0f;
 
-        // Reset multiplier completely
-        DeactivateMultiplierBar();
+        if (CurrentMode == GameMode.Arcade)
+        {
+            // Reset bar to 0 and multiplier to x1 after Hot Streak ends
+            hotStreakTimer = 0f;
+            multiplierBar = 0f;
+            currentMultiplier = 1f;
+            OnMultiplierChanged?.Invoke(false, currentMultiplier, multiplierBar);
+        }
+        else
+        {
+            // Zen: reset multiplier completely
+            hotStreakTimer = 0f;
+            DeactivateMultiplierBar();
+        }
 
-        // Fire event for UI cleanup
         OnHotStreakEnded?.Invoke();
-
-        // Return avatar to default struggling state
         AvatarManager.Instance?.OnHotStreakEnd();
     }
 
@@ -686,21 +851,17 @@ public class GameManager : MonoBehaviour
     /// </summary>
     private void ProcessHotStreakSolve(List<int> tileValues = null, int lineBaseScore = 10)
     {
-        var (effectiveBaseScore, enhancedBonus) = CalculateCommonBonuses(tileValues);
-        // Override base score with the line's actual sum
-        effectiveBaseScore = lineBaseScore;
+        float hsMultiplier = CurrentMode == GameMode.Arcade ? hotStreakMultiplier : effectiveHotStreakMultiplier;
 
-        int multipliedScore = Mathf.RoundToInt(effectiveBaseScore * effectiveHotStreakMultiplier);
-        int pointsAwarded = multipliedScore + enhancedBonus;
+        int multipliedScore = Mathf.RoundToInt(lineBaseScore * hsMultiplier);
 
-        int finalPoints = ApplyPostScoringBonuses(pointsAwarded, enhancedBonus, tileValues);
+        Debug.Log($"<color=orange>🔥 HOT STREAK SOLVE:</color> {lineBaseScore} × {hsMultiplier:F0} = <color=cyan>+{multipliedScore} pts</color>");
 
-        Debug.Log($"<color=orange>🔥 HOT STREAK SOLVE:</color> ({effectiveBaseScore} × {effectiveHotStreakMultiplier:F0}) + {enhancedBonus} enhanced = <color=cyan>+{finalPoints} pts</color>");
+        CommitScore(multipliedScore);
 
-        CommitScore(finalPoints);
-
-        // Multiplier stays fixed during hot streak
-        OnMultiplierChanged?.Invoke(true, currentMultiplier, hotStreakTimer);
+        // Fire UI update with mode-appropriate bar/timer value
+        float barOrTimer = CurrentMode == GameMode.Arcade ? multiplierBar : hotStreakTimer;
+        OnMultiplierChanged?.Invoke(true, currentMultiplier, barOrTimer);
     }
     
     #endregion

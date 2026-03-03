@@ -99,19 +99,35 @@ Lines matching a multiple of 10 score their sum as base BP:
   10-sum → 10 BP, 20-sum → 20 BP, 30-sum → 30 BP
 
 PLAYER SWAP MATCHES (cascadeCount == 1):
-  Solve #1: lineSum pts (no multiplier)
-  Solve #2: lineSum pts + MULTIPLIER ACTIVATED (×1.25)
-  Solve #3+: lineSum × multiplier + speedBonus
-  Also: adds time bonus (timeBonusPerMatch per line)
+  lineSum × currentMultiplier (derived from bar level)
+  + speedBonus (+5 BP if solved within 4s)
+  + time bonus (timeBonusPerMatch per line, Arcade only)
+  Bar fills +10 per swap (once, regardless of lines cleared)
 
 CASCADE MATCHES (cascadeCount >= 2):
-  Flat lineSum BP only — no multiplier, no time bonus, no speed bonus.
-  Does NOT increment SolveCount or trigger hot streak.
+  Flat lineSum BP only — no multiplier, no bar fill, no speed bonus.
+  Bar freezes during cascade processing (no drain).
 ```
 
-### Multiplier & Hot Streak
+### Arcade Multiplier Bar
 ```
-Multiplier: ×1.25 start → +0.25 per solve → ×3.00 max → triggers Hot Streak (×5.00, 10s)
+Bar: 0–100 capacity
+  +10 per player swap (not per line, not on cascades)
+  -1 per second (freezes during cascades)
+
+Multiplier tiers (derived from bar level):
+   0–24  →  ×1.00
+  25–49  →  ×1.50
+  50–74  →  ×2.00
+  75–99  →  ×2.50
+    100  →  ×5.00  (Hot Streak)
+
+Hot Streak triggers at bar = 100:
+  ×5.00 multiplier for 15 seconds (fixed duration)
+  Bar illuminates rainbow color spectrum during Hot Streak
+  Countdown bar appears in avatar region showing remaining Hot Streak time
+  When 15s expires: bar resets to 0, multiplier resets to ×1.00
+
 Speed Bonus: +5 BP if solved within 4s of last player solve
 ```
 
@@ -191,10 +207,10 @@ Locked tiles (value ≥ 10):
 | Setting | Arcade | MakeZen | Location |
 |---------|--------|---------|----------|
 | Game Duration | 60s | 300s (5 min) | GameManager |
-| Multiplier Start/Max | ×1.25 / ×3.00 | ×1.25 / ×3.00 | GameManager |
-| Multiplier Drain | Timer-based (10s) | No drain (reset on fail) | GameManager |
+| Multiplier System | Bar 0–100 (+10/solve, -1/sec) | Per-solve ×1.25→×3.00 | GameManager |
+| Multiplier Drain | Bar drains 1/sec (freezes in cascades) | No drain (reset on fail) | GameManager |
 | Failed Swap Penalty | None | -3s + multiplier reset | GameManager |
-| Hot Streak | ×5.00, 10s | ×5.00, 10s | GameManager |
+| Hot Streak | ×5.00 at bar=100, 15s fixed, rainbow bar + countdown, resets to 0 | ×5.00, 10s fixed | GameManager |
 | Grid Size | 5×5 | 5×5 | GridManager |
 | Max Reshuffles | Unlimited | 3 | GameManager |
 | Canvas | 1080×1920 | 1080×1920 | Canvas |
