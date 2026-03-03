@@ -70,6 +70,26 @@ public class TileWeightManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Get current bag contents for save/resume. Returns remaining tile values.
+    /// </summary>
+    public int[] GetBagContents()
+    {
+        return tileBag.ToArray();
+    }
+
+    /// <summary>
+    /// Restore bag contents from saved data.
+    /// </summary>
+    public void RestoreBag(int[] contents)
+    {
+        tileBag.Clear();
+        if (contents != null)
+        {
+            tileBag.AddRange(contents);
+        }
+    }
+
+    /// <summary>
     /// Calculate the current adjusted weights based on mode, solve/match count, and progressive ramp.
     /// Arcade: solve-based ramp introducing 5s, 6s, 7s gradually.
     /// Zen: 7-tier match-based ramp widening the full tile range.

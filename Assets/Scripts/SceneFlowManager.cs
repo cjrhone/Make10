@@ -428,6 +428,7 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log("ReturnToMainMenuFromZen - cleaning up...");
 
         AudioManager.Instance?.StopMusic();
+        AudioManager.Instance?.StopTimeWarning();
         RunManager.Instance?.EndRun();
         GameManager.Instance?.DeactivateGame();
 
@@ -842,11 +843,62 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log($"OnZenPressed called! CurrentState = {CurrentState}");
         HandleButton(GameState.MainMenu, () =>
         {
-            StartCoroutine(ZenPlaySequence());
+            // Check if there's a saved Zen game to resume
+            if (GameManager.HasZenSave())
+            {
+                ShowZenResumePrompt();
+            }
+            else
+            {
+                StartCoroutine(ZenNewGameSequence());
+            }
         });
     }
 
-    private IEnumerator ZenPlaySequence()
+    /// <summary>
+    /// Shows a popup asking the player if they want to resume or start fresh.
+    /// </summary>
+    private void ShowZenResumePrompt()
+    {
+        // Always create a fresh popup to avoid inheriting stale event listeners
+        GameObject popupObj = new GameObject("ZenResumePopup");
+        popupObj.transform.SetParent(mainCanvas.transform, false);
+        PopupWindow popup = popupObj.AddComponent<PopupWindow>();
+
+        popup.SetTitle("MAKEZEN");
+        popup.ClearContent();
+        popup.SetAutoSizeMode(900f, 300f, 800f, enableScrollbar: false);
+
+        popup.AddSpacer(16f);
+        popup.AddText("SAVED GAME FOUND", UIStyleGuide.FontSizeSubheading,
+            UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddSpacer(10f);
+        popup.AddText("You have a session in progress.\nWould you like to pick up where you left off?",
+            UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextSecondary, TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(24f);
+
+        popup.AddButtonRow(
+            ("Resume", () => {
+                AudioManager.Instance?.PlayButtonClick();
+                popup.Close();
+                StartCoroutine(ZenResumeSequence());
+            }, UIStyleGuide.ColorButtonPrimary),
+            ("New Game", () => {
+                AudioManager.Instance?.PlayButtonClick();
+                popup.Close();
+                GameManager.ClearZenSave();
+                StartCoroutine(ZenNewGameSequence());
+            }, UIStyleGuide.ColorButtonSecondary)
+        );
+
+        popup.Open();
+        AudioManager.Instance?.PlayButtonClick();
+    }
+
+    /// <summary>
+    /// Fresh Zen game: show disclaimer popup after slide, then start.
+    /// </summary>
+    private IEnumerator ZenNewGameSequence()
     {
         // Stop menu music
         AudioManager.Instance?.StopMusic();
@@ -862,11 +914,18 @@ public class SceneFlowManager : MonoBehaviour
         // Vertical slide: main menu scrolls up, game panel enters from below
         yield return VerticalSlideTransition(mainMenuPanel, gamePanel, slideUp: false);
 
-        // Spawn grid
+        // Spawn fresh grid (visible behind the disclaimer popup)
         FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
         yield return new WaitForSeconds(0.1f);
 
-        // Activate game immediately (no countdown in Zen mode)
+        // Show disclaimer popup — game waits here until player dismisses it
+        bool popupDismissed = false;
+        ShowZenDisclaimer(() => popupDismissed = true);
+
+        // Wait for player to close the popup
+        yield return new WaitUntil(() => popupDismissed);
+
+        // NOW activate game and start the timer
         CurrentState = GameState.ZenGame;
         GameManager.Instance?.ActivateGame();
         FindFirstObjectByType<GridManager>()?.OnRoundStarted();
@@ -875,7 +934,148 @@ public class SceneFlowManager : MonoBehaviour
         // Start zen music
         AudioManager.Instance?.PlayZenMusic();
 
-        Debug.Log("Zen Mode started — no timer, no countdown");
+        Debug.Log("Zen Mode started — fresh game, timer begins now");
+    }
+
+    /// <summary>
+    /// Resume saved Zen game: restore grid and state, skip disclaimer.
+    /// </summary>
+    private IEnumerator ZenResumeSequence()
+    {
+        // Stop menu music
+        AudioManager.Instance?.StopMusic();
+
+        // Set game mode to Zen
+        GameManager.Instance?.SetGameMode(GameManager.GameMode.Zen);
+
+        RunManager.Instance?.StartNewRun();
+
+        // Reset game panel X position
+        SetPanelPosition(gamePanel, 0);
+
+        // Vertical slide into game
+        yield return VerticalSlideTransition(mainMenuPanel, gamePanel, slideUp: false);
+
+        // Load saved state into GameManager (restores score, timer, multiplier, zen stats)
+        GameManager.ZenSaveData saveData = GameManager.Instance?.LoadZenState();
+
+        if (saveData != null)
+        {
+            // Restore grid from saved tile values (instead of spawning fresh)
+            GridManager gm = FindFirstObjectByType<GridManager>();
+            gm?.RestoreGridFromSave(saveData);
+
+            // Restore tile bag
+            if (saveData.tileBagContents != null)
+                TileWeightManager.Instance?.RestoreBag(saveData.tileBagContents);
+
+            yield return new WaitForSeconds(0.1f);
+
+            // Activate game state (timer already restored by LoadZenState)
+            CurrentState = GameState.ZenGame;
+            FindFirstObjectByType<GridManager>()?.OnRoundStarted();
+            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+
+            // Clear the save — it's been consumed (will re-save if paused again)
+            GameManager.ClearZenSave();
+        }
+        else
+        {
+            // Fallback: save was corrupted or empty, start fresh
+            Debug.LogWarning("[Zen Resume] Save data was null — starting fresh");
+            FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
+            yield return new WaitForSeconds(0.1f);
+
+            CurrentState = GameState.ZenGame;
+            GameManager.Instance?.ActivateGame();
+            FindFirstObjectByType<GridManager>()?.OnRoundStarted();
+            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+        }
+
+        // Start zen music
+        AudioManager.Instance?.PlayZenMusic();
+
+        Debug.Log("Zen Mode resumed from saved state");
+    }
+
+    /// <summary>
+    /// Shows a disclaimer/how-to-play popup before MakeZen gameplay begins.
+    /// Calls onDismissed when the player closes the popup.
+    /// </summary>
+    private void ShowZenDisclaimer(System.Action onDismissed)
+    {
+        // Always create a fresh popup to avoid inheriting stale event listeners
+        // from tutorial or other popups (which caused X button to trigger Arcade mode)
+        GameObject popupObj = new GameObject("ZenDisclaimerPopup");
+        popupObj.transform.SetParent(mainCanvas.transform, false);
+        PopupWindow popup = popupObj.AddComponent<PopupWindow>();
+
+        popup.SetTitle("MAKEZEN");
+        popup.ClearContent();
+        popup.SetAutoSizeMode(900f, 400f, 1200f, enableScrollbar: false);
+
+        // Early access notice
+        popup.AddText("EARLY ACCESS", UIStyleGuide.FontSizeSubheading,
+            UIStyleGuide.ColorWarning, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddSpacer(8f);
+        popup.AddText("Zen Mode is still under development.\nThis mode plays differently from Arcade.",
+            UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextSecondary, TMPro.TextAlignmentOptions.Center);
+
+        popup.AddSpacer(20f);
+        popup.AddDivider(UIStyleGuide.ColorTextMuted);
+        popup.AddSpacer(20f);
+
+        // How to play
+        popup.AddText("HOW TO PLAY", UIStyleGuide.FontSizeSubheading,
+            UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddSpacer(10f);
+        popup.AddText("Select any two tiles to swap them.\nTry to make rows or columns that add up to 10!",
+            UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextPrimary, TMPro.TextAlignmentOptions.Center);
+
+        popup.AddSpacer(16f);
+
+        popup.AddText("This is a chill mode with no pressure.\nSee how high you can build your tiles\nin 5 minutes.",
+            UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextSecondary, TMPro.TextAlignmentOptions.Center);
+
+        popup.AddSpacer(16f);
+        popup.AddDivider(UIStyleGuide.ColorTextMuted);
+        popup.AddSpacer(16f);
+
+        // Pause hint
+        popup.AddText("Tap  \u23F8  to pause at any time.\nTake a break and return to continue\nwhere you left off.",
+            UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextSecondary, TMPro.TextAlignmentOptions.Center);
+
+        popup.AddSpacer(24f);
+
+        // Ensure onDismissed fires exactly once, whether via button or X/overlay close
+        bool dismissed = false;
+        System.Action dismissOnce = () =>
+        {
+            if (dismissed) return;
+            dismissed = true;
+            onDismissed?.Invoke();
+        };
+
+        // Play button — dismisses popup and signals the coroutine to continue
+        popup.AddButton("Let's Go!", () =>
+        {
+            AudioManager.Instance?.PlayButtonClick();
+            popup.Close();
+            dismissOnce();
+        }, UIStyleGuide.ColorButtonPrimary);
+
+        // Also fire onDismissed if closed via X button or overlay tap
+        // Use a wrapper that auto-unsubscribes to prevent stale listeners on popup reuse
+        System.Action onClosed = null;
+        onClosed = () =>
+        {
+            popup.OnWindowClosed -= onClosed;
+            dismissOnce();
+        };
+        popup.OnWindowClosed += onClosed;
+
+        popup.Open();
+        AudioManager.Instance?.PlayButtonClick();
     }
 
     public void OnOptionsPressed()
@@ -1025,6 +1225,12 @@ public class SceneFlowManager : MonoBehaviour
         // Hide pause menu
         UIManager uiManager = FindFirstObjectByType<UIManager>();
         uiManager?.HidePauseMenu();
+
+        // Save Zen state before leaving so it can be resumed later
+        if (stateBeforePause == GameState.ZenGame)
+        {
+            GameManager.Instance?.SaveZenState();
+        }
 
         // Route to the correct return-to-menu based on which mode we paused from
         if (stateBeforePause == GameState.ZenGame)

@@ -108,6 +108,8 @@ public class AvatarManager : MonoBehaviour
             {
                 originalPosition = avatarRect.anchoredPosition;
             }
+            // Don't block raycasts — allows pause button behind avatar to receive taps
+            avatarImage.raycastTarget = false;
         }
     }
 

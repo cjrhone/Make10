@@ -2507,4 +2507,104 @@ public class GridManager : MonoBehaviour
         ResetHintTimer();
         StartCoroutine(ProcessMatchesCoroutine());
     }
+
+    #region Zen Save/Resume
+
+    /// <summary>
+    /// Write current grid tile values into save data (flat array, row-major).
+    /// Called by GameManager.SaveZenState().
+    /// </summary>
+    public void SaveGridToData(GameManager.ZenSaveData save)
+    {
+        save.gridWidth = gridWidth;
+        save.gridHeight = gridHeight;
+        save.tileValues = new int[gridWidth * gridHeight];
+
+        for (int y = 0; y < gridHeight; y++)
+        {
+            for (int x = 0; x < gridWidth; x++)
+            {
+                int index = y * gridWidth + x;
+                save.tileValues[index] = (grid[x, y] != null) ? grid[x, y].Value : 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore the grid from saved data. Creates tiles with saved values/positions.
+    /// Replaces SpawnGridOnly() for resume flow.
+    /// </summary>
+    public void RestoreGridFromSave(GameManager.ZenSaveData save)
+    {
+        Debug.Log($"GridManager.RestoreGridFromSave() — restoring {save.gridWidth}x{save.gridHeight} grid");
+
+        if (gridContainer == null)
+        {
+            Debug.LogError("GridManager: gridContainer is not assigned!");
+            return;
+        }
+
+        gridValidation.ResetConsecutive();
+        ClearGrid();
+
+        gridWidth = save.gridWidth;
+        gridHeight = save.gridHeight;
+        grid = new Tile[gridWidth, gridHeight];
+
+        UpdateGridSizeFromDifficulty();
+
+        // Calculate tile positions (same math as SpawnGrid)
+        float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
+        float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
+        float startX = -totalWidth / 2f + tileSize / 2f;
+        float startY = totalHeight / 2f - tileSize / 2f;
+
+        for (int y = 0; y < gridHeight; y++)
+        {
+            for (int x = 0; x < gridWidth; x++)
+            {
+                int index = y * gridWidth + x;
+                int value = (save.tileValues != null && index < save.tileValues.Length)
+                    ? save.tileValues[index] : 0;
+
+                float posX = startX + x * (tileSize + tileSpacing);
+                float posY = startY - y * (tileSize + tileSpacing);
+
+                // Create tile with prefab (same as CreateTile but with explicit value)
+                GameObject tileObj = Instantiate(tilePrefab, gridContainer);
+                Tile tile = tileObj.GetComponent<Tile>();
+                if (tile != null)
+                {
+                    tile.Initialize(value, x, y);
+                    tile.SetPosition(new Vector2(posX, posY));
+
+                    RectTransform rt = tile.GetRectTransform();
+                    rt.sizeDelta = new Vector2(tileSize, tileSize);
+                }
+
+                grid[x, y] = tile;
+            }
+        }
+
+        // Initialize VFX system
+        StartCoroutine(InitializeVFXDelayed());
+
+        // Clear swap tracking for clean resume
+        lastSwappedFirst = null;
+        lastSwappedSecond = null;
+
+        Debug.Log($"<color=green>[Zen Restore] Grid rebuilt with {save.tileValues?.Length ?? 0} tiles</color>");
+    }
+
+    /// <summary>
+    /// Wait one frame for Canvas layout then initialize VFX.
+    /// </summary>
+    private IEnumerator InitializeVFXDelayed()
+    {
+        yield return null;
+        if (GridVFX.Instance != null && gridContainer != null)
+            GridVFX.Instance.Initialize(gridContainer);
+    }
+
+    #endregion
 }

@@ -999,41 +999,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f665f450cf604ffa9c9183e83e6971e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugUpgradePanel
-  panelRoot: {fileID: 0}
-  contentParent: {fileID: 0}
-  closeButton: {fileID: 0}
-  availableUpgrades:
-  - {fileID: 11400000, guid: 3b826d91e2b87406381bdfeb0e12804f, type: 2}
-  - {fileID: 11400000, guid: dac18f49ab3d442459cd2b058dbde06e, type: 2}
-  - {fileID: 11400000, guid: a2e4a74b46f1b45e39c6eaa4299f4f4e, type: 2}
-  - {fileID: 11400000, guid: 8dc4c16f2296248f5aafc19fe2491c36, type: 2}
-  - {fileID: 11400000, guid: 5b3127cbf2af8416680aae370801abea, type: 2}
-  - {fileID: 11400000, guid: 1f5de8dd125f54e6f918c7435da31980, type: 2}
-  - {fileID: 11400000, guid: 3774b50533de54b85a6db55497547962, type: 2}
-  - {fileID: 11400000, guid: e00d507638a114c5791b2e7c03ec6a58, type: 2}
-  - {fileID: 11400000, guid: b2c695ae796234c6792440e8241d8fa8, type: 2}
-  - {fileID: 11400000, guid: 8f21353c49e2d4d4f9f388b57398a01b, type: 2}
-  - {fileID: 11400000, guid: 37872c69960944fc4a3a053290fa8aa9, type: 2}
-  - {fileID: 11400000, guid: 0382963a0d7cb44d78e81d6e2058a70e, type: 2}
-  availableSnacks:
-  - {fileID: 11400000, guid: a32cd2eb94f614b189026607be542133, type: 2}
-  - {fileID: 11400000, guid: 94b24cfc2b1a64327988cd6d6ed0ea1f, type: 2}
-  - {fileID: 11400000, guid: 0765ceb88bf76485f959bdba5a86e8ff, type: 2}
-  - {fileID: 11400000, guid: 508e22e74e9644068a1e040c6bd50f0e, type: 2}
-  - {fileID: 11400000, guid: 0b32484d146254bd58424989c863032a, type: 2}
-  - {fileID: 11400000, guid: 9450ac5760f614886828ec748feba3d9, type: 2}
-  - {fileID: 11400000, guid: 0183e8cc1f693434398c346f39476048, type: 2}
-  - {fileID: 11400000, guid: ff47a4ba656434d43a05764e327afcfc, type: 2}
-  - {fileID: 11400000, guid: 3abac44246c634dcc9d9395fd80c8bf8, type: 2}
-  - {fileID: 11400000, guid: 880636c8e0faa4343bf600e11085a24b, type: 2}
-  - {fileID: 11400000, guid: 71e21f15597f64a77ba7d927bc3fcb46, type: 2}
-  availableArtifacts:
-  - {fileID: 11400000, guid: 2bc918918ade1423cba4b932af19ac6c, type: 2}
-  - {fileID: 11400000, guid: 9435b3901f73244e6ab65b331fa74045, type: 2}
-  - {fileID: 11400000, guid: f5b1fe49086954d38be5f95d40b51bf1, type: 2}
-  - {fileID: 11400000, guid: 3ecf06b352bae4037a51b3fe0ececb71, type: 2}
-  - {fileID: 11400000, guid: 9628be155839a45d4b97ebcdd12e3042, type: 2}
-  isVisible: 0
 --- !u!1 &145499433
 GameObject:
   m_ObjectHideFlags: 0
@@ -1143,7 +1108,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1975.9124, y: -306}
+  m_AnchoredPosition: {x: 1975.9124, y: -918.38}
   m_SizeDelta: {x: 5231.8247, y: 140.757}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &147121221
@@ -2960,7 +2925,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 1107, y: 286.51}
+  m_AnchoredPosition: {x: 1112.7, y: 890.88}
   m_SizeDelta: {x: 3754.981, y: 146.9714}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &291611705
@@ -3570,7 +3535,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 791bef277b91f449aab398b0954cfacc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ExampleWindow
-  popupWindow: {fileID: 0}
 --- !u!1 &319372736
 GameObject:
   m_ObjectHideFlags: 0
@@ -5326,7 +5290,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2612b97e0627947e58441fe3731e2a68, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CampaignManager
-  currentRoundNumber: 1
 --- !u!1 &511060759
 GameObject:
   m_ObjectHideFlags: 0
@@ -12127,6 +12090,9 @@ MonoBehaviour:
     weight9: 0
   gameDuration: 60
   baseMatchScore: 10
+  barMax: 100
+  barGainPerSolve: 10
+  barDrainPerSecond: 1
   multiplierDuration: 10
   multiplierDrainRate: 1
   multiplierIncrement: 0.25
@@ -15157,23 +15123,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b19885f39c571455687cdd8fca345f61, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UpgradeConfirmWindow
-  windowWidth: 850
-  minWindowHeight: 400
-  maxWindowHeight: 1200
-  iconSize: 150
-  costColor:
-    r: 1
-    g: 0.85
-    b: 0.3
-    a: 1
-  descriptionColor:
-    r: 0.8
-    g: 0.8
-    b: 0.85
-    a: 1
-  testUpgrades: []
-  popupWindow: {fileID: 0}
-  currentUpgrade: {fileID: 0}
 --- !u!1 &1551267763
 GameObject:
   m_ObjectHideFlags: 0
@@ -21428,7 +21377,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 1.3862305}
+  m_AnchoredPosition: {x: 0, y: 150}
   m_SizeDelta: {x: 0, y: -2.7723}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2126877257
@@ -21451,7 +21400,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Make 10
+  m_text: Make10
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
   m_sharedMaterial: {fileID: 2028370367}
@@ -21480,8 +21429,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 193.74
-  m_fontSizeBase: 193.74
+  m_fontSize: 207.4
+  m_fontSizeBase: 207.4
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18

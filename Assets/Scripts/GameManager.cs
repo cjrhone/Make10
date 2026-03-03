@@ -111,6 +111,48 @@ public class GameManager : MonoBehaviour
     private const string ZEN_HIGH_SCORE_BP_KEY = "Make10_ZenHighScoreBP";
     private const string ZEN_TOTAL_GAMES_KEY = "Make10_ZenTotalGames";
 
+    // Zen save/resume persistence key
+    private const string ZEN_SAVE_KEY = "Make10_ZenSaveData";
+
+    /// <summary>
+    /// Serializable snapshot of all Zen game state for save/resume.
+    /// Saved to PlayerPrefs as JSON when player exits to main menu mid-game.
+    /// </summary>
+    [System.Serializable]
+    public class ZenSaveData
+    {
+        // Timer & Score
+        public int score;
+        public float timeRemaining;
+
+        // Multiplier state (Zen per-solve system)
+        public float currentMultiplier;
+        public float maxMultiplierReached;
+        public float multiplierTimer;
+        public bool multiplierActive;
+        public int solveCount;
+        public float timeSinceLastSolve;
+
+        // Hot Streak
+        public bool hotStreakActive;
+        public float hotStreakTimer;
+
+        // Zen-specific stats
+        public int zenReshufflesRemaining;
+        public int zenMatchCount;
+        public int zenLockedTileCount;
+        public int zenHighestLockedValue;
+        public int zenChainCount;
+
+        // Grid tile values (flat array, row-major: index = y * width + x)
+        public int gridWidth;
+        public int gridHeight;
+        public int[] tileValues;
+
+        // Tile bag remaining contents
+        public int[] tileBagContents;
+    }
+
     // Zen mode tracking
     private int zenReshufflesRemaining;
     public int ZenReshufflesRemaining => zenReshufflesRemaining;
@@ -932,6 +974,9 @@ public class GameManager : MonoBehaviour
 
         PlayerPrefs.Save();
 
+        // Game ended naturally — clear any saved Zen state (no resume possible)
+        if (CurrentMode == GameMode.Zen) ClearZenSave();
+
         string endMessage = CurrentMode == GameMode.Zen ? "STILLNESS" : "TIME'S UP";
         Debug.Log($"<color=cyan>*** {endMessage}! ***</color> Score: {Score} | Session: {lastSessionDuration:F1}s | Games: {gamesPlayed}");
         SceneFlowManager.Instance?.OnGameEnded();
@@ -958,6 +1003,144 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    #endregion
+
+    #region Zen Save/Resume
+
+    /// <summary>
+    /// Returns true if a saved Zen game exists in PlayerPrefs.
+    /// </summary>
+    public static bool HasZenSave()
+    {
+        return PlayerPrefs.HasKey(ZEN_SAVE_KEY);
+    }
+
+    /// <summary>
+    /// Save the current Zen game state to PlayerPrefs.
+    /// Called when player exits to main menu mid-game via pause menu.
+    /// </summary>
+    public void SaveZenState()
+    {
+        if (CurrentMode != GameMode.Zen) return;
+
+        ZenSaveData save = new ZenSaveData();
+
+        // Timer & Score
+        save.score = Score;
+        save.timeRemaining = TimeRemaining;
+
+        // Multiplier
+        save.currentMultiplier = currentMultiplier;
+        save.maxMultiplierReached = maxMultiplierReached;
+        save.multiplierTimer = multiplierTimer;
+        save.multiplierActive = multiplierActive;
+        save.solveCount = solveCount;
+        save.timeSinceLastSolve = timeSinceLastSolve;
+
+        // Hot Streak
+        save.hotStreakActive = hotStreakActive;
+        save.hotStreakTimer = hotStreakTimer;
+
+        // Zen stats
+        save.zenReshufflesRemaining = zenReshufflesRemaining;
+        save.zenMatchCount = zenMatchCount;
+        save.zenLockedTileCount = zenLockedTileCount;
+        save.zenHighestLockedValue = zenHighestLockedValue;
+        save.zenChainCount = zenChainCount;
+
+        // Grid state from GridManager
+        GridManager gm = FindFirstObjectByType<GridManager>();
+        if (gm != null)
+        {
+            gm.SaveGridToData(save);
+        }
+
+        // Tile bag state
+        TileWeightManager twm = TileWeightManager.Instance;
+        if (twm != null)
+        {
+            save.tileBagContents = twm.GetBagContents();
+        }
+
+        string json = JsonUtility.ToJson(save);
+        PlayerPrefs.SetString(ZEN_SAVE_KEY, json);
+        PlayerPrefs.Save();
+
+        Debug.Log($"<color=green>[Zen Save] Saved — Score: {save.score}, Time: {save.timeRemaining:F1}s, Locked: {save.zenLockedTileCount}</color>");
+    }
+
+    /// <summary>
+    /// Load saved Zen state and restore all game state fields.
+    /// Call BEFORE ActivateGame — this replaces ResetRoundState values.
+    /// Returns the save data (needed by GridManager to rebuild the grid).
+    /// </summary>
+    public ZenSaveData LoadZenState()
+    {
+        if (!HasZenSave()) return null;
+
+        string json = PlayerPrefs.GetString(ZEN_SAVE_KEY, "");
+        if (string.IsNullOrEmpty(json)) return null;
+
+        ZenSaveData save = JsonUtility.FromJson<ZenSaveData>(json);
+        if (save == null) return null;
+
+        // Restore timer & score
+        Score = save.score;
+        TimeRemaining = save.timeRemaining;
+        IsGameActive = true;
+        IsProcessing = false;
+        IsSolveAnimationPlaying = false;
+
+        // Restore multiplier
+        currentMultiplier = save.currentMultiplier;
+        maxMultiplierReached = save.maxMultiplierReached;
+        multiplierTimer = save.multiplierTimer;
+        multiplierActive = save.multiplierActive;
+        solveCount = save.solveCount;
+        timeSinceLastSolve = save.timeSinceLastSolve;
+
+        // Restore hot streak
+        hotStreakActive = save.hotStreakActive;
+        hotStreakTimer = save.hotStreakTimer;
+
+        // Restore zen stats
+        zenReshufflesRemaining = save.zenReshufflesRemaining;
+        zenMatchCount = save.zenMatchCount;
+        zenLockedTileCount = save.zenLockedTileCount;
+        zenHighestLockedValue = save.zenHighestLockedValue;
+        zenChainCount = save.zenChainCount;
+
+        // Arcade bar reset (not used in Zen but keep clean)
+        multiplierBar = 0f;
+        cascadeLineCounter = 0;
+        lastPlayerSolveTime = -999f;
+        sessionStartTime = Time.time;
+        lastSessionDuration = 0f;
+        IsNewHighScore = false;
+
+        // Cache effective values (same as ActivateGame)
+        CacheEffectiveValues();
+
+        // Notify UI of restored state
+        NotifyUIOfReset();
+
+        Debug.Log($"<color=green>[Zen Load] Restored — Score: {Score}, Time: {TimeRemaining:F1}s, Mult: x{currentMultiplier:F2}, Locked: {zenLockedTileCount}</color>");
+        return save;
+    }
+
+    /// <summary>
+    /// Clear the saved Zen game state. Called on game over (TimeUp, ZenGameOver)
+    /// and when starting a fresh new Zen game.
+    /// </summary>
+    public static void ClearZenSave()
+    {
+        if (PlayerPrefs.HasKey(ZEN_SAVE_KEY))
+        {
+            PlayerPrefs.DeleteKey(ZEN_SAVE_KEY);
+            PlayerPrefs.Save();
+            Debug.Log("<color=yellow>[Zen Save] Cleared saved state</color>");
+        }
+    }
 
     #endregion
 
@@ -1068,6 +1251,9 @@ public class GameManager : MonoBehaviour
 
         // IsNewHighScore will be set later by CheckAndSaveBPHighScore() in UIManager
         IsNewHighScore = false;
+
+        // Game ended naturally — clear any saved state
+        ClearZenSave();
 
         PlayerPrefs.Save();
 

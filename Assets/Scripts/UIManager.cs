@@ -423,8 +423,12 @@ public class UIManager : MonoBehaviour
         pauseHamburgerButton.SetActive(false); // Hidden until game starts
 
         // === PAUSE OVERLAY (full-screen, hidden initially) ===
+        // Parent to the root Canvas so it renders ON TOP of everything (grid, avatar, etc.)
+        Canvas rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        Transform overlayParent = rootCanvas != null ? rootCanvas.transform : parent;
+
         pauseOverlay = new GameObject("PauseOverlay");
-        pauseOverlay.transform.SetParent(parent, false);
+        pauseOverlay.transform.SetParent(overlayParent, false);
 
         RectTransform overlayRT = pauseOverlay.AddComponent<RectTransform>();
         overlayRT.anchorMin = Vector2.zero;
@@ -560,7 +564,10 @@ public class UIManager : MonoBehaviour
     public void ShowPauseHamburger()
     {
         if (pauseHamburgerButton != null)
+        {
             pauseHamburgerButton.SetActive(true);
+            pauseHamburgerButton.transform.SetAsLastSibling(); // Render on top of other UI
+        }
     }
 
     /// <summary>
