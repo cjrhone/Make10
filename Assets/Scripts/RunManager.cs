@@ -2,20 +2,30 @@ using UnityEngine;
 using System;
 
 /// <summary>
-/// Manages persistent state across rounds within a single run.
-/// Tracks BP (Brain Points) currency and round progression.
+/// Manages persistent BP (Brain Points) currency across all sessions.
+/// TotalBP = lifetime earned (display stat, never decreases).
+/// SpendableBP = current balance (decreases on shop purchases).
+/// Also manages per-run state (round number, run active flag).
 /// </summary>
 public class RunManager : MonoBehaviour
 {
     public static RunManager Instance { get; private set; }
 
+    // PlayerPrefs keys for persistent BP
+    private const string TOTAL_BP_KEY = "Make10_TotalBP";
+    private const string SPENDABLE_BP_KEY = "Make10_SpendableBP";
+
     [Header("Run State")]
     [SerializeField] private int startingBP = 0;
 
-    // Current run state
+    // Current run state (per-session, resets each run)
     public int CurrentBP { get; private set; }
     public int RoundNumber { get; private set; }
     public bool IsRunActive { get; private set; }
+
+    // Persistent BP (saved to PlayerPrefs)
+    public int TotalBP => PlayerPrefs.GetInt(TOTAL_BP_KEY, 0);
+    public int SpendableBP => PlayerPrefs.GetInt(SPENDABLE_BP_KEY, 0);
 
     // Events for UI updates
     public event Action<int> OnBPChanged;
@@ -34,7 +44,7 @@ public class RunManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Start a new run. Resets BP and round number.
+    /// Start a new run. Resets per-session BP and round number.
     /// </summary>
     public void StartNewRun()
     {
@@ -42,7 +52,7 @@ public class RunManager : MonoBehaviour
         RoundNumber = 1;
         IsRunActive = true;
 
-        Debug.Log($"<color=cyan>[RunManager] New run started! BP: {CurrentBP}, Round: {RoundNumber}</color>");
+        Debug.Log($"<color=cyan>[RunManager] New run started! BP: {CurrentBP}, Round: {RoundNumber}, Lifetime: {TotalBP}, Spendable: {SpendableBP}</color>");
 
         OnBPChanged?.Invoke(CurrentBP);
         OnRoundChanged?.Invoke(RoundNumber);
@@ -62,7 +72,7 @@ public class RunManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Add BP to the player's total (called when winning a round).
+    /// Add BP to the player's per-session total (called during gameplay).
     /// </summary>
     public void AddBP(int amount)
     {
@@ -77,23 +87,46 @@ public class RunManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Spend BP on an upgrade (returns false if insufficient funds).
+    /// Add earned BP to both persistent totals (TotalBP and SpendableBP).
+    /// Called at end of each round from the results screen.
+    /// </summary>
+    public void BankBP(int amount)
+    {
+        if (amount <= 0) return;
+
+        int prevTotal = TotalBP;
+        int prevSpendable = SpendableBP;
+
+        PlayerPrefs.SetInt(TOTAL_BP_KEY, prevTotal + amount);
+        PlayerPrefs.SetInt(SPENDABLE_BP_KEY, prevSpendable + amount);
+        PlayerPrefs.Save();
+
+        Debug.Log($"<color=green>[RunManager] Banked +{amount} BP! Total: {prevTotal} → {TotalBP}, Spendable: {prevSpendable} → {SpendableBP}</color>");
+
+        // Notify listeners (e.g. MainMenuUI BP display) of the updated balance
+        OnBPChanged?.Invoke(SpendableBP);
+    }
+
+    /// <summary>
+    /// Spend BP from the spendable balance (for shop purchases).
+    /// Returns false if insufficient funds.
     /// </summary>
     public bool SpendBP(int amount)
     {
         if (amount <= 0) return false;
-        if (CurrentBP < amount)
+        int current = SpendableBP;
+        if (current < amount)
         {
-            Debug.Log($"<color=yellow>[RunManager] Cannot spend {amount} BP - only have {CurrentBP}</color>");
+            Debug.Log($"<color=yellow>[RunManager] Cannot spend {amount} BP - only have {current}</color>");
             return false;
         }
 
-        int previousBP = CurrentBP;
-        CurrentBP -= amount;
+        PlayerPrefs.SetInt(SPENDABLE_BP_KEY, current - amount);
+        PlayerPrefs.Save();
 
-        Debug.Log($"<color=orange>[RunManager] -{amount} BP ({previousBP} → {CurrentBP})</color>");
+        Debug.Log($"<color=orange>[RunManager] -{amount} BP ({current} → {SpendableBP})</color>");
 
-        OnBPChanged?.Invoke(CurrentBP);
+        OnBPChanged?.Invoke(SpendableBP);
         return true;
     }
 
@@ -114,6 +147,6 @@ public class RunManager : MonoBehaviour
     /// </summary>
     public bool CanAfford(int cost)
     {
-        return CurrentBP >= cost;
+        return SpendableBP >= cost;
     }
 }

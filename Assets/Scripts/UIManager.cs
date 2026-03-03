@@ -132,6 +132,11 @@ public class UIManager : MonoBehaviour
     private bool hotStreakActive = false;
     private bool isInHotStreakMode = false;
 
+    // Pause Menu UI elements (created programmatically)
+    private GameObject pauseHamburgerButton;
+    private GameObject pauseOverlay;
+    private bool pauseMenuCreated = false;
+
     // Hot Streak UI elements (created via code)
     private GameObject hotStreakTextObject;
     private TMPro.TMP_Text hotStreakText;
@@ -300,6 +305,9 @@ public class UIManager : MonoBehaviour
 
         // Create breakdown UI elements if not assigned in inspector
         EnsureBreakdownElementsExist();
+
+        // Create pause menu UI (hamburger button + overlay)
+        CreatePauseMenuUI();
     }
 
     private void CreateHotStreakText()
@@ -333,6 +341,217 @@ public class UIManager : MonoBehaviour
         );
 
         hotStreakTextObject.SetActive(false);
+    }
+
+    #endregion
+
+    #region Pause Menu
+
+    /// <summary>
+    /// Create the pause menu UI: hamburger button (top-left) + full-screen pause overlay.
+    /// Built entirely in code — no Inspector wiring needed.
+    /// </summary>
+    private void CreatePauseMenuUI()
+    {
+        if (pauseMenuCreated) return;
+        pauseMenuCreated = true;
+
+        // Parent to this UIManager's transform (lives on the game panel)
+        Transform parent = transform;
+
+        // === HAMBURGER BUTTON (top-left corner) ===
+        pauseHamburgerButton = new GameObject("PauseHamburgerButton");
+        pauseHamburgerButton.transform.SetParent(parent, false);
+
+        RectTransform hambRT = pauseHamburgerButton.AddComponent<RectTransform>();
+        hambRT.anchorMin = new Vector2(0f, 1f); // Top-left
+        hambRT.anchorMax = new Vector2(0f, 1f);
+        hambRT.pivot = new Vector2(0f, 1f);
+        hambRT.anchoredPosition = new Vector2(20f, -20f);
+        hambRT.sizeDelta = new Vector2(90f, 90f);
+
+        // Button background
+        Image hambBg = pauseHamburgerButton.AddComponent<Image>();
+        hambBg.color = new Color(0.1f, 0.1f, 0.15f, 0.7f);
+
+        // Button component
+        Button hambButton = pauseHamburgerButton.AddComponent<Button>();
+        ColorBlock hambColors = hambButton.colors;
+        hambColors.normalColor = new Color(0.1f, 0.1f, 0.15f, 0.7f);
+        hambColors.highlightedColor = new Color(0.2f, 0.2f, 0.25f, 0.85f);
+        hambColors.pressedColor = new Color(0.05f, 0.05f, 0.1f, 0.9f);
+        hambButton.colors = hambColors;
+        hambButton.onClick.AddListener(() => {
+            SceneFlowManager.Instance?.OnPausePressed();
+        });
+
+        // Hamburger icon text (☰)
+        GameObject hambTextObj = new GameObject("HamburgerIcon");
+        hambTextObj.transform.SetParent(pauseHamburgerButton.transform, false);
+        RectTransform hambTextRT = hambTextObj.AddComponent<RectTransform>();
+        hambTextRT.anchorMin = Vector2.zero;
+        hambTextRT.anchorMax = Vector2.one;
+        hambTextRT.offsetMin = Vector2.zero;
+        hambTextRT.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI hambText = hambTextObj.AddComponent<TextMeshProUGUI>();
+        hambText.text = "| |"; // Pause icon (two bars)
+        hambText.fontSize = 44f;
+        hambText.fontStyle = FontStyles.Bold;
+        hambText.alignment = TextAlignmentOptions.Center;
+        hambText.color = new Color(0.95f, 0.95f, 0.95f, 0.9f);
+        if (scoreText != null) hambText.font = scoreText.font;
+
+        pauseHamburgerButton.SetActive(false); // Hidden until game starts
+
+        // === PAUSE OVERLAY (full-screen, hidden initially) ===
+        pauseOverlay = new GameObject("PauseOverlay");
+        pauseOverlay.transform.SetParent(parent, false);
+
+        RectTransform overlayRT = pauseOverlay.AddComponent<RectTransform>();
+        overlayRT.anchorMin = Vector2.zero;
+        overlayRT.anchorMax = Vector2.one;
+        overlayRT.offsetMin = Vector2.zero;
+        overlayRT.offsetMax = Vector2.zero;
+
+        // Dark semi-transparent background
+        Image overlayBg = pauseOverlay.AddComponent<Image>();
+        overlayBg.color = new Color(0.02f, 0.02f, 0.06f, 0.88f);
+
+        // Content container (centered column)
+        GameObject contentContainer = new GameObject("PauseContent");
+        contentContainer.transform.SetParent(pauseOverlay.transform, false);
+        RectTransform contentRT = contentContainer.AddComponent<RectTransform>();
+        contentRT.anchorMin = new Vector2(0.5f, 0.5f);
+        contentRT.anchorMax = new Vector2(0.5f, 0.5f);
+        contentRT.sizeDelta = new Vector2(600f, 500f);
+        contentRT.anchoredPosition = Vector2.zero;
+
+        // "PAUSED" title
+        GameObject pauseTitle = new GameObject("PauseTitle");
+        pauseTitle.transform.SetParent(contentContainer.transform, false);
+        RectTransform titleRT = pauseTitle.AddComponent<RectTransform>();
+        titleRT.anchorMin = new Vector2(0.5f, 1f);
+        titleRT.anchorMax = new Vector2(0.5f, 1f);
+        titleRT.pivot = new Vector2(0.5f, 1f);
+        titleRT.anchoredPosition = new Vector2(0f, 0f);
+        titleRT.sizeDelta = new Vector2(500f, 80f);
+
+        TextMeshProUGUI titleText = pauseTitle.AddComponent<TextMeshProUGUI>();
+        titleText.text = "PAUSED";
+        titleText.fontSize = 64f;
+        titleText.fontStyle = FontStyles.Bold;
+        titleText.alignment = TextAlignmentOptions.Center;
+        titleText.color = UIStyleGuide.ColorTextPrimary;
+        if (scoreText != null) titleText.font = scoreText.font;
+
+        // Button layout: Resume, Options, Main Menu (stacked vertically)
+        float buttonWidth = 480f;
+        float buttonHeight = UIStyleGuide.ButtonHeight;
+        float buttonSpacing = 24f;
+        float startY = -120f; // Below title
+
+        CreatePauseButton(contentContainer.transform, "ResumeButton", "Resume",
+            UIStyleGuide.ColorButtonPrimary, startY, buttonWidth, buttonHeight,
+            () => SceneFlowManager.Instance?.OnResumePressed());
+
+        CreatePauseButton(contentContainer.transform, "OptionsButton", "Options",
+            UIStyleGuide.ColorButtonSecondary, startY - (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
+            () => SceneFlowManager.Instance?.OnPauseOptionsPressed());
+
+        CreatePauseButton(contentContainer.transform, "MainMenuButton", "Main Menu",
+            UIStyleGuide.ColorButtonDanger, startY - 2 * (buttonHeight + buttonSpacing), buttonWidth, buttonHeight,
+            () => SceneFlowManager.Instance?.OnPauseMainMenuPressed());
+
+        pauseOverlay.SetActive(false);
+    }
+
+    /// <summary>
+    /// Helper: Create a styled button for the pause menu.
+    /// </summary>
+    private void CreatePauseButton(Transform parent, string name, string label, Color bgColor,
+        float yPos, float width, float height, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject buttonObj = new GameObject(name);
+        buttonObj.transform.SetParent(parent, false);
+
+        RectTransform rt = buttonObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, yPos);
+        rt.sizeDelta = new Vector2(width, height);
+
+        Image bg = buttonObj.AddComponent<Image>();
+        bg.color = bgColor;
+
+        Button button = buttonObj.AddComponent<Button>();
+        button.targetGraphic = bg;
+        ColorBlock colors = button.colors;
+        colors.normalColor = Color.white;
+        colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+        button.colors = colors;
+        button.onClick.AddListener(onClick);
+
+        // Button text
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI text = textObj.AddComponent<TextMeshProUGUI>();
+        text.text = label;
+        text.fontSize = UIStyleGuide.FontSizeButton;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = UIStyleGuide.ColorTextPrimary;
+        if (scoreText != null) text.font = scoreText.font;
+    }
+
+    /// <summary>
+    /// Show the pause menu overlay. Called by SceneFlowManager.OnPausePressed().
+    /// </summary>
+    public void ShowPauseMenu()
+    {
+        if (pauseOverlay != null)
+        {
+            pauseOverlay.SetActive(true);
+            pauseOverlay.transform.SetAsLastSibling(); // Render on top
+        }
+        if (pauseHamburgerButton != null)
+            pauseHamburgerButton.SetActive(false); // Hide hamburger while paused
+    }
+
+    /// <summary>
+    /// Hide the pause menu overlay. Called by SceneFlowManager.OnResumePressed().
+    /// </summary>
+    public void HidePauseMenu()
+    {
+        if (pauseOverlay != null)
+            pauseOverlay.SetActive(false);
+        if (pauseHamburgerButton != null)
+            pauseHamburgerButton.SetActive(true); // Show hamburger again
+    }
+
+    /// <summary>
+    /// Show the hamburger button (call when game starts).
+    /// </summary>
+    public void ShowPauseHamburger()
+    {
+        if (pauseHamburgerButton != null)
+            pauseHamburgerButton.SetActive(true);
+    }
+
+    /// <summary>
+    /// Hide the hamburger button (call when game ends / returns to menu).
+    /// </summary>
+    public void HidePauseHamburger()
+    {
+        if (pauseHamburgerButton != null)
+            pauseHamburgerButton.SetActive(false);
     }
 
     #endregion
@@ -378,6 +597,7 @@ public class UIManager : MonoBehaviour
         StopTimeWarningSound();
         DeactivateHotStreak();
         CleanupHotStreakMode();
+        HidePauseHamburger();
         StartCoroutine(ShowFinishThenResult(true));
     }
 
@@ -408,6 +628,9 @@ public class UIManager : MonoBehaviour
         displayedScore = 0;
         pendingScoreToAdd = 0;
         UpdateScoreDisplay(0);
+
+        // Show the pause hamburger button when a game run starts
+        ShowPauseHamburger();
     }
 
     #endregion
@@ -985,6 +1208,14 @@ public class UIManager : MonoBehaviour
         int sessionTimeBonus = isZen ? 0 : Mathf.RoundToInt(sessionDuration);
         int total = baseScore + sessionTimeBonus;
 
+        // === PERSIST IMMEDIATELY (before animation, so button clicks can't interrupt) ===
+        // Save BP high score (also sets IsNewHighScore flag)
+        gameManager?.CheckAndSaveBPHighScore(total);
+        // Bank earned BP to persistent totals (TotalBP + SpendableBP)
+        RunManager.Instance?.BankBP(total);
+        // Cache the high score flag since it needs to survive cleanup
+        bool isNewHighScore = gameManager != null && gameManager.IsNewHighScore;
+
         // Hide all breakdown elements initially
         HideBreakdownElements();
 
@@ -1101,14 +1332,11 @@ public class UIManager : MonoBehaviour
             }
         }
 
-        // Save BP high score
-        gameManager?.CheckAndSaveBPHighScore(total);
-
-        // Show NEW HIGH SCORE banner if applicable
-        if (gameManager != null && gameManager.IsNewHighScore)
+        // Show NEW HIGH SCORE banner if applicable (flag was set earlier before animation)
+        if (isNewHighScore)
         {
-            yield return new WaitForSeconds(0.2f);
-            ShowNewHighScoreBanner();
+            yield return new WaitForSeconds(0.3f);
+            yield return StartCoroutine(ShowNewHighScoreCelebration());
         }
     }
 
@@ -1246,27 +1474,27 @@ public class UIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Show the NEW HIGH SCORE banner with animation.
+    /// Animated NEW HIGH SCORE celebration with scale-up, glow pulse, and sound.
     /// </summary>
-    private void ShowNewHighScoreBanner()
+    private IEnumerator ShowNewHighScoreCelebration()
     {
         if (newHighScoreBanner == null)
         {
             // Create it dynamically if not assigned in inspector
-            if (winScreen == null) return;
+            if (winScreen == null) yield break;
 
             Transform breakdownContainer = winScreen.transform.Find("BreakdownContainer");
-            if (breakdownContainer == null) return;
+            if (breakdownContainer == null) yield break;
 
             GameObject bannerObj = new GameObject("NewHighScoreBanner");
             bannerObj.transform.SetParent(breakdownContainer, false);
 
             RectTransform bannerRT = bannerObj.AddComponent<RectTransform>();
-            bannerRT.sizeDelta = new Vector2(0, 50f);
+            bannerRT.sizeDelta = new Vector2(0, 60f);
 
             TMP_Text bannerText = bannerObj.AddComponent<TextMeshProUGUI>();
             bannerText.text = "NEW HIGH SCORE!";
-            bannerText.fontSize = 42f;
+            bannerText.fontSize = 48f;
             bannerText.fontStyle = FontStyles.Bold;
             bannerText.alignment = TextAlignmentOptions.Center;
             bannerText.color = newHighScoreColor;
@@ -1278,8 +1506,35 @@ public class UIManager : MonoBehaviour
         }
 
         newHighScoreBanner.SetActive(true);
-        StartCoroutine(AnimationUtilities.PunchScale(newHighScoreBanner.transform, 1.3f, 0.3f));
-        AudioManager.Instance?.PlayButtonClick(); // Celebratory sound
+        newHighScoreBanner.transform.localScale = Vector3.zero;
+
+        // Big pop-in with overshoot
+        AudioManager.Instance?.PlayFinishSound();
+        yield return StartCoroutine(AnimationUtilities.PopIn(newHighScoreBanner.transform, 1.4f, 0.3f, 0.08f));
+
+        // Gold glow pulse (3 cycles)
+        TMP_Text text = newHighScoreBanner.GetComponent<TextMeshProUGUI>();
+        if (text != null)
+        {
+            Color brightGold = new Color(1f, 0.95f, 0.6f);
+            for (int i = 0; i < 3; i++)
+            {
+                float elapsed = 0f;
+                float pulseDuration = 0.4f;
+                while (elapsed < pulseDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / pulseDuration;
+                    float glow = Mathf.Sin(t * Mathf.PI); // 0 → 1 → 0
+                    text.color = Color.Lerp(newHighScoreColor, brightGold, glow);
+                    yield return null;
+                }
+            }
+            text.color = newHighScoreColor; // Settle on gold
+        }
+
+        // Screen shake for emphasis
+        GridVFX.Instance?.TriggerShake(2);
     }
 
     /// <summary>
@@ -1605,19 +1860,8 @@ public class UIManager : MonoBehaviour
     {
         AudioManager.Instance?.PlayButtonClick();
 
-        // Calculate total BP earned
-        if (gameManager != null)
-        {
-            int baseScore = gameManager.Score;
-            bool isZen = SceneFlowManager.Instance != null && SceneFlowManager.Instance.ResultsFromZen;
-            int sessionTimeBonus = isZen ? 0 : Mathf.RoundToInt(gameManager.SessionDuration);
-            int totalBP = baseScore + sessionTimeBonus;
-
-            // Add BP to RunManager
-            RunManager.Instance?.AddBP(totalBP);
-
-            Debug.Log($"<color=green>[UIManager] Play Again pressed - Added {totalBP} BP to run total</color>");
-        }
+        // BP was already banked to persistent storage in ShowWinScreenBreakdown()
+        // No need to add again here
 
         // Hide win screen immediately
         SetActiveIfNotNull(winScreen, false);
@@ -1664,6 +1908,10 @@ public class UIManager : MonoBehaviour
 
         // Also clean up effects
         CleanupGameOverState();
+
+        // Hide pause UI
+        HidePauseHamburger();
+        HidePauseMenu();
     }
 
     /// <summary>

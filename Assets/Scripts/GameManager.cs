@@ -741,13 +741,15 @@ public class GameManager : MonoBehaviour
         int gamesPlayed = PlayerPrefs.GetInt(gamesKey, 0) + 1;
         PlayerPrefs.SetInt(gamesKey, gamesPlayed);
 
-        // Check for new high score (raw score)
-        IsNewHighScore = Score > PlayerPrefs.GetInt(hsKey, 0);
-        if (IsNewHighScore)
+        // Save raw score high score (legacy key, kept for backward compat)
+        if (Score > PlayerPrefs.GetInt(hsKey, 0))
         {
             PlayerPrefs.SetInt(hsKey, Score);
-            Debug.Log($"<color=yellow>*** NEW HIGH SCORE ({CurrentMode}): {Score}! ***</color>");
         }
+
+        // IsNewHighScore will be set later by CheckAndSaveBPHighScore() in UIManager
+        // after total BP (including session time bonus) is calculated
+        IsNewHighScore = false;
 
         PlayerPrefs.Save();
 
@@ -759,17 +761,21 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Save the total BP earned this round as high score if it's a new record.
-    /// Called from UIManager after BP calculation.
+    /// Called from UIManager after BP calculation. Sets IsNewHighScore flag.
     /// </summary>
     public void CheckAndSaveBPHighScore(int totalBP)
     {
         string key = CurrentMode == GameMode.Zen ? ZEN_HIGH_SCORE_BP_KEY : HIGH_SCORE_BP_KEY;
         int currentBest = PlayerPrefs.GetInt(key, 0);
-        if (totalBP > currentBest)
+
+        // Set IsNewHighScore based on total BP (the real player-facing score)
+        IsNewHighScore = totalBP > currentBest;
+
+        if (IsNewHighScore)
         {
             PlayerPrefs.SetInt(key, totalBP);
             PlayerPrefs.Save();
-            Debug.Log($"<color=yellow>*** NEW BP HIGH SCORE ({CurrentMode}): {totalBP}! ***</color>");
+            Debug.Log($"<color=yellow>*** NEW BP HIGH SCORE ({CurrentMode}): {totalBP} (prev: {currentBest})! ***</color>");
         }
     }
 
@@ -874,14 +880,15 @@ public class GameManager : MonoBehaviour
         int gamesPlayed = PlayerPrefs.GetInt(gamesKey, 0) + 1;
         PlayerPrefs.SetInt(gamesKey, gamesPlayed);
 
-        // Check for new high score
+        // Save raw score high score (legacy key)
         string hsKey = ZEN_HIGH_SCORE_KEY;
-        IsNewHighScore = Score > PlayerPrefs.GetInt(hsKey, 0);
-        if (IsNewHighScore)
+        if (Score > PlayerPrefs.GetInt(hsKey, 0))
         {
             PlayerPrefs.SetInt(hsKey, Score);
-            Debug.Log($"<color=yellow>*** NEW ZEN HIGH SCORE: {Score}! ***</color>");
         }
+
+        // IsNewHighScore will be set later by CheckAndSaveBPHighScore() in UIManager
+        IsNewHighScore = false;
 
         PlayerPrefs.Save();
 

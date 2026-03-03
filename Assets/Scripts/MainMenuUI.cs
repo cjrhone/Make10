@@ -25,9 +25,15 @@ public class MainMenuUI : MonoBehaviour
     [SerializeField] private float bannerWidth = 1500f; // Width of ONE banner text
     
     [Header("Button References")]
-    [SerializeField] private Button playButton;
-    [SerializeField] private Button optionsButton;
-    [SerializeField] private Button quitButton;
+    [SerializeField] private Button playButton;         // Arcade Mode — wire to SceneFlowManager.OnPlayPressed()
+    [SerializeField] private Button zenButton;           // Zen Mode — wire to SceneFlowManager.OnZenPressed()
+    [SerializeField] private Button creditsButton;       // Credits — wire to SceneFlowManager.OnCreditsPressed()
+    [SerializeField] private Button shopButton;          // Shop (greyed out) — wire to SceneFlowManager.OnShopPressed()
+    [SerializeField] private Button optionsButton;       // Legacy — kept for backward compatibility
+    [SerializeField] private Button quitButton;          // Legacy — kept for backward compatibility
+
+    [Header("BP Display")]
+    [SerializeField] private TMP_Text bpDisplayText;     // Shows "BP: X,XXX" on main menu bottom-left
 
     [Header("High Score Display")]
     [SerializeField] private TMP_Text highScoreDisplayText;
@@ -47,8 +53,18 @@ public class MainMenuUI : MonoBehaviour
         // Setup button listeners
         SetupButtons();
 
+        // Configure shop button as greyed out
+        SetupShopButton();
+
         // Show high score on menu
         UpdateHighScoreDisplay();
+
+        // Show BP currency
+        UpdateBPDisplay();
+
+        // Subscribe to BP changes so display updates after rounds
+        if (RunManager.Instance != null)
+            RunManager.Instance.OnBPChanged += OnBPChanged;
 
         // Start animations
         StartCoroutine(AnimateTitle());
@@ -56,31 +72,47 @@ public class MainMenuUI : MonoBehaviour
 
     private void OnEnable()
     {
-        // Refresh high score every time menu becomes visible
+        // Refresh high score and BP every time menu becomes visible
+        UpdateHighScoreDisplay();
+        UpdateBPDisplay();
+    }
+
+    private void OnDestroy()
+    {
+        // Unsubscribe to prevent memory leaks
+        if (RunManager.Instance != null)
+            RunManager.Instance.OnBPChanged -= OnBPChanged;
+    }
+
+    private void OnBPChanged(int _)
+    {
+        UpdateBPDisplay();
         UpdateHighScoreDisplay();
     }
 
     /// <summary>
     /// Update the high score display on the main menu.
+    /// Shows BP-based high scores (total BP per round, not raw score).
     /// </summary>
     private void UpdateHighScoreDisplay()
     {
         if (highScoreDisplayText == null) return;
 
-        int arcadeHighScore = PlayerPrefs.GetInt("Make10_HighScore", 0);
+        // Use BP high score keys (the real player-facing score including bonuses)
+        int arcadeBestBP = PlayerPrefs.GetInt("Make10_HighScoreBP", 0);
         int arcadeGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
-        int zenHighScore = PlayerPrefs.GetInt("Make10_ZenHighScore", 0);
+        int zenBestBP = PlayerPrefs.GetInt("Make10_ZenHighScoreBP", 0);
         int zenGames = PlayerPrefs.GetInt("Make10_ZenTotalGames", 0);
 
         if (arcadeGames > 0 || zenGames > 0)
         {
             string display = "";
             if (arcadeGames > 0)
-                display += $"Arcade Best: {arcadeHighScore}";
+                display += $"Arcade Best: {arcadeBestBP:N0} BP";
             if (zenGames > 0)
             {
                 if (display.Length > 0) display += "  |  ";
-                display += $"Zen Best: {zenHighScore}";
+                display += $"Zen Best: {zenBestBP:N0} BP";
             }
             highScoreDisplayText.text = display;
             highScoreDisplayText.gameObject.SetActive(true);
@@ -100,40 +132,76 @@ public class MainMenuUI : MonoBehaviour
     
     /// <summary>
     /// Setup button click listeners.
-    /// NOTE: Disabled - buttons are wired via Inspector onClick instead.
-    /// Keeping this code for reference if needed later.
+    /// Buttons can be wired in Inspector OR set up here in code.
+    /// Code-based wiring only runs for buttons that have a reference assigned
+    /// but no Inspector onClick events.
     /// </summary>
     private void SetupButtons()
     {
-        // Buttons are wired in Inspector - don't double-wire here
-        // If you want to use code-based wiring instead, uncomment below
-        // and remove the Inspector onClick events
-        
-        /*
-        if (playButton != null)
+        // Wire Zen button if assigned but not yet wired
+        if (zenButton != null && zenButton.onClick.GetPersistentEventCount() == 0)
         {
-            playButton.onClick.AddListener(() => {
+            zenButton.onClick.AddListener(() => {
                 if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnPlayPressed();
+                    SceneFlowManager.Instance.OnZenPressed();
             });
         }
-        
-        if (optionsButton != null)
+
+        // Wire Credits button if assigned but not yet wired
+        if (creditsButton != null && creditsButton.onClick.GetPersistentEventCount() == 0)
         {
-            optionsButton.onClick.AddListener(() => {
+            creditsButton.onClick.AddListener(() => {
                 if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnOptionsPressed();
+                    SceneFlowManager.Instance.OnCreditsPressed();
             });
         }
-        
-        if (quitButton != null)
+
+        // Wire Shop button if assigned but not yet wired
+        if (shopButton != null && shopButton.onClick.GetPersistentEventCount() == 0)
         {
-            quitButton.onClick.AddListener(() => {
+            shopButton.onClick.AddListener(() => {
                 if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnQuitPressed();
+                    SceneFlowManager.Instance.OnShopPressed();
             });
         }
-        */
+    }
+
+    /// <summary>
+    /// Configure the shop button as greyed out with "Coming Soon" state.
+    /// </summary>
+    private void SetupShopButton()
+    {
+        if (shopButton == null) return;
+
+        shopButton.interactable = false;
+
+        // Grey out the button visuals
+        ColorBlock colors = shopButton.colors;
+        colors.disabledColor = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        shopButton.colors = colors;
+
+        // Add "Coming Soon" label if the button has a text child
+        TMP_Text buttonText = shopButton.GetComponentInChildren<TMP_Text>();
+        if (buttonText != null)
+        {
+            buttonText.text = "Shop - Coming Soon";
+            buttonText.color = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+        }
+    }
+
+    /// <summary>
+    /// Update the BP currency display on the main menu.
+    /// Shows persistent spendable BP from RunManager.
+    /// </summary>
+    private void UpdateBPDisplay()
+    {
+        if (bpDisplayText == null) return;
+
+        int spendableBP = RunManager.Instance != null
+            ? RunManager.Instance.SpendableBP
+            : PlayerPrefs.GetInt("Make10_SpendableBP", 0);
+        bpDisplayText.text = $"BP: {spendableBP:N0}";
+        bpDisplayText.gameObject.SetActive(true);
     }
     
     /// <summary>

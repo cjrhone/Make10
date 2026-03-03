@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using System.Collections;
 
 /// <summary>
@@ -41,8 +42,11 @@ public class SceneFlowManager : MonoBehaviour
     private float screenHeight;
 
     // Current state
-    public enum GameState { Loading, MainMenu, Options, Game, ZenGame, Results, Tutorial1, Tutorial2, Countdown, Quit }
+    public enum GameState { Loading, MainMenu, Options, Game, ZenGame, Results, Tutorial1, Tutorial2, Countdown, Quit, Paused }
     public GameState CurrentState { get; private set; }
+
+    // Track what state we paused FROM so we can resume correctly
+    private GameState stateBeforePause;
 
     // Track which mode the Results screen originated from (for correct back-navigation)
     public bool ResultsFromZen => resultsFromZen;
@@ -164,6 +168,9 @@ public class SceneFlowManager : MonoBehaviour
         SetPanelActive(countdownPanel, true);
         SetPanelActive(quitPanel, true);
 
+        // Fix options panel anchoring — ensure it's centered and properly sized
+        EnsureOptionsPanelAnchored();
+
         // Hide old tutorial panels (replaced by TutorialBuilder popups)
         SetPanelActive(tutorialPanel1, false);
         SetPanelActive(tutorialPanel2, false);
@@ -230,6 +237,30 @@ public class SceneFlowManager : MonoBehaviour
     {
         if (panel != null)
             panel.gameObject.SetActive(active);
+    }
+
+    /// <summary>
+    /// Ensure the Options panel is properly anchored to center of screen
+    /// with correct sizing. Fixes misposition issues from Inspector defaults.
+    /// </summary>
+    private void EnsureOptionsPanelAnchored()
+    {
+        if (optionsPanel == null) return;
+
+        // Options is a centered overlay, not a full-screen slide panel
+        optionsPanel.anchorMin = new Vector2(0.5f, 0.5f);
+        optionsPanel.anchorMax = new Vector2(0.5f, 0.5f);
+        optionsPanel.pivot = new Vector2(0.5f, 0.5f);
+        optionsPanel.anchoredPosition = Vector2.zero;
+
+        // Use UIStyleGuide large window size for consistency
+        optionsPanel.sizeDelta = UIStyleGuide.WindowSizeLarge;
+
+        // Ensure it has a CanvasGroup for fade transitions
+        if (optionsPanel.GetComponent<CanvasGroup>() == null)
+            optionsPanel.gameObject.AddComponent<CanvasGroup>();
+
+        Debug.Log($"[Make10] Options panel anchored: center, size {UIStyleGuide.WindowSizeLarge}");
     }
     
     /// <summary>
@@ -320,6 +351,11 @@ public class SceneFlowManager : MonoBehaviour
             case GameState.Tutorial1:
             case GameState.Tutorial2:
                 StartCoroutine(CancelTutorialToMainMenu());
+                break;
+
+            // Paused → resume the game
+            case GameState.Paused:
+                OnResumePressed();
                 break;
 
             default:
@@ -461,6 +497,27 @@ public class SceneFlowManager : MonoBehaviour
         screenWidth = GetCanvasWidth();
         screenHeight = GetCanvasHeight();
 
+        // Fast path: if all managers are already initialized, skip the loading bar
+        bool allReady = (AudioManager.Instance != null &&
+                         GameManager.Instance != null &&
+                         FindFirstObjectByType<GridManager>() != null);
+
+        if (allReady)
+        {
+            Debug.Log("LoadingSequence: All managers ready — skipping to MainMenu");
+
+            // Brief flash of loading screen (just enough for visual continuity)
+            yield return new WaitForSeconds(0.3f);
+
+            PlayAudio(() => AudioManager.Instance?.PlayMenuMusic());
+            yield return SlideTransition(loadingPanel, mainMenuPanel, slideLeft: true);
+            SetPanelActive(loadingPanel, false);
+            CurrentState = GameState.MainMenu;
+            Debug.Log($"Now in MainMenu state (fast path)");
+            yield break;
+        }
+
+        // Normal path: show loading progress while managers initialize
         loadingDisplayProgress = 0f;
         float startTime = Time.time;
 
@@ -856,6 +913,123 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log("Opening itch.io...");
         Application.OpenURL("https://itch.io/");
     }
+
+    /// <summary>
+    /// Credits button pressed — opens a PopupWindow with credits info.
+    /// Wire this to the Credits button's onClick in Inspector (or called from MainMenuUI).
+    /// </summary>
+    public void OnCreditsPressed()
+    {
+        Debug.Log($"OnCreditsPressed called! CurrentState = {CurrentState}");
+        if (CurrentState != GameState.MainMenu) return;
+        AudioManager.Instance?.PlayButtonClick();
+        ShowCreditsPopup();
+    }
+
+    /// <summary>
+    /// Shop button pressed — shows "Coming Soon" feedback.
+    /// Wire this to the Shop button's onClick in Inspector (or called from MainMenuUI).
+    /// </summary>
+    public void OnShopPressed()
+    {
+        Debug.Log($"OnShopPressed called! CurrentState = {CurrentState}");
+        if (CurrentState != GameState.MainMenu) return;
+        AudioManager.Instance?.PlayButtonClick();
+        // Shop is greyed out — this is a safety fallback if somehow clicked
+        Debug.Log("Shop coming soon!");
+    }
+
+    /// <summary>
+    /// Pause button pressed (hamburger menu during gameplay).
+    /// Freezes time and shows pause overlay.
+    /// </summary>
+    public void OnPausePressed()
+    {
+        if (CurrentState != GameState.Game && CurrentState != GameState.ZenGame) return;
+
+        Debug.Log($"Game paused from state: {CurrentState}");
+        AudioManager.Instance?.PlayButtonClick();
+
+        stateBeforePause = CurrentState;
+        CurrentState = GameState.Paused;
+        Time.timeScale = 0f;
+
+        // Tell UIManager to show pause overlay
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.ShowPauseMenu();
+    }
+
+    /// <summary>
+    /// Resume button pressed — unpauses and returns to gameplay.
+    /// </summary>
+    public void OnResumePressed()
+    {
+        if (CurrentState != GameState.Paused) return;
+
+        Debug.Log($"Game resumed to state: {stateBeforePause}");
+        AudioManager.Instance?.PlayButtonClick();
+
+        Time.timeScale = 1f;
+        CurrentState = stateBeforePause;
+
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.HidePauseMenu();
+    }
+
+    /// <summary>
+    /// Main Menu button pressed from pause menu — quits current game.
+    /// </summary>
+    public void OnPauseMainMenuPressed()
+    {
+        if (CurrentState != GameState.Paused) return;
+
+        Debug.Log("Returning to main menu from pause");
+        AudioManager.Instance?.PlayButtonClick();
+
+        // Unpause time first
+        Time.timeScale = 1f;
+
+        // Hide pause menu
+        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        uiManager?.HidePauseMenu();
+
+        // Route to the correct return-to-menu based on which mode we paused from
+        if (stateBeforePause == GameState.ZenGame)
+        {
+            CurrentState = GameState.ZenGame; // Temporarily set so GoBack routes correctly
+            GoBack();
+        }
+        else
+        {
+            CurrentState = GameState.Game;
+            GoBack();
+        }
+    }
+
+    /// <summary>
+    /// Options button pressed from pause menu — opens options overlay.
+    /// </summary>
+    public void OnPauseOptionsPressed()
+    {
+        if (CurrentState != GameState.Paused) return;
+
+        Debug.Log("Opening options from pause menu");
+        AudioManager.Instance?.PlayButtonClick();
+
+        // Show options panel as overlay (time stays paused)
+        StartCoroutine(FadeTransition(optionsPanel, fadeIn: true));
+        // Note: we stay in Paused state, options is just an overlay on top
+    }
+
+    /// <summary>
+    /// Close options panel and return to pause menu (when opened from pause).
+    /// </summary>
+    public void OnPauseOptionsClosePressed()
+    {
+        Debug.Log("Closing options, returning to pause menu");
+        AudioManager.Instance?.PlayButtonClick();
+        StartCoroutine(FadeTransition(optionsPanel, fadeIn: false));
+    }
     
     public void OnTutorial1OkPressed()
     {
@@ -885,6 +1059,69 @@ public class SceneFlowManager : MonoBehaviour
     
     #endregion
     
+    #region Credits
+
+    /// <summary>
+    /// Show the credits popup using PopupWindow system.
+    /// </summary>
+    private void ShowCreditsPopup()
+    {
+        // Find or create a PopupWindow
+        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
+        if (popup == null)
+        {
+            GameObject popupObj = new GameObject("CreditsPopup");
+            popupObj.transform.SetParent(mainCanvas.transform, false);
+            popup = popupObj.AddComponent<PopupWindow>();
+        }
+
+        popup.SetTitle("Credits");
+        popup.ClearContent();
+
+        popup.AddText("MAKE 10", UIStyleGuide.FontSizeHeadline, UIStyleGuide.ColorTextAccent,
+            TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddSpacer(10f);
+        popup.AddText("A Number Puzzle Game", UIStyleGuide.FontSizeSubheading, UIStyleGuide.ColorTextSecondary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(20f);
+        popup.AddDivider();
+        popup.AddSpacer(10f);
+
+        popup.AddText("Created by", UIStyleGuide.FontSizeCaption, UIStyleGuide.ColorTextSecondary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddText("CJ Rhone", UIStyleGuide.FontSizeSubheading, UIStyleGuide.ColorTextPrimary,
+            TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+        popup.AddText("Wizard Bodega", UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextAccent,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(20f);
+        popup.AddDivider();
+        popup.AddSpacer(10f);
+
+        popup.AddText("Design & Programming", UIStyleGuide.FontSizeCaption, UIStyleGuide.ColorTextSecondary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddText("CJ Rhone", UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextPrimary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(10f);
+
+        popup.AddText("Made for", UIStyleGuide.FontSizeCaption, UIStyleGuide.ColorTextSecondary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddText("Brainless Game Jam 2026", UIStyleGuide.FontSizeBody, UIStyleGuide.ColorTextPrimary,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(20f);
+        popup.AddDivider();
+        popup.AddSpacer(10f);
+
+        popup.AddText("Built with Unity", UIStyleGuide.FontSizeCaption, UIStyleGuide.ColorTextMuted,
+            TMPro.TextAlignmentOptions.Center);
+        popup.AddSpacer(20f);
+
+        popup.AddButton("Close", () => popup.Close(), UIStyleGuide.ColorButtonPrimary);
+
+        popup.Open();
+    }
+
+    #endregion
+
     #region Public Utilities
     
     /// <summary>
@@ -902,7 +1139,7 @@ public class SceneFlowManager : MonoBehaviour
         CurrentState = GameState.Results;
     }
 
-    public bool IsInGameplay() => CurrentState == GameState.Game || CurrentState == GameState.ZenGame;
+    public bool IsInGameplay() => CurrentState == GameState.Game || CurrentState == GameState.ZenGame || CurrentState == GameState.Paused;
 
     
     public void RestartWithCountdown()
