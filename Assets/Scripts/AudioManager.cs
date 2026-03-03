@@ -15,11 +15,16 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioSource sfxSource; // Kept for Inspector wiring — seeds sfxPool[0]
     [SerializeField] private AudioSource voiceSource;
     private AudioSource timeWarningSource; // Dedicated source so looping warning doesn't block SFX
+    private AudioSource pitchedSfxSource;  // Dedicated source for pitch-shifted SFX (ten pop cascades)
 
-    // SFX pool: round-robin to avoid pitch contamination and polyphony stacking
+    // SFX pool: round-robin for general SFX (always pitch 1.0)
     private const int SFX_POOL_SIZE = 4;
     private AudioSource[] sfxPool;
     private int sfxPoolIndex = 0;
+
+    // Lightweight throttle for score tick SFX only (particle impacts arrive every 0.03s)
+    private float lastScoreTickTime;
+    private const float SCORE_TICK_MIN_INTERVAL = 0.06f; // Play every other tick — still sounds continuous
 
     
     [Header("Volume Defaults")]
@@ -87,6 +92,10 @@ public class AudioManager : MonoBehaviour
         timeWarningSource = gameObject.AddComponent<AudioSource>();
         timeWarningSource.playOnAwake = false;
 
+        // Create dedicated AudioSource for pitch-shifted match sounds (isolated from pool)
+        pitchedSfxSource = gameObject.AddComponent<AudioSource>();
+        pitchedSfxSource.playOnAwake = false;
+
         // Build SFX pool: slot 0 is the Inspector-wired sfxSource, rest are cloned
         sfxPool = new AudioSource[SFX_POOL_SIZE];
         sfxPool[0] = sfxSource;
@@ -135,6 +144,7 @@ public class AudioManager : MonoBehaviour
     {
         if (musicSource != null) musicSource.volume = musicVolume;
         ApplySFXPoolVolume(sfxVolume);
+        if (pitchedSfxSource != null) pitchedSfxSource.volume = sfxVolume;
         if (timeWarningSource != null) timeWarningSource.volume = sfxVolume;
         if (voiceSource != null) voiceSource.volume = voiceVolume;
     }
@@ -193,6 +203,7 @@ public class AudioManager : MonoBehaviour
     {
         sfxVolume = volume;
         ApplySFXPoolVolume(volume);
+        if (pitchedSfxSource != null) pitchedSfxSource.volume = volume;
         if (timeWarningSource != null) timeWarningSource.volume = volume;
         SaveVolumeSettings();
         PlayButtonClick(); // Test sound
@@ -273,17 +284,15 @@ public class AudioManager : MonoBehaviour
     /// <summary>
     /// Play the "10" pop sound with pitch shifting for cascade chains.
     /// chainCount 1 = normal pitch, 2+ = incrementally higher (capped at 1.5).
-    /// Each call gets its own pooled AudioSource so pitch doesn't bleed.
+    /// Uses a dedicated AudioSource so pitch never bleeds into the general pool.
     /// </summary>
     public void PlayTenPopSound(int chainCount)
     {
-        if (tenPopSFX == null) return;
-        AudioSource source = GetNextSFXSource();
-        if (source == null) return;
+        if (pitchedSfxSource == null || tenPopSFX == null) return;
 
         float pitch = Mathf.Min(1.0f + (chainCount - 1) * 0.08f, 1.5f);
-        source.pitch = pitch;
-        source.PlayOneShot(tenPopSFX, sfxVolume);
+        pitchedSfxSource.pitch = pitch;
+        pitchedSfxSource.PlayOneShot(tenPopSFX, sfxVolume);
     }
     public void PlaySwapSound() => PlaySFX(swapSFX);
     public void PlayCountdownBeep() => PlaySFX(countdownBeepSFX);
@@ -293,8 +302,22 @@ public class AudioManager : MonoBehaviour
     public void PlayFinishSound() => PlaySFX(finishSFX);
     public void PlayMultiplierIncrease() => PlaySFX(multiplierIncreaseSFX);
 
-    public void PlayScoreTickSmall() => PlaySFX(scoreTickSmallSFX);
-    public void PlayScoreTickBig() => PlaySFX(scoreTickBigSFX);
+    /// <summary>
+    /// Score ticks are lightly throttled — particles arrive every 0.03s but we only
+    /// play every other one. Still sounds like a continuous stream, avoids pool starvation.
+    /// </summary>
+    public void PlayScoreTickSmall()
+    {
+        if (Time.time - lastScoreTickTime < SCORE_TICK_MIN_INTERVAL) return;
+        lastScoreTickTime = Time.time;
+        PlaySFX(scoreTickSmallSFX);
+    }
+
+    public void PlayScoreTickBig()
+    {
+        // Big ticks are rarer (0.08s stagger) and more important — always play
+        PlaySFX(scoreTickBigSFX);
+    }
 
     public void PlayComboSound() => PlaySFX(comboMergeSFX);
     public void PlayUltraComboSound() => PlaySFX(ultraComboSFX);
