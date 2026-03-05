@@ -631,6 +631,10 @@ public class SceneFlowManager : MonoBehaviour
             GameManager.Instance?.ActivateGame();
             FindFirstObjectByType<GridManager>()?.OnRoundStarted();
             FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+
+            // Safety net: ensure pause button is visible after countdown
+            // (covers cases where RunManager event subscription was missed)
+            UIManager.Instance?.ShowPauseHamburger();
         });
     }
 
@@ -930,6 +934,9 @@ public class SceneFlowManager : MonoBehaviour
         GameManager.Instance?.ActivateGame();
         FindFirstObjectByType<GridManager>()?.OnRoundStarted();
         FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+
+        // Safety net: ensure pause button is visible
+        UIManager.Instance?.ShowPauseHamburger();
 
         // Start zen music
         AudioManager.Instance?.PlayZenMusic();

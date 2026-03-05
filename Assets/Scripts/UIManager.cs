@@ -130,6 +130,7 @@ public class UIManager : MonoBehaviour
     private Coroutine hotStreakRainbowCoroutine;
     private bool isTimeWarningPlaying = false;
     private bool isSubscribed = false;
+    private bool runManagerSubscribed = false;
     private bool hotStreakActive = false;
     private bool isInHotStreakMode = false;
 
@@ -177,6 +178,15 @@ public class UIManager : MonoBehaviour
         if (!isSubscribed)
             TrySubscribeToEvents();
 
+        // Late-bind RunManager subscription if it wasn't available during Awake
+        if (isSubscribed && !runManagerSubscribed && RunManager.Instance != null)
+        {
+            RunManager.Instance.OnRoundChanged += HandleRoundChanged;
+            RunManager.Instance.OnRunStarted += HandleRunStarted;
+            runManagerSubscribed = true;
+            Debug.Log("UIManager: Late-bound RunManager events in Start().");
+        }
+
         InitializeUI();
         Debug.Log("UIManager initialized successfully!");
     }
@@ -214,6 +224,12 @@ public class UIManager : MonoBehaviour
         {
             RunManager.Instance.OnRoundChanged += HandleRoundChanged;
             RunManager.Instance.OnRunStarted += HandleRunStarted;
+            runManagerSubscribed = true;
+        }
+        else
+        {
+            Debug.LogWarning("UIManager: RunManager not found during event subscription — will retry in Update.");
+            runManagerSubscribed = false;
         }
 
         isSubscribed = true;
