@@ -78,10 +78,14 @@ public class GridManager : MonoBehaviour
     private bool isDragging = false;
     private Tile draggedTile = null;
     private int dragCurrentGridX, dragCurrentGridY;
+    private int dragSwapCount = 0; // Number of cell-to-cell swaps during current drag
 
     // MakeZen: track last swapped tiles for merge position logic
     private Tile lastSwappedFirst;
     private Tile lastSwappedSecond;
+
+    // MakeZen: true when the current swap came from drag (no revert on failure)
+    private bool wasDragSwap = false;
 
     public event System.Action OnGridUnsolvable;
 
@@ -438,6 +442,7 @@ public class GridManager : MonoBehaviour
         // (from StartMatchProcessing) doesn't fire OnFailedSwap
         lastSwappedFirst = null;
         lastSwappedSecond = null;
+        wasDragSwap = false;
 
         float totalWidth = gridWidth * tileSize + (gridWidth - 1) * tileSpacing;
         float totalHeight = gridHeight * tileSize + (gridHeight - 1) * tileSpacing;
@@ -647,6 +652,7 @@ public class GridManager : MonoBehaviour
             // MakeZen: track swapped tiles for merge position logic
             lastSwappedFirst = tileA;
             lastSwappedSecond = tileB;
+            wasDragSwap = false; // tap/swipe swap — revert on failure
         }
 
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
@@ -751,8 +757,7 @@ public class GridManager : MonoBehaviour
         if (isProcessing) return;
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
 
-        // Zen: no drag-to-swap — players must tap-select two tiles deliberately
-        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen) return;
+        // Zen: drag-to-swap enabled — tiles stay in place on failed drag (no revert)
 
         // Clear any click-selection
         if (selectedTile != null)
@@ -765,6 +770,7 @@ public class GridManager : MonoBehaviour
         draggedTile = tile;
         dragCurrentGridX = tile.GridX;
         dragCurrentGridY = tile.GridY;
+        dragSwapCount = 0;
 
         // Bring dragged tile to front so it renders above others
         tile.GetRectTransform().SetAsLastSibling();
@@ -848,16 +854,25 @@ public class GridManager : MonoBehaviour
         // Snap the dragged tile to its final grid cell
         tile.SetPosition(GridToWorldPosition(dragCurrentGridX, dragCurrentGridY));
 
-        Debug.Log($"Drag ended: {tile} at [{dragCurrentGridX},{dragCurrentGridY}]");
+        Debug.Log($"Drag ended: {tile} at [{dragCurrentGridX},{dragCurrentGridY}], {dragSwapCount} swap(s)");
+
+        isDragging = false;
+        draggedTile = null;
+
+        // If the player picked up a tile but didn't actually move it to another cell,
+        // there's nothing to process — no penalty, no match check
+        if (dragSwapCount == 0)
+        {
+            Debug.Log("Drag ended with no cell changes — ignoring.");
+            return;
+        }
 
         // MakeZen: track the dragged tile as both first and second swap
         // (drag-swap doesn't have a clean "two tile" swap, but the dragged tile's
         // final position is the most natural merge point)
         lastSwappedFirst = tile;
         lastSwappedSecond = tile;
-
-        isDragging = false;
-        draggedTile = null;
+        wasDragSwap = true;
 
         // Now process any matches created by the drag
         StartCoroutine(ProcessMatchesCoroutine());
@@ -890,6 +905,7 @@ public class GridManager : MonoBehaviour
         // Update drag tracking position
         dragCurrentGridX = targetX;
         dragCurrentGridY = targetY;
+        dragSwapCount++;
 
         AudioManager.Instance?.PlaySwapSound();
         ResetHintTimer();
@@ -1230,19 +1246,30 @@ public class GridManager : MonoBehaviour
                     {
                         // Only treat as failed swap if this was triggered by an actual player swap.
                         // Skip on game start, post-reshuffle, and other non-swap entries.
-                        Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap, reverting.");
 
-                        // Animate tiles back to their original positions before showing feedback
-                        Tile revertA = lastSwappedFirst;
-                        Tile revertB = lastSwappedSecond;
-                        yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
+                        if (wasDragSwap)
+                        {
+                            // Drag-swap: tiles stay where they landed, just apply penalty + feedback
+                            Debug.Log("<color=cyan>[Zen]</color> No matches found — failed drag, tiles stay in place.");
+                            PlayFailedSwapFeedback();
+                            GameManager.Instance?.OnFailedSwap();
+                        }
+                        else
+                        {
+                            // Tap/swipe swap: revert tiles back to original positions
+                            Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap, reverting.");
 
-                        // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
-                        // to prevent taps during feedback. Released at end of ProcessMatchesCoroutine.
-                        isProcessing = true;
+                            Tile revertA = lastSwappedFirst;
+                            Tile revertB = lastSwappedSecond;
+                            yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
 
-                        PlayFailedSwapFeedback();
-                        GameManager.Instance?.OnFailedSwap();
+                            // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
+                            // to prevent taps during feedback. Released at end of ProcessMatchesCoroutine.
+                            isProcessing = true;
+
+                            PlayFailedSwapFeedback();
+                            GameManager.Instance?.OnFailedSwap();
+                        }
                     }
                     else
                     {
@@ -1258,6 +1285,7 @@ public class GridManager : MonoBehaviour
                 {
                     lastSwappedFirst = null;
                     lastSwappedSecond = null;
+                    wasDragSwap = false;
                     GameManager.Instance?.RecordZenChain();
                 }
 
@@ -1339,6 +1367,7 @@ public class GridManager : MonoBehaviour
                     // doesn't treat the "no matches" result as a failed player swap
                     lastSwappedFirst = null;
                     lastSwappedSecond = null;
+                    wasDragSwap = false;
                     OnGridUnsolvable?.Invoke();
                     yield return new WaitForSeconds(unsolvableResetDelay);
                     ResetGridSilent();
@@ -2597,6 +2626,7 @@ public class GridManager : MonoBehaviour
         // Clear swap tracking for clean resume
         lastSwappedFirst = null;
         lastSwappedSecond = null;
+        wasDragSwap = false;
 
         Debug.Log($"<color=green>[Zen Restore] Grid rebuilt with {save.tileValues?.Length ?? 0} tiles</color>");
     }
