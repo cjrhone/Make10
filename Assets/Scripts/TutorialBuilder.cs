@@ -214,21 +214,13 @@ public class TutorialBuilder : MonoBehaviour
 
         tutorial2Popup.AddSpacer(20);
 
-        // Button row: BACK + LET'S GO!
-        tutorial2Popup.AddButtonRow(
-            ("\u2190  BACK", () =>
-            {
-                isAdvancing = true;
-                tutorial2Popup.Close();
-                ShowTutorial1();
-            }, UIStyleGuide.ColorButtonNeutral),
-            ("LET'S GO!", () =>
-            {
-                isAdvancing = true;
-                tutorial2Popup.Close();
-                OnTutorial2Complete?.Invoke();
-            }, UIStyleGuide.ColorButtonPrimary)
-        );
+        // LET'S GO! button
+        tutorial2Popup.AddButton("LET'S GO!", () =>
+        {
+            isAdvancing = true;
+            tutorial2Popup.Close();
+            OnTutorial2Complete?.Invoke();
+        }, UIStyleGuide.ColorButtonPrimary);
 
         tutorial2Popup.RefreshAutoSize();
     }

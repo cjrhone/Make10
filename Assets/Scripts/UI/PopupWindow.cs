@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System;
 using System.Collections;
@@ -450,6 +451,9 @@ public class PopupWindow : MonoBehaviour
         Image handleImg = handleObj.AddComponent<Image>();
         handleImg.color = Color.white;
 
+        // Allow drag-to-scroll through slider area
+        sliderObj.AddComponent<ScrollPassthrough>();
+
         // Wire up Slider component
         Slider slider = sliderObj.AddComponent<Slider>();
         slider.minValue = min;
@@ -499,6 +503,9 @@ public class PopupWindow : MonoBehaviour
 
         if (onClick != null)
             btn.onClick.AddListener(() => onClick());
+
+        // Allow drag-to-scroll through buttons
+        btnObj.AddComponent<ScrollPassthrough>();
 
         // Button text
         GameObject textObj = CreateUIElement("Text", btnObj.transform);
@@ -552,6 +559,9 @@ public class PopupWindow : MonoBehaviour
 
             if (onClick != null)
                 btn.onClick.AddListener(() => onClick());
+
+            // Allow drag-to-scroll through buttons
+            btnObj.AddComponent<ScrollPassthrough>();
 
             GameObject textObj = CreateUIElement("Text", btnObj.transform);
             RectTransform textRect = textObj.GetComponent<RectTransform>();
@@ -696,7 +706,10 @@ public class PopupWindow : MonoBehaviour
         scrollRect.horizontal = false;
         scrollRect.vertical = true;
         scrollRect.scrollSensitivity = 30f;
-        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.elasticity = 0.1f;
+        scrollRect.inertia = true;
+        scrollRect.decelerationRate = 0.12f;
 
         RectTransform scrollViewRect = scrollViewObj.GetComponent<RectTransform>();
         scrollViewRect.anchorMin = Vector2.zero;
@@ -709,6 +722,10 @@ public class PopupWindow : MonoBehaviour
         // === VIEWPORT ===
         GameObject viewport = CreateUIElement("Viewport", scrollViewObj.transform);
         viewport.AddComponent<RectMask2D>();
+        // Transparent image ensures drags anywhere in the viewport register with ScrollRect
+        Image viewportImg = viewport.AddComponent<Image>();
+        viewportImg.color = Color.clear;
+        viewportImg.raycastTarget = true;
         RectTransform viewportRect = viewport.GetComponent<RectTransform>();
         viewportRect.anchorMin = Vector2.zero;
         viewportRect.anchorMax = Vector2.one;
@@ -891,4 +908,34 @@ public class PopupWindow : MonoBehaviour
     }
 
     #endregion
+}
+
+/// <summary>
+/// Forwards drag events from interactive child elements (buttons, sliders, etc.)
+/// to a parent ScrollRect so content-area dragging scrolls the window.
+/// Attach to any child that would otherwise swallow drag input.
+/// </summary>
+public class ScrollPassthrough : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    private ScrollRect parentScrollRect;
+
+    private void Awake()
+    {
+        parentScrollRect = GetComponentInParent<ScrollRect>();
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        parentScrollRect?.OnBeginDrag(eventData);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        parentScrollRect?.OnDrag(eventData);
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        parentScrollRect?.OnEndDrag(eventData);
+    }
 }
