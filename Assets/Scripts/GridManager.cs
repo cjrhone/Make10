@@ -74,11 +74,15 @@ public class GridManager : MonoBehaviour
     private HintMove currentHint = null;
     private List<GameObject> activeHintParticles = new List<GameObject>();
 
-    // Drag-swap state
+    // Drag-swap state (single-swap-per-gesture)
     private bool isDragging = false;
     private Tile draggedTile = null;
-    private int dragCurrentGridX, dragCurrentGridY;
-    private int dragSwapCount = 0; // Number of cell-to-cell swaps during current drag
+    private int dragCurrentGridX, dragCurrentGridY; // The dragged tile's origin cell (does NOT update during drag — only set in HandleDragStarted and consumed by PerformDragSwap on release)
+    private int dragTargetGridX, dragTargetGridY;   // Cell the finger is currently over (updated each HandleDragMoved)
+    private bool dragHasValidTarget = false;        // True when the finger is over a valid in-bounds grid cell
+    #pragma warning disable CS0414
+    private int dragSwapCount = 0;                  // Vestigial — incremented by PerformDragSwap; no longer read after the single-swap-per-gesture fix
+    #pragma warning restore CS0414
 
     // MakeZen: track last swapped tiles for merge position logic
     private Tile lastSwappedFirst;
@@ -755,6 +759,7 @@ public class GridManager : MonoBehaviour
     private void HandleDragStarted(Tile tile)
     {
         if (isProcessing) return;
+        if (isDragging) return; // Multitouch guard: a drag is already in flight, reject this one.
         if (GameManager.Instance != null && !GameManager.Instance.IsGameActive) return;
 
         // Zen: drag-to-swap enabled — tiles stay in place on failed drag (no revert)
@@ -770,7 +775,9 @@ public class GridManager : MonoBehaviour
         draggedTile = tile;
         dragCurrentGridX = tile.GridX;
         dragCurrentGridY = tile.GridY;
-        dragSwapCount = 0;
+        dragTargetGridX = tile.GridX;
+        dragTargetGridY = tile.GridY;
+        dragHasValidTarget = false; // Not over a different cell yet
 
         // Bring dragged tile to front so it renders above others
         tile.GetRectTransform().SetAsLastSibling();
@@ -783,7 +790,8 @@ public class GridManager : MonoBehaviour
 
     /// <summary>
     /// Called every frame during drag with the screen-space position.
-    /// Moves the dragged tile and triggers swaps on cell boundary crossings.
+    /// Visually follows the finger and tracks which cell is currently under the finger.
+    /// Does NOT perform any swap during the drag — the swap happens once on release in HandleDragEnded.
     /// </summary>
     private void HandleDragMoved(Tile tile, Vector2 screenPos)
     {
@@ -804,7 +812,7 @@ public class GridManager : MonoBehaviour
             return; // Conversion failed
         }
 
-        // Move the dragged tile to follow the finger/cursor
+        // Move the dragged tile to follow the finger/cursor (preview only — no swap yet)
         tile.GetRectTransform().anchoredPosition = localPos;
 
         // Determine which grid cell the tile center is now over
@@ -812,70 +820,103 @@ public class GridManager : MonoBehaviour
         int targetX = targetCell.x;
         int targetY = targetCell.y;
 
-        // Check if we've crossed into a different cell
-        if (targetX != dragCurrentGridX || targetY != dragCurrentGridY)
+        // Track the current target cell. Stay valid only while the finger is in-bounds;
+        // if the finger leaves the grid, mark the target invalid so a release outside the grid
+        // won't trigger a swap. (The drag is not ended here — the player can still drag back in.)
+        if (targetX >= 0 && targetX < gridWidth && targetY >= 0 && targetY < gridHeight)
         {
-            // Only swap with adjacent cells (cardinal directions)
-            int dx = targetX - dragCurrentGridX;
-            int dy = targetY - dragCurrentGridY;
-
-            // If the target is more than 1 step away, step toward it one cell at a time
-            if (Mathf.Abs(dx) + Mathf.Abs(dy) > 1)
-            {
-                // Prefer the axis with the larger delta
-                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-                {
-                    targetX = dragCurrentGridX + (dx > 0 ? 1 : -1);
-                    targetY = dragCurrentGridY;
-                }
-                else
-                {
-                    targetX = dragCurrentGridX;
-                    targetY = dragCurrentGridY + (dy > 0 ? 1 : -1);
-                }
-            }
-
-            // Validate bounds
-            if (targetX >= 0 && targetX < gridWidth && targetY >= 0 && targetY < gridHeight)
-            {
-                PerformDragSwap(targetX, targetY);
-            }
+            dragTargetGridX = targetX;
+            dragTargetGridY = targetY;
+            dragHasValidTarget = (targetX != dragCurrentGridX || targetY != dragCurrentGridY);
+        }
+        else
+        {
+            dragHasValidTarget = false;
         }
     }
 
     /// <summary>
     /// Called when the drag ends (finger/mouse released).
-    /// Snaps the tile to its grid position and triggers match processing.
+    /// Performs at most ONE swap (origin-cell ↔ final target-cell), enforcing mode rules:
+    ///   - Arcade: target must be cardinally adjacent. Otherwise the tile snaps back, no swap.
+    ///   - Zen:    any unlocked free cell allowed.
+    /// If the drag ended outside the grid, on the origin cell, or on a locked tile, no swap occurs.
     /// </summary>
     private void HandleDragEnded(Tile tile)
     {
         if (!isDragging || tile != draggedTile) return;
 
-        // Snap the dragged tile to its final grid cell
-        tile.SetPosition(GridToWorldPosition(dragCurrentGridX, dragCurrentGridY));
+        int startX = dragCurrentGridX;
+        int startY = dragCurrentGridY;
+        int targetX = dragTargetGridX;
+        int targetY = dragTargetGridY;
+        bool hasValidTarget = dragHasValidTarget;
 
-        Debug.Log($"Drag ended: {tile} at [{dragCurrentGridX},{dragCurrentGridY}], {dragSwapCount} swap(s)");
+        Debug.Log($"Drag ended: {tile} from [{startX},{startY}] → target [{targetX},{targetY}] hasValid={hasValidTarget}");
 
-        isDragging = false;
-        draggedTile = null;
+        // Decide whether the gesture should commit a swap.
+        bool shouldSwap = hasValidTarget && (targetX != startX || targetY != startY);
 
-        // If the player picked up a tile but didn't actually move it to another cell,
-        // there's nothing to process — no penalty, no match check
-        if (dragSwapCount == 0)
+        if (shouldSwap)
         {
-            Debug.Log("Drag ended with no cell changes — ignoring.");
+            // Any-distance drag is allowed in both modes (1.0.1 unified swap-revert spec).
+            // Reject swap onto a locked tile (Zen) or a missing tile.
+            Tile targetTile = grid[targetX, targetY];
+            if (targetTile == null)
+            {
+                Debug.Log("Drag target cell empty — no swap.");
+                shouldSwap = false;
+            }
+            else if (targetTile.IsLocked)
+            {
+                Debug.Log("Drag target tile is locked — no swap.");
+                shouldSwap = false;
+            }
+        }
+
+        if (!shouldSwap)
+        {
+            // Snap the dragged tile back to its origin cell. No match processing, no penalty.
+            tile.SetPosition(GridToWorldPosition(startX, startY));
+            ClearDragState();
             return;
         }
 
-        // MakeZen: track the dragged tile as both first and second swap
-        // (drag-swap doesn't have a clean "two tile" swap, but the dragged tile's
-        // final position is the most natural merge point)
-        lastSwappedFirst = tile;
-        lastSwappedSecond = tile;
+        // Capture the displaced tile BEFORE PerformDragSwap mutates the grid array.
+        // Needed so the no-match revert path has access to BOTH tile refs.
+        Tile displacedTile = grid[targetX, targetY];
+
+        // Commit the single swap. PerformDragSwap reads draggedTile + dragCurrentGridX/Y,
+        // both of which are still set correctly here (origin cell).
+        PerformDragSwap(targetX, targetY);
+
+        // PerformDragSwap moved the dragged tile in the grid array but didn't reposition it
+        // visually (the visual position has been tracking the finger). Snap it to its new cell.
+        tile.SetPosition(GridToWorldPosition(targetX, targetY));
+
+        // Record both tiles for the no-match revert path (1.0.1 unified spec) and for
+        // Zen merge-position logic. lastSwappedSecond mirrors tap-tap convention: the tile
+        // that ended up at the drag origin (which is where the player started the gesture).
+        lastSwappedFirst = tile;            // dragged tile, now at (targetX, targetY)
+        lastSwappedSecond = displacedTile;  // displaced tile, now at (startX, startY)
         wasDragSwap = true;
 
-        // Now process any matches created by the drag
+        ClearDragState();
+
+        // Process any matches the swap created. If none, ProcessMatchesCoroutine reverts
+        // the swap visually (1.0.1 unified spec — no penalty in either mode).
         StartCoroutine(ProcessMatchesCoroutine());
+    }
+
+    /// <summary>
+    /// Reset all per-drag state so the next gesture starts clean.
+    /// </summary>
+    private void ClearDragState()
+    {
+        isDragging = false;
+        draggedTile = null;
+        dragHasValidTarget = false;
+        dragSwapCount = 0;
     }
 
     /// <summary>
@@ -898,9 +939,14 @@ public class GridManager : MonoBehaviour
         draggedTile.GridX = targetX;
         draggedTile.GridY = targetY;
 
-        // Animate the displaced tile sliding to the vacated cell
+        // Place the displaced tile instantly at the vacated cell.
+        // Previously this used SnapTileCoroutine (~80ms slide), but on a no-match drag the
+        // subsequent revert AnimatedSwapCoroutine would race the in-flight snap — both
+        // coroutines write to the same anchoredPosition, leaving tiles frozen mid-air.
+        // Snapping instantly mirrors the dragged tile's instant placement in HandleDragEnded
+        // and gives both the match-cascade and no-match-revert paths a clean starting state.
         Vector2 vacatedPos = GridToWorldPosition(dragCurrentGridX, dragCurrentGridY);
-        StartCoroutine(SnapTileCoroutine(displacedTile, vacatedPos, 0.08f));
+        displacedTile.SetPosition(vacatedPos);
 
         // Update drag tracking position
         dragCurrentGridX = targetX;
@@ -1247,28 +1293,20 @@ public class GridManager : MonoBehaviour
                         // Only treat as failed swap if this was triggered by an actual player swap.
                         // Skip on game start, post-reshuffle, and other non-swap entries.
 
-                        if (wasDragSwap)
-                        {
-                            // Drag-swap: tiles stay where they landed, just apply penalty + feedback
-                            Debug.Log("<color=cyan>[Zen]</color> No matches found — failed drag, tiles stay in place.");
-                            PlayFailedSwapFeedback();
-                            GameManager.Instance?.OnFailedSwap();
-                        }
-                        else
-                        {
-                            // Tap/swipe swap: revert tiles back to original positions
-                            Debug.Log("<color=cyan>[Zen]</color> No matches found — failed swap, reverting.");
+                        // Unified 1.0.1 behaviour: revert visually, no penalty, no feedback.
+                        // Drag-swap and tap/swipe-swap paths now share identical revert logic.
+                        Debug.Log(wasDragSwap
+                            ? "<color=cyan>[Zen]</color> No matches — reverting drag swap."
+                            : "<color=cyan>[Zen]</color> No matches — reverting tap-tap swap.");
 
-                            Tile revertA = lastSwappedFirst;
-                            Tile revertB = lastSwappedSecond;
+                        Tile revertA = lastSwappedFirst;
+                        Tile revertB = lastSwappedSecond;
+                        if (revertA != null && revertB != null && revertA != revertB)
+                        {
                             yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
-
                             // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
-                            // to prevent taps during feedback. Released at end of ProcessMatchesCoroutine.
+                            // until ProcessMatchesCoroutine ends — prevents input during the revert tail.
                             isProcessing = true;
-
-                            PlayFailedSwapFeedback();
-                            GameManager.Instance?.OnFailedSwap();
                         }
                     }
                     else
@@ -1309,13 +1347,23 @@ public class GridManager : MonoBehaviour
             if (!result.HasMatches)
             {
                 if (cascadeCount > 0)
+                {
                     Debug.Log($"Cascade complete! {cascadeCount} chain(s)");
+                }
                 else
                 {
-                    Debug.Log("No matches found.");
-                    PlayFailedSwapFeedback();
-                    // Zen mode: reset multiplier on failed swap (no match from player action)
-                    GameManager.Instance?.OnFailedSwap();
+                    // Failed swap: revert visually only — no penalty, no scoring impact.
+                    // Arcade has no failed-swap feedback UI today; the revert IS the feedback.
+                    Debug.Log("Arcade: no matches — reverting swap.");
+                    Tile revertA = lastSwappedFirst;
+                    Tile revertB = lastSwappedSecond;
+                    if (revertA != null && revertB != null && revertA != revertB)
+                    {
+                        yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
+                        // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
+                        // until ProcessMatchesCoroutine ends — prevents input during the revert tail.
+                        isProcessing = true;
+                    }
                 }
                 break;
             }

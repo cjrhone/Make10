@@ -141,14 +141,13 @@ public class MatchChecker : MonoBehaviour
     
     /// <summary>
     /// Find a swap that would create a match.
-    /// Returns the tile to move and the direction to swipe, or null if no hint found.
-    /// In Zen mode, returns a two-tile hint (any pair of free tiles on the board).
+    /// 1.0.1: both modes now allow any-distance drag swaps, so dead-board / hint detection
+    /// uses the all-pairs Zen variant in both modes. Returns a two-tile hint.
+    /// <see cref="FindHintMoveArcade"/> is retained for reference but no longer called.
     /// </summary>
     public HintMove FindHintMove()
     {
-        bool isZen = GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
-        if (isZen) return FindHintMoveZen();
-        return FindHintMoveArcade();
+        return FindHintMoveZen();
     }
 
     /// <summary>
@@ -281,13 +280,13 @@ public class MatchChecker : MonoBehaviour
     
     /// <summary>
     /// Check if any valid swap exists on the board.
-    /// Arcade: adjacent swaps only. Zen: any two free tiles.
+    /// 1.0.1: both modes now allow any-distance drag swaps, so dead-board detection uses
+    /// the all-pairs Zen variant in both modes. <see cref="HasValidMovesArcade"/> is
+    /// retained for reference but no longer called.
     /// </summary>
     public bool HasValidMoves()
     {
-        bool isZen = GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen;
-        if (isZen) return HasValidMovesZen();
-        return HasValidMovesArcade();
+        return HasValidMovesZen();
     }
 
     /// <summary>

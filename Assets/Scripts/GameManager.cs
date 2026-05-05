@@ -978,23 +978,15 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// Called when a swap produces no match (failed swap).
-    /// In Zen mode, deducts time — punishes random guessing.
+    /// 1.0.1: penalty removed — failed swaps now revert visually with no time deduction
+    /// or multiplier impact in either mode. Method retained as a no-op for backwards
+    /// compatibility; can be deleted once all call sites are removed.
+    /// The serialized <see cref="zenFailedSwapPenalty"/> field is intentionally left in
+    /// place to avoid Inspector serialization churn.
     /// </summary>
     public void OnFailedSwap()
     {
-        if (CurrentMode != GameMode.Zen) return;
-
-        // Time penalty
-        TimeRemaining -= zenFailedSwapPenalty;
-        TimeRemaining = Mathf.Max(0f, TimeRemaining);
-        OnTimeChanged?.Invoke(TimeRemaining);
-        Debug.Log($"<color=red>[Zen] Failed swap — -{zenFailedSwapPenalty}s! Timer: {TimeRemaining:F1}s</color>");
-
-        // Check if time penalty caused game over
-        if (TimeRemaining <= 0f)
-        {
-            TimeUp();
-        }
+        // No-op (1.0.1).
     }
 
     /// <summary>
