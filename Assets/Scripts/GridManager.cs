@@ -1350,21 +1350,6 @@ public class GridManager : MonoBehaviour
                 {
                     Debug.Log($"Cascade complete! {cascadeCount} chain(s)");
                 }
-                else
-                {
-                    // Failed swap: revert visually only — no penalty, no scoring impact.
-                    // Arcade has no failed-swap feedback UI today; the revert IS the feedback.
-                    Debug.Log("Arcade: no matches — reverting swap.");
-                    Tile revertA = lastSwappedFirst;
-                    Tile revertB = lastSwappedSecond;
-                    if (revertA != null && revertB != null && revertA != revertB)
-                    {
-                        yield return StartCoroutine(AnimatedSwapCoroutine(revertA, revertB, isRevert: true));
-                        // Re-lock processing (AnimatedSwapCoroutine sets isProcessing=false on exit)
-                        // until ProcessMatchesCoroutine ends — prevents input during the revert tail.
-                        isProcessing = true;
-                    }
-                }
                 break;
             }
 
