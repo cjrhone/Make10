@@ -65,9 +65,6 @@ public class GameManager : MonoBehaviour
     // Zen multiplier settings removed — Zen uses flat scoring (lineSum only).
     // Arcade multiplier is bar-based (see "Multiplier Bar" header above).
 
-    [Header("Time Bonus")]
-    [SerializeField] private float timeBonusPerMatch = 1.5f;
-
     [Header("Hot Streak Mode")]
     [SerializeField] private float hotStreakDuration = 15f;
     [SerializeField] private float hotStreakMultiplier = 5f;
@@ -504,12 +501,9 @@ public class GameManager : MonoBehaviour
 
         if (isPlayerMatch)
         {
-            // PLAYER SWAP: full scoring with multiplier, speed bonus
-            // Time bonus only in Arcade (Zen timer is fixed 300s minus penalties)
-            if (linesCleared > 0 && CurrentMode == GameMode.Arcade)
-            {
-                AddTime(timeBonusPerMatch * linesCleared);
-            }
+            // PLAYER SWAP: full scoring with multiplier, speed bonus.
+            // Arcade is a flat 60-second sprint — no per-match time bonus.
+            // Zen has its own fixed 300s clock with penalties, also no bonus here.
 
             // Arcade: fill bar once per swap (not per line), check Hot Streak trigger
             if (CurrentMode == GameMode.Arcade)

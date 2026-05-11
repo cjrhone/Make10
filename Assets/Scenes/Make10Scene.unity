@@ -6097,7 +6097,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 20}
-  m_SizeDelta: {x: 949.4294, y: 1048.0929}
+  m_SizeDelta: {x: 854.4865, y: 943.2836}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &625274646
 GameObject:
@@ -11917,7 +11917,6 @@ MonoBehaviour:
   barMax: 100
   barGainPerSolve: 10
   barDrainPerSecond: 1
-  timeBonusPerMatch: 1.5
   hotStreakDuration: 10
   hotStreakMultiplier: 5
   speedBonusThreshold: 4

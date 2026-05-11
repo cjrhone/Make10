@@ -77,18 +77,17 @@ public class GridManager : MonoBehaviour
     // Drag-swap state (single-swap-per-gesture)
     private bool isDragging = false;
     private Tile draggedTile = null;
-    private int dragCurrentGridX, dragCurrentGridY; // The dragged tile's origin cell (does NOT update during drag — only set in HandleDragStarted and consumed by PerformDragSwap on release)
+    private int dragCurrentGridX, dragCurrentGridY; // The dragged tile's origin cell (set in HandleDragStarted, read by HandleDragEnded to snap back / kick off the animated swap)
     private int dragTargetGridX, dragTargetGridY;   // Cell the finger is currently over (updated each HandleDragMoved)
     private bool dragHasValidTarget = false;        // True when the finger is over a valid in-bounds grid cell
-    #pragma warning disable CS0414
-    private int dragSwapCount = 0;                  // Vestigial — incremented by PerformDragSwap; no longer read after the single-swap-per-gesture fix
-    #pragma warning restore CS0414
 
     // MakeZen: track last swapped tiles for merge position logic
     private Tile lastSwappedFirst;
     private Tile lastSwappedSecond;
 
-    // MakeZen: true when the current swap came from drag (no revert on failure)
+    // Informational — true when the most recent swap came from a drag gesture.
+    // Used by Zen's failed-swap log message; revert behaviour is identical for both
+    // drag and tap/swipe (Zen always reverts; Arcade never does).
     private bool wasDragSwap = false;
 
     public event System.Action OnGridUnsolvable;
@@ -650,11 +649,25 @@ public class GridManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Animate two tiles swapping positions with an arc motion.
-    /// When isRevert is true, this is a failed-swap revert: no sound, no swap tracking,
-    /// no match processing afterwards — just the visual animation + grid state update.
+    /// Animate two tiles swapping positions with an arc motion. Single chokepoint
+    /// used by every player-initiated swap: tap-tap, swipe, AND drag-release.
+    ///
+    /// Each call:
+    ///   1. Tweens both tiles between their current anchored positions over
+    ///      <see cref="tileSwapDuration"/> with a shallow arc.
+    ///   2. Commits the grid backing array (grid[] + GridX/GridY on both tiles).
+    ///   3. If not a revert, kicks off <see cref="ProcessMatchesCoroutine"/>.
+    ///
+    /// PARAMETERS:
+    ///   isRevert    — true for the Zen failed-swap rewind. No sound, no swap tracking,
+    ///                 no match processing afterwards. Arcade never calls with true.
+    ///   isDragSwap  — informational only (drives Zen's failed-swap log message and
+    ///                 anything else that reads wasDragSwap). Set true when the caller
+    ///                 is the drag-release path so Zen logs read "drag swap" instead
+    ///                 of "tap-tap swap". Has no effect on revert/non-revert routing
+    ///                 since Arcade has no revert and Zen reverts every failed swap.
     /// </summary>
-    private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB, bool isRevert = false)
+    private IEnumerator AnimatedSwapCoroutine(Tile tileA, Tile tileB, bool isRevert = false, bool isDragSwap = false)
     {
         isProcessing = true;
 
@@ -666,7 +679,7 @@ public class GridManager : MonoBehaviour
             // MakeZen: track swapped tiles for merge position logic
             lastSwappedFirst = tileA;
             lastSwappedSecond = tileB;
-            wasDragSwap = false; // tap/swipe swap — revert on failure
+            wasDragSwap = isDragSwap; // preserves Zen's drag-vs-tap log distinction
         }
 
         Vector2 posA = tileA.GetRectTransform().anchoredPosition;
@@ -892,30 +905,25 @@ public class GridManager : MonoBehaviour
             return;
         }
 
-        // Capture the displaced tile BEFORE PerformDragSwap mutates the grid array.
-        // Needed so the no-match revert path has access to BOTH tile refs.
+        // Resolve the displaced tile at the target cell — it'll become the swap partner.
         Tile displacedTile = grid[targetX, targetY];
 
-        // Commit the single swap. PerformDragSwap reads draggedTile + dragCurrentGridX/Y,
-        // both of which are still set correctly here (origin cell).
-        PerformDragSwap(targetX, targetY);
+        // Path (A) feel: rewind the dragged tile to its origin cell BEFORE the arc swap
+        // animation starts. The animation then tweens both tiles between two true grid
+        // cells (origin ↔ target) exactly like tap-tap and swipe, instead of starting
+        // from wherever the finger happened to release. Keeps the arc math symmetric
+        // and matches the gameplay feel the player already knows from tap-tap.
+        tile.SetPosition(GridToWorldPosition(startX, startY));
 
-        // PerformDragSwap moved the dragged tile in the grid array but didn't reposition it
-        // visually (the visual position has been tracking the finger). Snap it to its new cell.
-        tile.SetPosition(GridToWorldPosition(targetX, targetY));
-
-        // Record both tiles for the no-match revert path (1.0.1 unified spec) and for
-        // Zen merge-position logic. lastSwappedSecond mirrors tap-tap convention: the tile
-        // that ended up at the drag origin (which is where the player started the gesture).
-        lastSwappedFirst = tile;            // dragged tile, now at (targetX, targetY)
-        lastSwappedSecond = displacedTile;  // displaced tile, now at (startX, startY)
-        wasDragSwap = true;
-
+        // Drop drag tracking now — the gesture is fully resolved; everything downstream
+        // is just the animated swap. AnimatedSwapCoroutine sets isProcessing=true on entry
+        // so input is gated for the 0.15s duration.
         ClearDragState();
 
-        // Process any matches the swap created. If none, ProcessMatchesCoroutine reverts
-        // the swap visually (1.0.1 unified spec — no penalty in either mode).
-        StartCoroutine(ProcessMatchesCoroutine());
+        // Run the unified animated swap. isDragSwap=true preserves Zen's drag-vs-tap log
+        // distinction (the only thing that reads wasDragSwap today). AnimatedSwapCoroutine
+        // commits the grid array post-tween and kicks off ProcessMatchesCoroutine.
+        StartCoroutine(AnimatedSwapCoroutine(tile, displacedTile, isRevert: false, isDragSwap: true));
     }
 
     /// <summary>
@@ -926,45 +934,6 @@ public class GridManager : MonoBehaviour
         isDragging = false;
         draggedTile = null;
         dragHasValidTarget = false;
-        dragSwapCount = 0;
-    }
-
-    /// <summary>
-    /// Instantly swap the dragged tile's grid position with the tile at (targetX, targetY).
-    /// The displaced tile animates to the vacated cell; the dragged tile stays under the finger.
-    /// </summary>
-    private void PerformDragSwap(int targetX, int targetY)
-    {
-        Tile displacedTile = grid[targetX, targetY];
-        if (displacedTile == null) return;
-        if (displacedTile.IsLocked) return; // Can't swap with a locked tile
-
-        // Update grid array
-        grid[dragCurrentGridX, dragCurrentGridY] = displacedTile;
-        grid[targetX, targetY] = draggedTile;
-
-        // Update GridX/GridY on both tiles
-        displacedTile.GridX = dragCurrentGridX;
-        displacedTile.GridY = dragCurrentGridY;
-        draggedTile.GridX = targetX;
-        draggedTile.GridY = targetY;
-
-        // Place the displaced tile instantly at the vacated cell.
-        // Previously this used SnapTileCoroutine (~80ms slide), but on a no-match drag the
-        // subsequent revert AnimatedSwapCoroutine would race the in-flight snap — both
-        // coroutines write to the same anchoredPosition, leaving tiles frozen mid-air.
-        // Snapping instantly mirrors the dragged tile's instant placement in HandleDragEnded
-        // and gives both the match-cascade and no-match-revert paths a clean starting state.
-        Vector2 vacatedPos = GridToWorldPosition(dragCurrentGridX, dragCurrentGridY);
-        displacedTile.SetPosition(vacatedPos);
-
-        // Update drag tracking position
-        dragCurrentGridX = targetX;
-        dragCurrentGridY = targetY;
-        dragSwapCount++;
-
-        AudioManager.Instance?.PlaySwapSound();
-        ResetHintTimer();
     }
 
     /// <summary>

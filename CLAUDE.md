@@ -114,7 +114,6 @@ Lines summing to multiples of 10 score that sum as base BP (10-sum → 10 BP, et
 PLAYER SWAP MATCHES (cascadeCount == 1):
   lineSum × currentMultiplier
   + speedBonus (+5 BP if solved within 4s)
-  + time bonus (per line, Arcade only)
   Bar fills +10 per swap
 
 CASCADE MATCHES (cascadeCount >= 2):
@@ -178,7 +177,7 @@ Locked tiles (value ≥ 10) can't be selected/swapped, fall with gravity, count 
 | Max Reshuffles | Unlimited | 3 | GameManager |
 | Tile Bag | 25 | 25 | TileWeightManager |
 | Speed Bonus | +5 BP within 4s | +5 BP within 4s | GameManager |
-| Time Bonus/Match | +1.5s per line | None | GameManager |
+| Time Bonus/Match | None | None | GameManager |
 
 ---
 
