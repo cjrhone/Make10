@@ -110,6 +110,67 @@ public class PopupWindow : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Padding (in canvas units) between the popup edge and the canvas/safe-area edge.
+    /// Applied on every side when ClampSizeToCanvas() shrinks an oversized popup.
+    /// </summary>
+    private const float CanvasEdgePadding = 30f;
+
+    /// <summary>
+    /// Clamp a desired popup size so it never exceeds the parent canvas/safe-area rect.
+    /// On phones with a tall portrait aspect (canvas width &lt; design width), this
+    /// shrinks the popup to fit horizontally. Heights are clamped the same way so
+    /// auto-size popups stay on-screen on shorter devices.
+    /// Returns the input unmodified if no canvas is found yet (e.g., very early Awake).
+    /// </summary>
+    private Vector2 ClampSizeToCanvas(Vector2 size)
+    {
+        // Use the immediate parent rect — popups live under SafeAreaContainer, which
+        // accounts for notches. Falling back to the root canvas if needed.
+        RectTransform reference = transform.parent as RectTransform;
+        if (reference == null)
+        {
+            Canvas canvas = GetComponentInParent<Canvas>()?.rootCanvas;
+            if (canvas != null) reference = canvas.GetComponent<RectTransform>();
+        }
+        if (reference == null) return size;
+
+        float maxW = Mathf.Max(0f, reference.rect.width  - CanvasEdgePadding * 2f);
+        float maxH = Mathf.Max(0f, reference.rect.height - CanvasEdgePadding * 2f);
+
+        // Keep aspect-ratio of the original design when shrinking width — otherwise
+        // a 980×1200 popup on a 880-wide canvas would look squashed.
+        if (size.x > maxW && size.x > 0f)
+        {
+            float scale = maxW / size.x;
+            size = new Vector2(maxW, size.y * scale);
+        }
+        if (size.y > maxH && size.y > 0f)
+        {
+            float scale = maxH / size.y;
+            size = new Vector2(size.x * scale, maxH);
+        }
+        return size;
+    }
+
+    /// <summary>
+    /// Recompute and apply windowContainer.sizeDelta from the current canvas size.
+    /// Call this on Open() so orientation/resolution changes between Awake and Open
+    /// are respected. Cheap — just clamps + assigns sizeDelta.
+    /// </summary>
+    private void ApplyClampedWindowSize()
+    {
+        if (windowContainer == null) return;
+        if (IsAutoSize) return; // AutoSize path runs through RefreshAutoSize()
+
+        RectTransform windowRect = windowContainer.GetComponent<RectTransform>();
+        if (windowRect == null) return;
+
+        Vector2 clamped = ClampSizeToCanvas(WindowSizePixels);
+        if (windowRect.sizeDelta != clamped)
+            windowRect.sizeDelta = clamped;
+    }
+
     private void Awake()
     {
         if (windowContainer == null)
@@ -127,6 +188,17 @@ public class PopupWindow : MonoBehaviour
 
         gameObject.SetActive(true);
         isOpen = true;
+
+        // Re-flow window sizing now that the popup is ACTIVE. LayoutRebuilder doesn't
+        // measure RectTransforms under inactive parents reliably, so any RefreshAutoSize
+        // call made from BuildXxxContent (which runs during Awake while we're inactive)
+        // gets stale content-height readings — the window stays at min height and the
+        // bottom-most element (the confirm button) ends up cropped by the viewport mask.
+        // Calling it here, post-activation, fixes that.
+        if (IsAutoSize)
+            RefreshAutoSize();
+        else
+            ApplyClampedWindowSize();
 
         if (animationCoroutine != null)
             StopCoroutine(animationCoroutine);
@@ -174,32 +246,63 @@ public class PopupWindow : MonoBehaviour
     /// <summary>
     /// Recalculates the window size to fit content (only works in AutoSize mode).
     /// Call this after adding all content to have the window resize to fit.
+    ///
+    /// On narrow canvases (iPhone portrait), the design width <c>autoSizeWidth</c>
+    /// can exceed the canvas. We clamp width FIRST so the ContentSizeFitter remeasures
+    /// at the actual deliverable width — text wraps to more lines when narrower, so
+    /// measuring before clamping would understate the height and crop content.
     /// </summary>
     public void RefreshAutoSize()
     {
         if (!IsAutoSize || windowContainer == null || contentArea == null) return;
 
-        // Force layout rebuild to get accurate content size
+        RectTransform windowRect = windowContainer.GetComponent<RectTransform>();
+
+        // ── Step 1: lock the window WIDTH to its clamped value before measuring.
+        float canvasW = GetReferenceRectSize().x;
+        float maxW = Mathf.Max(0f, canvasW - CanvasEdgePadding * 2f);
+        float finalWidth = autoSizeWidth > 0f ? Mathf.Min(autoSizeWidth, maxW) : maxW;
+        windowRect.sizeDelta = new Vector2(finalWidth, windowRect.sizeDelta.y);
+
+        // ── Step 2: force the content layout to re-flow at that width.
+        // Rebuild the WindowContainer first so the Viewport (which derives from the
+        // window's RectTransform) sees the new width before the ContentArea remeasures.
+        // Without this, the first call after a width change reports the previous
+        // content height and the popup ends up too short on narrow canvases.
         Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(windowRect);
         LayoutRebuilder.ForceRebuildLayoutImmediate(contentArea.GetComponent<RectTransform>());
 
-        // Get content height
         RectTransform contentRect = contentArea.GetComponent<RectTransform>();
         float contentHeight = contentRect.rect.height;
 
-        // Calculate total window height needed
+        // ── Step 3: compute total height needed and apply min/max + canvas-height cap.
         float totalHeight = contentHeight + UIStyleGuide.HeaderHeight + autoSizePadding + UIStyleGuide.WindowPadding * 2;
-
-        // Clamp to min/max
         totalHeight = Mathf.Max(totalHeight, autoSizeMinHeight);
-        if (autoSizeMaxHeight > 0)
-            totalHeight = Mathf.Min(totalHeight, autoSizeMaxHeight);
+        if (autoSizeMaxHeight > 0) totalHeight = Mathf.Min(totalHeight, autoSizeMaxHeight);
 
-        // Update window container size
-        RectTransform windowRect = windowContainer.GetComponent<RectTransform>();
-        windowRect.sizeDelta = new Vector2(autoSizeWidth, totalHeight);
+        float canvasH = GetReferenceRectSize().y;
+        float maxH = Mathf.Max(0f, canvasH - CanvasEdgePadding * 2f);
+        totalHeight = Mathf.Min(totalHeight, maxH);
 
-        Debug.Log($"[PopupWindow] AutoSize: content={contentHeight:F0}px, total={totalHeight:F0}px");
+        windowRect.sizeDelta = new Vector2(finalWidth, totalHeight);
+
+        Debug.Log($"[PopupWindow] AutoSize: width={finalWidth:F0} (design {autoSizeWidth:F0}), content={contentHeight:F0}, total={totalHeight:F0}");
+    }
+
+    /// <summary>
+    /// Returns the size of the rect this popup is laid out against (parent →
+    /// rootCanvas → fallback). Used by both width and height clamps.
+    /// </summary>
+    private Vector2 GetReferenceRectSize()
+    {
+        RectTransform reference = transform.parent as RectTransform;
+        if (reference == null)
+        {
+            Canvas canvas = GetComponentInParent<Canvas>()?.rootCanvas;
+            if (canvas != null) reference = canvas.GetComponent<RectTransform>();
+        }
+        return reference != null ? reference.rect.size : new Vector2(float.MaxValue, float.MaxValue);
     }
 
     /// <summary>
@@ -584,7 +687,10 @@ public class PopupWindow : MonoBehaviour
 
     private void BuildWindowUI()
     {
-        Vector2 size = WindowSizePixels;
+        // Clamp the design size so we never build a popup wider than the canvas.
+        // ApplyClampedWindowSize() will reapply on Open() in case canvas size
+        // changes between Awake and the first open.
+        Vector2 size = ClampSizeToCanvas(WindowSizePixels);
 
         // Root setup
         RectTransform rt = GetComponent<RectTransform>();

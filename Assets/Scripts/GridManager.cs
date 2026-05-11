@@ -146,6 +146,16 @@ public class GridManager : MonoBehaviour
         tileSize = (containerWidth - totalSpacing) / gridWidth;
     }
 
+    /// <summary>
+    /// Public hook so a responsive layout script (e.g. TabletLayoutAdapter) can re-trigger
+    /// tile-size recalculation after it has changed <see cref="gridContainer"/>'s sizeDelta.
+    /// Safe to call before tiles are spawned; cached values feed Spawn/Resize logic.
+    /// </summary>
+    public void RecalculateSizesFromContainer()
+    {
+        CalculateSizesFromContainer();
+    }
+
     #if UNITY_EDITOR
     /// <summary>
     /// Recalculates grid preview when settings change in the editor.

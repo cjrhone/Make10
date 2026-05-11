@@ -104,33 +104,33 @@ public class TutorialBuilder : MonoBehaviour
         tutorial1Popup.AddText("MAKE 10!", UIStyleGuide.FontSizeHeadline,
             UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
 
-        tutorial1Popup.AddSpacer(8);
+        tutorial1Popup.AddSpacer(6);
 
-        // Description
-        tutorial1Popup.AddBody("Swap tiles so any row or column\nadds up to exactly 10");
+        // Description — single line, tightened from two lines so the popup
+        // fits a narrow iPhone canvas without pushing the GOT IT button off-screen.
+        tutorial1Popup.AddBody("Swap tiles so any row or column sums to 10.");
 
-        tutorial1Popup.AddSpacer(15);
+        tutorial1Popup.AddSpacer(12);
 
         // Demo widget container
         AddDemoWidget(tutorial1Popup);
 
-        tutorial1Popup.AddSpacer(15);
+        tutorial1Popup.AddSpacer(12);
 
         // Divider
         tutorial1Popup.AddDivider(UIStyleGuide.ColorBorder);
 
-        tutorial1Popup.AddSpacer(8);
+        tutorial1Popup.AddSpacer(6);
 
-        // Controls section
+        // Controls section — three lines collapsed into one (the three actions
+        // are equivalent ways to swap, no need to list them on separate lines).
         tutorial1Popup.AddSubheading("CONTROLS", UIStyleGuide.ColorTextAccent);
 
-        tutorial1Popup.AddSpacer(5);
+        tutorial1Popup.AddSpacer(4);
 
-        tutorial1Popup.AddBody("Tap two adjacent tiles to swap them");
-        tutorial1Popup.AddBody("Swipe a tile in any direction");
-        tutorial1Popup.AddBody("Hold & drag for multi-swaps");
+        tutorial1Popup.AddBody("Tap two adjacent tiles, swipe, or drag.");
 
-        tutorial1Popup.AddSpacer(20);
+        tutorial1Popup.AddSpacer(16);
 
         // GOT IT button
         tutorial1Popup.AddButton("GOT IT", () =>
@@ -183,36 +183,36 @@ public class TutorialBuilder : MonoBehaviour
         tutorial2Popup.AddText("EARN BIG!", UIStyleGuide.FontSizeHeadline,
             UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
 
-        tutorial2Popup.AddSpacer(8);
+        tutorial2Popup.AddSpacer(6);
 
         // Description
-        tutorial2Popup.AddBody("Every Make 10 earns Brain Points");
+        tutorial2Popup.AddBody("Every Make 10 earns Brain Points.");
 
-        tutorial2Popup.AddSpacer(10);
+        tutorial2Popup.AddSpacer(8);
         tutorial2Popup.AddDivider(UIStyleGuide.ColorBorder);
+        tutorial2Popup.AddSpacer(6);
+
+        // Multiplier section (Arcade) \u2014 collapsed to single line.
+        tutorial2Popup.AddSubheading("MULTIPLIER", UIStyleGuide.ColorTextAccent);
+        tutorial2Popup.AddSpacer(2);
+        tutorial2Popup.AddBody("Solve fast to boost your score up to \u00d75.");
+
         tutorial2Popup.AddSpacer(8);
 
-        // Multiplier section (Arcade)
-        tutorial2Popup.AddSubheading("MULTIPLIER", UIStyleGuide.ColorTextAccent);
-        tutorial2Popup.AddSpacer(5);
-        tutorial2Popup.AddBody("Solve quickly to fill the multiplier bar\nand boost your score up to \u00d75!");
-
-        tutorial2Popup.AddSpacer(10);
-
-        // Hot Streak section (Arcade)
+        // Hot Streak section (Arcade) \u2014 collapsed to single line.
         Color hotStreakColor = new Color(1f, 0.5f, 0.15f); // Orange
         tutorial2Popup.AddSubheading("HOT STREAK", hotStreakColor);
-        tutorial2Popup.AddSpacer(5);
-        tutorial2Popup.AddBody("Fill the bar to trigger Hot Streak!\n15 seconds of \u00d75 scoring");
+        tutorial2Popup.AddSpacer(2);
+        tutorial2Popup.AddBody("Fill the bar for 15s of \u00d75 scoring!");
 
-        tutorial2Popup.AddSpacer(10);
+        tutorial2Popup.AddSpacer(8);
 
-        // Time Bonus section
+        // Time Bonus section \u2014 already a single line, just trim leading spacer.
         tutorial2Popup.AddSubheading("TIME BONUS", UIStyleGuide.ColorInfo);
-        tutorial2Popup.AddSpacer(5);
-        tutorial2Popup.AddBody("Every second played = +1 BP");
+        tutorial2Popup.AddSpacer(2);
+        tutorial2Popup.AddBody("+1 BP every second played.");
 
-        tutorial2Popup.AddSpacer(20);
+        tutorial2Popup.AddSpacer(16);
 
         // LET'S GO! button
         tutorial2Popup.AddButton("LET'S GO!", () =>

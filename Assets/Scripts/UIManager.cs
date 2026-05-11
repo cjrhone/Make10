@@ -389,36 +389,95 @@ public class UIManager : MonoBehaviour
         if (pauseMenuCreated) return;
         pauseMenuCreated = true;
 
-        // Parent to this UIManager's transform (lives on the game panel)
-        Transform parent = transform;
+        // === PAUSE HAMBURGER BUTTON (top-left corner) ===
+        // Parent OUTSIDE GamePanel so the button doesn't get overdrawn by
+        // CharacterPanel / StatsPanelBG / other game-panel siblings. We attach
+        // it to the SafeAreaContainer (Canvas/SafeAreaContainer) — so it respects
+        // notches but renders on top of the gameplay layer regardless of sibling
+        // order inside GamePanel.
+        Canvas rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+        Transform safeAreaParent = rootCanvas != null
+            ? rootCanvas.transform.Find("SafeAreaContainer")
+            : null;
+        // Fall back to root canvas, then to UIManager itself if neither exists yet.
+        Transform pauseParent = safeAreaParent != null
+            ? safeAreaParent
+            : (rootCanvas != null ? rootCanvas.transform : transform);
 
-        // === HAMBURGER BUTTON (top-left corner) ===
         pauseHamburgerButton = new GameObject("PauseHamburgerButton");
-        pauseHamburgerButton.transform.SetParent(parent, false);
+        pauseHamburgerButton.transform.SetParent(pauseParent, false);
 
         RectTransform hambRT = pauseHamburgerButton.AddComponent<RectTransform>();
-        hambRT.anchorMin = new Vector2(0f, 1f); // Top-left
+        hambRT.anchorMin = new Vector2(0f, 1f); // Top-left of safe area
         hambRT.anchorMax = new Vector2(0f, 1f);
         hambRT.pivot = new Vector2(0f, 1f);
         hambRT.anchoredPosition = new Vector2(20f, -20f);
-        hambRT.sizeDelta = new Vector2(90f, 90f);
+        hambRT.sizeDelta = new Vector2(96f, 96f);
 
-        // Button background
+        // Soft outer glow (slightly larger than the button itself, behind everything)
+        GameObject hambGlow = new GameObject("PauseGlow");
+        hambGlow.transform.SetParent(pauseHamburgerButton.transform, false);
+        RectTransform glowRT = hambGlow.AddComponent<RectTransform>();
+        glowRT.anchorMin = Vector2.zero;
+        glowRT.anchorMax = Vector2.one;
+        glowRT.offsetMin = new Vector2(-18f, -18f);
+        glowRT.offsetMax = new Vector2(18f, 18f);
+        Image glowImg = hambGlow.AddComponent<Image>();
+        GlowTextureGenerator.ApplyCircularGlow(glowImg, 96, 1.8f);
+        glowImg.color = new Color(0.95f, 0.78f, 0.30f, 0.55f); // warm gold glow
+        glowImg.raycastTarget = false;
+
+        // Circular button background (target graphic for the Button)
         Image hambBg = pauseHamburgerButton.AddComponent<Image>();
-        hambBg.color = new Color(0.1f, 0.1f, 0.15f, 0.7f);
+        hambBg.sprite = GlowTextureGenerator.GetCircularGlowSprite(96, 6f); // sharper edge
+        hambBg.type = Image.Type.Simple;
+        hambBg.preserveAspect = true;
+        hambBg.color = new Color(0.12f, 0.12f, 0.18f, 0.92f);
 
-        // Button component
+        // Inner ring accent — slightly inset, brighter color for clear button edge
+        GameObject hambRing = new GameObject("PauseRing");
+        hambRing.transform.SetParent(pauseHamburgerButton.transform, false);
+        RectTransform ringRT = hambRing.AddComponent<RectTransform>();
+        ringRT.anchorMin = Vector2.zero;
+        ringRT.anchorMax = Vector2.one;
+        ringRT.offsetMin = new Vector2(6f, 6f);
+        ringRT.offsetMax = new Vector2(-6f, -6f);
+        Image ringImg = hambRing.AddComponent<Image>();
+        ringImg.sprite = GlowTextureGenerator.GetCircularGlowSprite(96, 8f); // very sharp ring
+        ringImg.type = Image.Type.Simple;
+        ringImg.preserveAspect = true;
+        ringImg.color = new Color(0.95f, 0.78f, 0.30f, 0.85f); // matches glow → ring of light
+        ringImg.raycastTarget = false;
+
+        // Inner fill — sits just inside the ring, gives the icon a clean dark backing
+        GameObject hambFill = new GameObject("PauseFill");
+        hambFill.transform.SetParent(pauseHamburgerButton.transform, false);
+        RectTransform fillRT = hambFill.AddComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = Vector2.one;
+        fillRT.offsetMin = new Vector2(10f, 10f);
+        fillRT.offsetMax = new Vector2(-10f, -10f);
+        Image fillImg = hambFill.AddComponent<Image>();
+        fillImg.sprite = GlowTextureGenerator.GetCircularGlowSprite(96, 6f);
+        fillImg.type = Image.Type.Simple;
+        fillImg.preserveAspect = true;
+        fillImg.color = new Color(0.08f, 0.08f, 0.12f, 0.96f);
+        fillImg.raycastTarget = false;
+
+        // Button component — uses the outer bg as targetGraphic so the whole disc is tappable
         Button hambButton = pauseHamburgerButton.AddComponent<Button>();
+        hambButton.targetGraphic = hambBg;
         ColorBlock hambColors = hambButton.colors;
-        hambColors.normalColor = new Color(0.1f, 0.1f, 0.15f, 0.7f);
-        hambColors.highlightedColor = new Color(0.2f, 0.2f, 0.25f, 0.85f);
-        hambColors.pressedColor = new Color(0.05f, 0.05f, 0.1f, 0.9f);
+        hambColors.normalColor = new Color(1f, 1f, 1f, 1f);
+        hambColors.highlightedColor = new Color(1.1f, 1.1f, 1.1f, 1f);
+        hambColors.pressedColor = new Color(0.75f, 0.75f, 0.75f, 1f);
+        hambColors.colorMultiplier = 1f;
         hambButton.colors = hambColors;
         hambButton.onClick.AddListener(() => {
             SceneFlowManager.Instance?.OnPausePressed();
         });
 
-        // Hamburger icon text (☰)
+        // Pause icon text (two bars) — sits above the fill so it reads on the dark interior
         GameObject hambTextObj = new GameObject("HamburgerIcon");
         hambTextObj.transform.SetParent(pauseHamburgerButton.transform, false);
         RectTransform hambTextRT = hambTextObj.AddComponent<RectTransform>();
@@ -429,18 +488,19 @@ public class UIManager : MonoBehaviour
 
         TextMeshProUGUI hambText = hambTextObj.AddComponent<TextMeshProUGUI>();
         hambText.text = "| |"; // Pause icon (two bars)
-        hambText.fontSize = 44f;
+        hambText.fontSize = 48f;
         hambText.fontStyle = FontStyles.Bold;
         hambText.alignment = TextAlignmentOptions.Center;
-        hambText.color = new Color(0.95f, 0.95f, 0.95f, 0.9f);
+        hambText.color = new Color(1f, 0.92f, 0.6f, 1f); // warm cream — pops on dark fill
+        hambText.raycastTarget = false;
         if (scoreText != null) hambText.font = scoreText.font;
 
         pauseHamburgerButton.SetActive(false); // Hidden until game starts
 
         // === PAUSE OVERLAY (full-screen, hidden initially) ===
         // Parent to the root Canvas so it renders ON TOP of everything (grid, avatar, etc.)
-        Canvas rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
-        Transform overlayParent = rootCanvas != null ? rootCanvas.transform : parent;
+        // rootCanvas was already resolved above for the hamburger button — reuse it.
+        Transform overlayParent = rootCanvas != null ? rootCanvas.transform : transform;
 
         pauseOverlay = new GameObject("PauseOverlay");
         pauseOverlay.transform.SetParent(overlayParent, false);
