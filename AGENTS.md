@@ -43,6 +43,7 @@ Play service-account key at `~/.config/play/Make10.play.json`.
 | `Assets/Tests/` | EditMode + PlayMode tests — **not created yet** |
 | `Tools/*.py` | Build / version / test tooling (Python — preferred over Bash here) |
 | `fastlane/` | Google Play upload lanes |
+| `Screenshots/` | App Store assets + BRP/URP render-comparison shots — **capital S** (see Gotchas) |
 | `~/.claude/skills/update-play-target-api/` | User-level skill (shared across all games): bump Android target API to the latest Play requirement |
 
 ## Conventions
@@ -184,3 +185,11 @@ Build only (no upload), then upload later:
   `promote` lane sets it to `draft` so a promote never auto-goes-live.
 - **Production uploads as a DRAFT only.** Going live is always a manual publish
   click in the Console — the tooling never auto-rolls-out.
+- **`Screenshots/` is capital-S — never create `screenshots/`.** The repo tracks
+  `Screenshots/` (App Store assets, BRP/URP comparison shots). macOS is
+  case-insensitive (`git config core.ignorecase` = `true`), so a lowercase
+  `screenshots/…` silently folds into the tracked `Screenshots/` in git — it
+  *looks* fine locally but on a case-sensitive filesystem (Linux CI, some
+  contributors) the two are different directories, and `raw.githubusercontent`
+  URLs / relative paths pointing at the wrong case 404. Always reference the
+  capital-S `Screenshots/`.

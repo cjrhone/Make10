@@ -2554,6 +2554,29 @@ public class GridManager : MonoBehaviour
         StartCoroutine(ProcessMatchesCoroutine());
     }
 
+    // --- Test hooks (visible to Make10.Tests.PlayMode via InternalsVisibleTo) ---
+    // The swap loop is otherwise pointer-driven (Tile.cs) with no public entry
+    // point; these expose just enough for PlayMode integration tests to set up a
+    // known board and drive a real swap without reflection.
+
+    /// <summary>Grid column count (test hook).</summary>
+    internal int GridColumns => gridWidth;
+
+    /// <summary>Grid row count (test hook).</summary>
+    internal int GridRows => gridHeight;
+
+    /// <summary>Tile at a cell, or null if empty (test hook).</summary>
+    internal Tile GetTileAt(int x, int y) => grid[x, y];
+
+    /// <summary>True while a swap/match/cascade is resolving (test hook).</summary>
+    internal bool IsBusy => isProcessing;
+
+    /// <summary>
+    /// Run a player swap through the real chokepoint every tap-tap / swipe / drag
+    /// swap funnels into, including match/score/cascade processing (test hook).
+    /// </summary>
+    internal void BeginSwap(Tile a, Tile b) => StartCoroutine(AnimatedSwapCoroutine(a, b));
+
     #region Zen Save/Resume
 
     /// <summary>
