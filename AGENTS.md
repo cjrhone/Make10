@@ -6,6 +6,32 @@ project is built, tested, and shipped — for both humans and agents.
 
 Studio: CJ Rhone / Wizard Bodega. For gameplay/design detail see `CLAUDE.md`.
 
+## Prerequisites (CLI dependencies)
+
+Every dev machine that builds/publishes needs these. Versions are what's in use
+today (2026-07-22); newer patch versions are fine.
+
+| Tool | Install | Used for | Notes |
+|------|---------|----------|-------|
+| **Unity 6000.5.4f1** + **Android Build Support** (incl. OpenJDK, SDK, NDK) | Unity Hub | headless `.aab` build, `keytool` for signing/verify | Must match `ProjectSettings/ProjectVersion.txt` exactly. The SDK Platform for the target API (36) must be installed. |
+| **fastlane** (2.237.0) | `brew install fastlane` | Google Play upload lanes | Pulls its own Ruby dependency. |
+| **Python 3** (3.10+) | preinstalled on macOS / `brew install python` | `Tools/*.py` | 3.10+ required — scripts use `X \| None` type hints. |
+| **git** (2.x) + SSH key on GitHub | Xcode CLT / `brew install git` | clone/commit/push; `origin` is SSH (`git@github.com:cjrhone/Make10.git`) | — |
+| **Ruby** | comes with the `fastlane` formula | fastlane runtime | No separate install needed. |
+| **Java / keytool** | bundled in Unity's Android module | keystore verify/sign | Use Unity's OpenJDK; no system JDK needed. |
+
+Quick machine setup:
+
+```bash
+brew install fastlane            # + Ruby
+# Unity 6000.5.4f1 with Android Build Support via Unity Hub
+# GitHub SSH key configured (git@github.com)
+```
+
+Not CLI tools, but required (kept **outside** the repo — see Signing below):
+upload keystore + `M10_KEYSTORE_PASS`/`M10_KEYALIAS_PASS` in `~/.zshenv`, and the
+Play service-account key at `~/.config/play/Make10.play.json`.
+
 ## Layout
 
 | Path | What |
@@ -70,6 +96,28 @@ One command does bump → build signed `.aab` → upload a **Production draft**:
   plus `build-v<name>.log`. The version **code** stays Play-side tracking only.
 - Variants: `--no-bump` (rebuild same code), `--name 1.1 --upload` (milestone).
 
+### Native debug symbols (ANR / crash symbolication)
+
+`BuildScript` sets `UserBuildSettings.DebugSymbols` to **SymbolTable / Zip**, so
+each build emits a `*.symbols.zip` next to the `.aab`. `build_android.py` finds
+it and, on `--upload`, passes it to the `production_draft` lane, which uploads it
+as **native debug symbols** for that versionCode (`mapping_paths` → nativeCode)
+so Google Play can symbolicate native crashes and ANRs. Missing symbols is a
+warning, not a build failure. (`SymbolTable` is enough for ANR stacks; `Full`
+also embeds DWARF and is much larger.)
+
+## Releasing (git tags)
+
+Each Play release gets an **annotated tag** `v<name>` on the release commit:
+
+```bash
+git tag -a v1.1 <commit> -m "Make10 v1.1 (Android) — Play versionCode 2 ..."
+git push origin v1.1
+```
+
+The release commit bumps `bundleVersion` + `AndroidBundleVersionCode` and updates
+`CHANGELOG.md`. Tag *after* the draft uploads cleanly.
+
 Build only (no upload), then upload later:
 
 ```bash
@@ -105,7 +153,8 @@ Build only (no upload), then upload later:
 ## fastlane lanes (`fastlane/Fastfile`)
 
 - `fastlane verify` — check the Play credential works (read-only). Run this FIRST.
-- `fastlane production_draft aab:<path>` — upload an `.aab` to Production as a draft.
+- `fastlane production_draft aab:<path> [symbols:<path>]` — upload an `.aab` to
+  Production as a draft; optional `symbols:` uploads the native debug symbols zip.
 - `fastlane promote version:<code>` — promote an already-uploaded build to a
   Production **draft** without re-uploading (a code can only be uploaded once).
 - `fastlane internal aab:<path>` — internal testing track.

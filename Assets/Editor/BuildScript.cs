@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Android;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using Unity.Android.Types;
 
 // Headless Android build entry point, invoked from the command line via
 //   Unity -batchmode -quit -executeMethod BuildScript.BuildAndroid
@@ -45,6 +47,12 @@ public static class BuildScript {
 
     // Build an App Bundle (.aab), not an APK — Play needs the bundle.
     EditorUserBuildSettings.buildAppBundle = true;
+
+    // Emit native debug symbols as a symbols.zip next to the .aab so Google Play
+    // can symbolicate native crashes and ANRs. SymbolTable is enough for ANR
+    // stack symbolication (Full also embeds DWARF debug info — much larger).
+    UserBuildSettings.DebugSymbols.level = DebugSymbolLevel.SymbolTable;
+    UserBuildSettings.DebugSymbols.format = DebugSymbolFormat.Zip;
 
     var scenes = EditorBuildSettings.scenes
       .Where(s => s.enabled)

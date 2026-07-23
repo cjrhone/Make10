@@ -42,6 +42,19 @@ sysinfo.txt
 *.apk
 *.aab
 *.unitypackage
+
+# Native debug symbols + mapping (Play ANR/crash symbolication). Normally emitted
+# to ~/Developer/Make10Builds (outside the repo); ignored defensively in case a
+# build ever targets the project tree — never commit these.
+*.symbols.zip
+mapping.txt
+
+# Unity IL2CPP / native (CMake + ninja) build workspace — pure build junk
+/.utmp/
+
+# Python bytecode cache (Tools/*.py)
+__pycache__/
+*.pyc
 *.app
 
 # Signing keystores (never commit these)

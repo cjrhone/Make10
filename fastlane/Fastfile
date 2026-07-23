@@ -71,13 +71,24 @@ platform :android do
     aab = options[:aab] || ENV["AAB_PATH"]
     UI.user_error!("Pass the bundle: fastlane production_draft aab:/path/to/app.aab") if aab.nil? || aab.empty?
 
-    upload_to_play_store(
+    params = {
       track: "production",
       aab: aab,
       release_status: "draft",      # <-- draft, not live
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true
-    )
+    }
+
+    # Optional native debug symbols (Unity's *.symbols.zip) for Play ANR /
+    # native-crash symbolication. supply detects a .zip in mapping_paths and
+    # uploads it as nativeCode deobfuscation for this versionCode.
+    symbols = options[:symbols] || ENV["SYMBOLS_PATH"]
+    if symbols && !symbols.empty?
+      UI.user_error!("symbols file not found: #{symbols}") unless File.exist?(symbols)
+      params[:mapping_paths] = [symbols]
+    end
+
+    upload_to_play_store(**params)
   end
 end

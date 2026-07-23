@@ -135,6 +135,43 @@ Make10/
 
 ---
 
+## Building & Releasing (Android)
+
+Full details in **[`AGENTS.md`](AGENTS.md)**. Quick reference:
+
+### Prerequisites (every dev machine)
+
+| Tool | Install | Used for |
+|------|---------|----------|
+| Unity **6000.5.4f1** + Android Build Support (OpenJDK/SDK/NDK) | Unity Hub | headless `.aab` build, keystore signing |
+| **fastlane** | `brew install fastlane` (pulls Ruby) | Google Play upload |
+| **Python 3.10+** | macOS preinstalled / `brew install python` | `Tools/*.py` |
+| **git + GitHub SSH key** | Xcode CLT / `brew install git` | clone / push (SSH remote) |
+
+Plus (outside the repo): the upload keystore + `M10_KEYSTORE_PASS` / `M10_KEYALIAS_PASS`
+in `~/.zshenv`, and the Play key at `~/.config/play/Make10.play.json`.
+
+### Quick reference
+
+- **Android** target for Google Play (`gg.wizardbodega.make10deluxe`), Unity 6
+  (6000.5.x), IL2CPP, target API 36 / min 26. (The WebGL notes above are stale.)
+- One command bumps the version, builds a signed `.aab`, and uploads a Google
+  Play **Production draft** (never auto-goes-live):
+
+  ```bash
+  export M10_KEYSTORE_PASS=...  M10_KEYALIAS_PASS=...   # in ~/.zshenv
+  ./Tools/build_android.py --name 1.1 --upload
+  ```
+
+- **Native debug symbols** (`*.symbols.zip`) are emitted per build and uploaded
+  with the bundle so Play can symbolicate native crashes and ANRs.
+- **Releases** are tagged `v<name>` (annotated) on the release commit; see
+  `CHANGELOG.md`.
+- Secrets (keystore, Play service-account key) live outside the repo; passwords
+  come from env vars. Build output goes to `~/Developer/Make10Builds/`.
+
+---
+
 ## Credits
 
 **Game Design & Development:** CJ Rhone

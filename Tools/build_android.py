@@ -101,6 +101,17 @@ def main(argv: list[str] | None = None) -> None:
     size_mb = aab.stat().st_size / (1024 * 1024)
     print(f"==> Built {size_mb:.0f} MB  {aab}")
 
+    # BuildScript emits native debug symbols as a *.symbols.zip next to the .aab
+    # (for Play ANR/native-crash symbolication). Pick the freshest one we just
+    # wrote. Missing symbols is a warning, not a build failure.
+    zips = sorted(DEFAULT_OUTPUT_DIR.glob("*.symbols.zip"), key=lambda p: p.stat().st_mtime)
+    symbols = zips[-1] if zips else None
+    if symbols:
+        print(f"==> Symbols  {symbols.stat().st_size / (1024 * 1024):.0f} MB  {symbols}")
+    else:
+        print("==> WARNING: no *.symbols.zip found — ANR/native symbolication won't be "
+              "available for this build. Check that BuildScript set DebugSymbols.")
+
     # --- Optional upload (Production draft) --------------------------------
     if args.upload:
         key = Path(os.environ.get("SUPPLY_JSON_KEY", str(DEFAULT_KEY)))
@@ -108,13 +119,16 @@ def main(argv: list[str] | None = None) -> None:
             die(f"Play key not found at {key} (set SUPPLY_JSON_KEY). "
                 f"The .aab built fine at {aab} — upload it manually once the key is set.")
         print(f"==> Uploading v{name} (code {code}) to Production (draft)")
+        cmd = ["fastlane", "production_draft", f"aab:{aab}"]
+        if symbols:
+            cmd.append(f"symbols:{symbols}")  # uploaded as native debug symbols
         subprocess.run(
-            ["fastlane", "production_draft", f"aab:{aab}"],
-            cwd=PROJECT_ROOT, env={**os.environ, "SUPPLY_JSON_KEY": str(key)}, check=True,
+            cmd, cwd=PROJECT_ROOT, env={**os.environ, "SUPPLY_JSON_KEY": str(key)}, check=True,
         )
         print("==> Uploaded as a DRAFT. Review and press publish in the Play Console to go live.")
     else:
-        print(f'Next: fastlane production_draft aab:"{aab}"   (uploads a production draft)')
+        tail = f' symbols:"{symbols}"' if symbols else ""
+        print(f'Next: fastlane production_draft aab:"{aab}"{tail}   (uploads a production draft)')
 
 
 if __name__ == "__main__":
