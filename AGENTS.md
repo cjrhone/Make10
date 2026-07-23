@@ -36,10 +36,18 @@ Editor must be **closed** (Unity locks the project).
 ```bash
 ./Tools/run_tests.py              # EditMode + PlayMode
 ./Tools/run_tests.py playmode     # one suite
+./Tools/run_tests.py --allow-empty  # tolerate a suite with 0 tests
 ```
 
-> **No tests exist yet.** Until `Assets/Tests/` has an EditMode/PlayMode asmdef,
-> Unity runs zero tests and reports success. The runner is wired and ready.
+The runner parses the NUnit results XML and **fails on a suite that ran 0
+tests** (Unity's `-runTests` exits 0 on nothing — a false green without this
+guard). Pass `--allow-empty` to tolerate it.
+
+> **No tests exist yet**, and adding them needs a refactor first: game code
+> lives in `Assembly-CSharp`, which a test asmdef cannot reference. To write
+> real game-logic tests, move the code under test behind its own asmdef, then
+> add an EditMode/PlayMode test asmdef that references it. Until then every suite
+> runs 0 tests (so `run_tests.py` fails by design).
 
 ## Build & publish
 

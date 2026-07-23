@@ -4,12 +4,17 @@
     ./Tools/run_tests.py             # EditMode + PlayMode
     ./Tools/run_tests.py playmode    # PlayMode only
     ./Tools/run_tests.py editmode    # EditMode only
+    ./Tools/run_tests.py --allow-empty   # don't fail when a suite has 0 tests
 
 The Unity editor must be CLOSED (Unity holds an exclusive project lock).
 
-NOTE: Make10 has no test assemblies yet. Until Assets/Tests/ (with an
-EditMode/PlayMode asmdef referencing the test framework) exists, Unity runs
-zero tests and reports success. Add tests, then this wires them into CI.
+Honest-empty: Unity's `-runTests` exits 0 even when there are NO test assemblies,
+which would read as a false green. This runner parses the NUnit results XML and
+treats a suite that ran 0 tests as a FAILURE, unless you pass --allow-empty.
+
+NOTE: Make10 has no test assemblies yet — game code lives in `Assembly-CSharp`,
+which a test asmdef can't reference. Real game-logic tests need the code moved
+behind its own asmdef first; until then every suite runs 0 tests.
 """
 from __future__ import annotations
 
@@ -17,6 +22,7 @@ import argparse
 import os
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -35,9 +41,29 @@ def unity_binary() -> Path:
     return Path(f"/Applications/Unity/Hub/Editor/{version}/Unity.app/Contents/MacOS/Unity")
 
 
+def parse_counts(results: Path) -> tuple[int, int, int] | None:
+    """Return (total, passed, failed) from an NUnit3 results file, or None if
+    the file is missing/unparsable (Unity may skip writing it when nothing ran)."""
+    if not results.is_file():
+        return None
+    try:
+        root = ET.parse(results).getroot()  # <test-run total=".." passed=".." failed="..">
+    except ET.ParseError:
+        return None
+    def n(attr: str) -> int:
+        try:
+            return int(root.get(attr, "0"))
+        except ValueError:
+            return 0
+    total = n("total") or n("testcasecount")
+    return total, n("passed"), n("failed")
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("suite", nargs="?", default="all", choices=["all", "editmode", "playmode"])
+    p.add_argument("--allow-empty", action="store_true",
+                   help="treat a suite that ran 0 tests as success (default: failure)")
     args = p.parse_args(argv)
 
     unity = unity_binary()
@@ -52,17 +78,32 @@ def main(argv: list[str] | None = None) -> int:
     for platform in platforms:
         results = RESULTS_DIR / f"{platform}.xml"
         log = RESULTS_DIR / f"{platform}.log"
+        results.unlink(missing_ok=True)  # stale results would mask a run that wrote nothing
         print(f"==> Running {platform} tests (log: {log})")
         # PlayMode tests render a UI canvas, so no -nographics here.
         proc = subprocess.run(
             [str(unity), "-runTests", "-batchmode", "-projectPath", str(PROJECT_ROOT),
              "-testPlatform", platform, "-testResults", str(results), "-logFile", str(log)]
         )
-        if proc.returncode == 0:
-            print(f"==> {platform} PASSED")
-        else:
-            print(f"==> {platform} FAILED (exit {proc.returncode}) — see {log} and {results}", file=sys.stderr)
+
+        counts = parse_counts(results)
+        if proc.returncode != 0:
+            total = counts[0] if counts else "?"
+            failed = counts[2] if counts else "?"
+            print(f"==> {platform} FAILED (exit {proc.returncode}, {failed}/{total} failing) "
+                  f"— see {log} and {results}", file=sys.stderr)
             status = 1
+        elif counts is None or counts[0] == 0:
+            # Unity returned success but ran nothing — a false green without this guard.
+            if args.allow_empty:
+                print(f"==> {platform}: 0 tests ran (allowed by --allow-empty)")
+            else:
+                print(f"==> {platform} NO TESTS RAN — 0 test assemblies for this platform. "
+                      f"Add tests, or pass --allow-empty. (log: {log})", file=sys.stderr)
+                status = 1
+        else:
+            total, passed, _failed = counts
+            print(f"==> {platform} PASSED ({passed}/{total} tests)")
     return status
 
 
