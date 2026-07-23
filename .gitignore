@@ -51,6 +51,16 @@ sysinfo.txt
 # Crashlytics generated file
 crashlytics-build.properties
 
+# Headless test output (Tools/run_tests.py)
+/TestResults/
+
+# fastlane run artifacts (lanes live in fastlane/Appfile + fastlane/Fastfile)
+fastlane/report.xml
+fastlane/README.md
+fastlane/Preview.html
+**/.env
+*.play.json
+
 # Packed Addressables
 /[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
 
