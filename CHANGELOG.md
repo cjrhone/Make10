@@ -11,6 +11,7 @@ name (e.g. `1.1`) for releases (see `AGENTS.md`).
 
 **Platform: Android only.** Ships to Google Play (App Bundle, versionCode 2);
 no iOS build in this release. No gameplay changes — infrastructure/tooling only.
+**Play status:** submitted to Production 2026-07-22, under review.
 
 ### Changed
 - Updated Unity Editor to **6000.5.4f1**.

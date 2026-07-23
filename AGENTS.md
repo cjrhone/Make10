@@ -108,6 +108,10 @@ also embeds DWARF and is much larger.)
 
 ## Releasing (git tags)
 
+**Current Play status:** v1.1 = **versionCode 2**, submitted to Production
+2026-07-22 (under review). versionCode 2 is consumed — the next build bumps to
+**code 3**. Keep this line current when a release ships.
+
 Each Play release gets an **annotated tag** `v<name>` on the release commit:
 
 ```bash
