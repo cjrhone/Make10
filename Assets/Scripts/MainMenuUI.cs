@@ -179,7 +179,15 @@ public class MainMenuUI : MonoBehaviour {
   /// </summary>
   private void SetupShopButton() {
     if (shopButton == null) {
-      return;
+      // The 1.2.0 TestFlight build shipped with the Shop button visible because this reference
+      // was empty in the scene. Fall back to a name lookup so a broken reference degrades to a
+      // warning instead of leaking a dev-only button into release.
+      shopButton = transform.Find("ShopButton")?.GetComponent<Button>();
+      if (shopButton == null) {
+        return;
+      }
+
+      Debug.LogWarning("[MainMenuUI] shopButton was not wired in the Inspector; found it by name. Wire it to keep this warning quiet.", this);
     }
 
     if (!Debug.isDebugBuild) {

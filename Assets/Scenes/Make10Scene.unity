@@ -364,7 +364,7 @@ MonoBehaviour:
   playButton: {fileID: 1877129517}
   zenButton: {fileID: 0}
   creditsButton: {fileID: 0}
-  shopButton: {fileID: 0}
+  shopButton: {fileID: 1618790899}
   optionsButton: {fileID: 512812419}
   quitButton: {fileID: 288641638}
   bpDisplayText: {fileID: 329443362}
