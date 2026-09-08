@@ -47,9 +47,10 @@ Play service-account key at `~/.config/play/Make10.play.json`.
 
 ## Conventions
 
-- **Version name = `0.<code>`** (v10 = 0.10). `bump_version.py` keeps them in
-  sync so Play never shows a mismatch like `11(0.10)`. Use `--name` only for a
-  real milestone (e.g. `1.0`).
+- **Version name = `0.<code>`** for interim dev builds (v10 = 0.10).
+  `bump_version.py` keeps them in sync so Play never shows a mismatch like
+  `11(0.10)`. **Release** version names are semver from release-please
+  (`1.2.0`); the release PR writes them, so don't pass `--name` by hand.
 - **versionCode is global**: once a code is uploaded to *any* track it's
   consumed forever — always bump before building.
 - **Env-var prefix is `M10_`** (CardMatch uses `CM_`) so both games' keystore
@@ -112,15 +113,29 @@ also embeds DWARF and is much larger.)
 2026-07-22 (under review). versionCode 2 is consumed — the next build bumps to
 **code 3**. Keep this line current when a release ships.
 
-Each Play release gets an **annotated tag** `v<name>` on the release commit:
+Releases are cut by **release-please** (`.github/workflows/release-please.yml`),
+same flow as Hot Trash Summer:
 
-```bash
-git tag -a v1.1 <commit> -m "Make10 v1.1 (Android) — Play versionCode 2 ..."
-git push origin v1.1
-```
+1. Every push to `main` opens/updates a `chore(main): release X.Y.Z` PR from the
+   conventional commits since the last tag. The workflow's sync step then writes
+   into that PR: `version.txt` → `bundleVersion` (ProjectSettings + both Build
+   Profiles) and `AndroidBundleVersionCode` = main's code + 1.
+2. Merge the release PR. release-please tags `vX.Y.Z` and publishes the GitHub
+   release with the changelog section.
+3. Build the tagged commit **without bumping** (the PR already did):
+   ```bash
+   git checkout vX.Y.Z
+   ./Tools/build_android.py --no-bump --upload
+   ```
+   Then press publish in the Play Console and update the "Current Play status"
+   line above.
 
-The release commit bumps `bundleVersion` + `AndroidBundleVersionCode` and updates
-`CHANGELOG.md`. Tag *after* the draft uploads cleanly.
+The in-game label (`BuildStamp.Version`, bottom-right of the main menu) reads
+`Application.version`, so it moves with `bundleVersion` automatically.
+
+Tags are semver (`v1.2.0`), not the older two-part `v1.1`. `last-release-sha`
+in `release-please-config.json` points at the `v1.1` commit so only later
+commits count.
 
 Build only (no upload), then upload later:
 
