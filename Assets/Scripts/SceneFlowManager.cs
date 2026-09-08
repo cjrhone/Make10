@@ -162,11 +162,37 @@ public class SceneFlowManager : MonoBehaviour {
     }
 
     // Reparent all panels into SafeArea container (preserves sibling order)
+    var bleedCount = 0;
     foreach (var child in childrenToMove) {
       child.SetParent(safeAreaRect, false);
+
+      // Full-screen panels with a background Image get to bleed under the notch / home
+      // indicator; their children (buttons, text) still sit inside the safe area.
+      if (child is RectTransform childRect && ShouldBleed(childRect)) {
+        childRect.gameObject.AddComponent<SafeAreaBleed>();
+        bleedCount++;
+      }
     }
 
-    Debug.Log($"[Make10] SafeArea: Moved {childrenToMove.Count} panels into SafeAreaContainer.");
+    Debug.Log($"[Make10] SafeArea: Moved {childrenToMove.Count} panels into SafeAreaContainer ({bleedCount} bleed under insets).");
+  }
+
+  /// <summary>
+  /// A panel bleeds when it is a plain full-stretch rect (anchors 0..1, no offsets) that draws
+  /// a background Image. Dialog-sized panels (WinScreen, LoseScreen, tutorials) and empty
+  /// containers (ParallaxContainer, VFX holders) are left alone. Panels that already carry a
+  /// SafeAreaBleed from the scene are respected as-is.
+  /// </summary>
+  private static bool ShouldBleed (RectTransform rect) {
+    if (rect.GetComponent<SafeAreaBleed>() != null || rect.GetComponent<Image>() == null) {
+      return false;
+    }
+
+    const float epsilon = 0.5f;
+    return rect.anchorMin == Vector2.zero
+           && rect.anchorMax == Vector2.one
+           && Mathf.Abs(rect.offsetMin.x) < epsilon && Mathf.Abs(rect.offsetMin.y) < epsilon
+           && Mathf.Abs(rect.offsetMax.x) < epsilon && Mathf.Abs(rect.offsetMax.y) < epsilon;
   }
 
   private float GetCanvasWidth() {

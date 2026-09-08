@@ -59,6 +59,8 @@ WebBuild/, builds/     Build outputs
 | `UIManager.cs` | Score/timer/multiplier display, results screen, locked tile counter |
 | `MainMenuUI.cs` | Main menu + per-mode high scores |
 | `UI/PopupWindow.cs` | Reusable popup with scrollbar/auto-size |
+| `UI/SafeAreaHandler.cs` | Shrinks `SafeAreaContainer` to `Screen.safeArea`; `SceneFlowManager.SetupSafeArea` parents every panel under it |
+| `UI/SafeAreaBleed.cs` | Lets a panel background Image extend under notch / home-indicator insets; auto-added to full-screen Image panels, on `CharacterPanel` in-scene |
 
 ### Audio & VFX
 | Script | Purpose |

@@ -18276,6 +18276,7 @@ GameObject:
   - component: {fileID: 1878202361}
   - component: {fileID: 1878202360}
   - component: {fileID: 1878202362}
+  - component: {fileID: 1878202363}
   m_Layer: 5
   m_Name: CharacterPanel
   m_TagString: Untagged
@@ -18356,6 +18357,20 @@ MonoBehaviour:
   designWidth: 1080
   barColor: {r: 0.03, g: 0.03, b: 0.04, a: 1}
   bleed: 1
+--- !u!114 &1878202363
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1878202358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb8e05c819b1455191d32492d59aed4c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Make10.Runtime::SafeAreaBleed
+  flushTolerance: 1
+  safeArea: {fileID: 0}
 --- !u!1 &1880873838
 GameObject:
   m_ObjectHideFlags: 0

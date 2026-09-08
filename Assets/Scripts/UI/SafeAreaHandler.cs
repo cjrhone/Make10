@@ -16,6 +16,7 @@ public class SafeAreaHandler : MonoBehaviour {
   private RectTransform rectTransform;
   private Canvas rootCanvas;
   private Rect lastSafeArea;
+  private Vector2 lastScreenSize;
 
   private void Awake() {
     rectTransform = GetComponent<RectTransform>();
@@ -31,8 +32,10 @@ public class SafeAreaHandler : MonoBehaviour {
   }
 
   private void Update() {
-    // Only recalculate if safe area changed
-    if (Screen.safeArea != lastSafeArea) {
+    // Recalculate when either input changes. Screen size matters as much as the safe area:
+    // in Device Simulator (and on some devices during orientation changes) Screen.width/height
+    // can lag a frame behind Screen.safeArea, and the anchors are the ratio of the two.
+    if (Screen.safeArea != lastSafeArea || new Vector2(Screen.width, Screen.height) != lastScreenSize) {
       ApplySafeArea();
     }
   }
@@ -51,9 +54,20 @@ public class SafeAreaHandler : MonoBehaviour {
     // Convert safe area from screen space to canvas space
     // For Screen Space - Overlay canvas, we need to convert pixel values to anchor values
     var screenSize = new Vector2(Screen.width, Screen.height);
+    lastScreenSize = screenSize;
 
     // Avoid division by zero
     if (screenSize.x <= 0 || screenSize.y <= 0) {
+      return;
+    }
+
+    // The safe area must fit inside the screen it is expressed in. If it does not, the two
+    // values were sampled from different coordinate spaces (seen in Device Simulator during
+    // Awake: safeArea already in device pixels, Screen.width/height still the editor window).
+    // Leave the previous anchors alone and try again next frame instead of insetting nonsense.
+    if (safeArea.xMax > screenSize.x + 1f || safeArea.yMax > screenSize.y + 1f) {
+      lastSafeArea = default;
+      lastScreenSize = default;
       return;
     }
 
