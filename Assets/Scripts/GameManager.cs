@@ -29,7 +29,7 @@ public class GameManager : MonoBehaviour {
 
     [Header("Win Condition")] public int winScore = 100;
 
-    [Header("Tile Weights (base weights for tiles 0-9)"), Range(0, 1)] 
+    [Header("Tile Weights (base weights for tiles 0-9)"), Range(0, 1)]
     public float weight0 = 0.12f; // Grey (wildcard) — boosted for easy early 10s
 
     [Range(0, 1)] public float weight1 = 0.28f; // Gold — boosted primary, easiest combos
@@ -47,14 +47,14 @@ public class GameManager : MonoBehaviour {
     }
   }
 
-  [Header("Game Settings"), SerializeField] 
+  [Header("Game Settings"), SerializeField]
   private GameSettings gameSettings = new();
 
   #endregion
 
   public int WinScore => gameSettings.winScore;
   [SerializeField] private float gameDuration = 60f;
-  [Header("Scoring"), SerializeField]  private int baseMatchScore = 10;
+  [Header("Scoring"), SerializeField] private int baseMatchScore = 10;
 
   // Multiplier bar range/gain/drain, Hot Streak multiplier, speed bonus BP and
   // star thresholds live in ScoringRules (pure, unit-tested). Only timing knobs
@@ -63,10 +63,10 @@ public class GameManager : MonoBehaviour {
   // Zen multiplier settings removed — Zen uses flat scoring (lineSum only).
   // Arcade multiplier is bar-based (see ScoringRules.MultiplierForBar).
 
-  [Header("Hot Streak Mode"), SerializeField] 
+  [Header("Hot Streak Mode"), SerializeField]
   private float hotStreakDuration = 15f;
 
-  [Header("Speed Bonus"), SerializeField] 
+  [Header("Speed Bonus"), SerializeField]
   private float speedBonusThreshold = 4f; // Seconds to qualify
 
   [Header("Debug Mode"), SerializeField]
@@ -76,8 +76,7 @@ public class GameManager : MonoBehaviour {
   [SerializeField] private int debugStartingBP = 500;
 #pragma warning restore CS0414
 
-  [Header("References"), SerializeField] 
-  private UIManager uiManager;
+  [Header("References"), SerializeField] private UIManager uiManager;
 
   // GridManager is not a singleton. Cache it lazily instead of FindAnyObjectByType per call.
   private GridManager gridManagerCache;
@@ -92,10 +91,9 @@ public class GameManager : MonoBehaviour {
     }
   }
 
-  [Header("Zen Mode Settings"), SerializeField] 
+  [Header("Zen Mode Settings"), SerializeField]
   private float zenGameDuration = 300f; // 5 minutes
 
-  [SerializeField] private float zenFailedSwapPenalty = 3f; // Seconds deducted on bad swap
   [SerializeField] private int zenMaxReshuffles = 3;
 
   // High Score persistence keys
@@ -524,9 +522,9 @@ public class GameManager : MonoBehaviour {
     // chainIndex is 1-based and resets each chain (OnCascadeStart).
     cascadeLineCounter++;
     var cascadeBP = ScoringRules.CascadeSolve(CurrentMode, lineBaseScore, cascadeLineCounter);
-    Debug.Log(CurrentMode == GameMode.Arcade
-      ? $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (chain line #{cascadeLineCounter})"
-      : $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (flat, no multiplier)");
+    Debug.Log(CurrentMode == GameMode.Arcade ?
+      $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (chain line #{cascadeLineCounter})" :
+      $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (flat, no multiplier)");
     CommitScore(cascadeBP);
     // Note: does NOT increment solveCount, touch multiplier, or trigger hot streak
   }
@@ -581,7 +579,8 @@ public class GameManager : MonoBehaviour {
     Debug.Log(
       $"<color=green>[Arcade]</color> {lineBaseScore} × {currentMultiplier:F2} = <color=cyan>+{points} pts</color> (bar: {multiplierBar:F0})");
     if (speedBonus) {
-      Debug.Log($"<color=magenta>⚡ SPEED BONUS! +{ScoringRules.SpeedBonusBP} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
+      Debug.Log(
+        $"<color=magenta>⚡ SPEED BONUS! +{ScoringRules.SpeedBonusBP} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
     }
 
     lastPlayerSolveTime = Time.time;
@@ -927,8 +926,6 @@ public class GameManager : MonoBehaviour {
   /// 1.0.1: penalty removed — failed swaps now revert visually with no time deduction
   /// or multiplier impact in either mode. Method retained as a no-op for backwards
   /// compatibility; can be deleted once all call sites are removed.
-  /// The serialized <see cref="zenFailedSwapPenalty"/> field is intentionally left in
-  /// place to avoid Inspector serialization churn.
   /// </summary>
   public void OnFailedSwap() {
     // No-op (1.0.1).

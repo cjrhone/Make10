@@ -354,8 +354,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MainMenuUI
   titleCard: {fileID: 2126877256}
-  bounceHeight: 20
-  bounceSpeed: 2
   titleRotateAmount: 3
   topBanner: {fileID: 291611704}
   topBannerDuplicate: {fileID: 0}
@@ -371,6 +369,7 @@ MonoBehaviour:
   quitButton: {fileID: 288641638}
   bpDisplayText: {fileID: 329443362}
   highScoreDisplayText: {fileID: 0}
+  versionText: {fileID: 0}
 --- !u!114 &68437848
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1684,7 +1683,6 @@ MonoBehaviour:
   multiplierFillImage: {fileID: 1852814335}
   multiplierFullColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   multiplierLowColor: {r: 1, g: 0.3, b: 0.2, a: 1}
-  multiplierLowThreshold: 3
   hotStreakEffect: {fileID: 2128208163}
   enableHotStreak: 1
   hotStreakBackground: {fileID: 515369882}
@@ -1715,8 +1713,9 @@ MonoBehaviour:
   newHighScoreBanner: {fileID: 0}
   newHighScoreColor: {r: 1, g: 0.85, b: 0.1, a: 1}
   starFilledColor: {r: 1, g: 0.85, b: 0.1, a: 1}
-  starEmptyColor: {r: 0.4, g: 0.4, b: 0.4, a: 0.5}
-  starSize: 64
+  starEmptyColor: {r: 0.85, g: 0.65, b: 0.15, a: 0.45}
+  starSize: 88
+  starGlowFalloff: 1.2
   starRevealDelay: 0.25
   unsolvablePopup: {fileID: 731897464}
   unsolvablePopupDuration: 1
@@ -2615,8 +2614,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 208.51515, y: -371}
-  m_SizeDelta: {x: 327, y: 166.73}
+  m_AnchoredPosition: {x: 185, y: -371}
+  m_SizeDelta: {x: 340, y: 166.73}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &288503518
 MonoBehaviour:
@@ -5632,7 +5631,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 5.0
+  m_text: 0
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: b0df7b48da3614cb5bcda99e8f6faaf9, type: 2}
   m_sharedMaterial: {fileID: 2022190334}
@@ -5665,8 +5664,8 @@ MonoBehaviour:
   m_fontSizeBase: 35.88
   m_fontWeight: 400
   m_enableAutoSizing: 1
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMin: 32
+  m_fontSizeMax: 56.5
   m_fontStyle: 0
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
@@ -6934,6 +6933,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -7703,7 +7703,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
+  m_fontSize: 42
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -8408,7 +8408,7 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 45.2
+  m_fontSize: 42
   m_fontSizeBase: 45.2
   m_fontWeight: 400
   m_enableAutoSizing: 0
@@ -9203,14 +9203,15 @@ MonoBehaviour:
   sparkleColor: {r: 1, g: 0.95, b: 0.6, a: 1}
   gridValidation: {fileID: 194196916}
   tileWeightManager: {fileID: 1743593534}
-  enableHints: 1
-  hintDelay: 10
-  hintRepeatInterval: 3
-  hintParticleCount: 5
-  hintParticleSpeed: 120
-  hintParticleLifetime: 0.5
-  hintParticleSize: 12
-  hintParticleColor: {r: 1, g: 0.9, b: 0.3, a: 0.9}
+  hintSettings:
+    enableHints: 1
+    hintDelay: 10
+    hintRepeatInterval: 3
+    hintParticleCount: 5
+    hintParticleSpeed: 120
+    hintParticleLifetime: 0.5
+    hintParticleSize: 12
+    hintParticleColor: {r: 1, g: 0.9, b: 0.3, a: 0.9}
 --- !u!114 &901072116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11355,8 +11356,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -168.26765, y: -370.99887}
-  m_SizeDelta: {x: 356.5353, y: 166.7289}
+  m_AnchoredPosition: {x: -185, y: -371}
+  m_SizeDelta: {x: 340, y: 166.73}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1212490386
 MonoBehaviour:
@@ -11914,25 +11915,13 @@ MonoBehaviour:
     weight9: 0
   gameDuration: 60
   baseMatchScore: 10
-  barMax: 100
-  barGainPerSolve: 10
-  barDrainPerSecond: 1
   hotStreakDuration: 10
-  hotStreakMultiplier: 5
   speedBonusThreshold: 4
-  speedBonusAmount: 5
-  star1Threshold: 300
-  star2Threshold: 600
-  star3Threshold: 1000
   debugMode: 0
   debugStartingBP: 500
   uiManager: {fileID: 0}
   zenGameDuration: 300
-  zenFailedSwapPenalty: 3
   zenMaxReshuffles: 3
-  zenStar1Threshold: 500
-  zenStar2Threshold: 1000
-  zenStar3Threshold: 2000
 --- !u!4 &1333256940
 Transform:
   m_ObjectHideFlags: 0
@@ -12148,6 +12137,51 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!1 &1369926064
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1369926065}
+  - component: {fileID: 1369926066}
+  m_Layer: 0
+  m_Name: RunManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1369926065
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1369926064}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -443.6019, y: -960.00006, z: 0}
+  m_LocalScale: {x: 0.75829387, y: 0.75829387, z: 0.75829387}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1720076972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1369926066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1369926064}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7097daa89adf4a2a9e386bb838ed4ff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Make10.Runtime::RunManager
+  startingBP: 0
 --- !u!1 &1376408786
 GameObject:
   m_ObjectHideFlags: 0
@@ -16841,6 +16875,7 @@ RectTransform:
   - {fileID: 1333256940}
   - {fileID: 1743593535}
   - {fileID: 901072114}
+  - {fileID: 1369926065}
   m_Father: {fileID: 710881285}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -18240,6 +18275,7 @@ GameObject:
   - component: {fileID: 1878202359}
   - component: {fileID: 1878202361}
   - component: {fileID: 1878202360}
+  - component: {fileID: 1878202362}
   m_Layer: 5
   m_Name: CharacterPanel
   m_TagString: Untagged
@@ -18305,6 +18341,21 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1878202358}
   m_CullTransparentMesh: 1
+--- !u!114 &1878202362
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1878202358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62d65932eb7384ba4b2b39c0b6fd18a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Make10.Runtime::PillarboxBars
+  designWidth: 1080
+  barColor: {r: 0.03, g: 0.03, b: 0.04, a: 1}
+  bleed: 1
 --- !u!1 &1880873838
 GameObject:
   m_ObjectHideFlags: 0
@@ -21105,9 +21156,9 @@ MonoBehaviour:
   m_fontSize: 207.4
   m_fontSizeBase: 207.4
   m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_enableAutoSizing: 1
+  m_fontSizeMin: 110
+  m_fontSizeMax: 207.4
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -21119,7 +21170,7 @@ MonoBehaviour:
   m_lineSpacingMax: 0
   m_paragraphSpacing: 0
   m_charWidthMaxAdj: 0
-  m_TextWrappingMode: 1
+  m_TextWrappingMode: 0
   m_wordWrappingRatios: 0.4
   m_overflowMode: 0
   m_linkedTextComponent: {fileID: 0}
@@ -21141,7 +21192,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 48, y: 0, z: 48, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0

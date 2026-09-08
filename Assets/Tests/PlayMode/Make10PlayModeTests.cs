@@ -66,7 +66,7 @@ public class Make10PlayModeTests {
 
     Assert.IsNotNull(GameManager.Instance, "GameManager.Instance is null after scene load.");
     Assert.IsNotNull(SceneFlowManager.Instance, "SceneFlowManager.Instance is null after scene load.");
-    Assert.IsNotNull(Object.FindFirstObjectByType<GridManager>(),
+    Assert.IsNotNull(Object.FindAnyObjectByType<GridManager>(),
       "No GridManager found in the loaded scene.");
   }
 
@@ -76,7 +76,7 @@ public class Make10PlayModeTests {
     yield return null;
     yield return WaitForBootstrap(8f);
 
-    var canvas = Object.FindFirstObjectByType<Canvas>();
+    var canvas = Object.FindAnyObjectByType<Canvas>();
     Assert.IsNotNull(canvas, "No Canvas found in the scene.");
     // The whole game renders through a Screen Space - Overlay canvas, which
     // bypasses the SRP. This is why BRP -> URP is low risk; if this ever
@@ -91,7 +91,7 @@ public class Make10PlayModeTests {
     yield return null;
     yield return WaitForBootstrap(8f);
 
-    var cameras = Object.FindObjectsByType<Camera>(FindObjectsSortMode.None);
+    var cameras = Object.FindObjectsByType<Camera>();
     Assert.AreEqual(1, cameras.Length,
       "Expected exactly one Camera in the scene (baseline is a single orthographic camera).");
   }
@@ -117,7 +117,7 @@ public class Make10PlayModeTests {
     yield return WaitForBootstrap(8f);
 
     var gm = GameManager.Instance;
-    var grid = Object.FindFirstObjectByType<GridManager>();
+    var grid = Object.FindAnyObjectByType<GridManager>();
     Assert.IsNotNull(gm, "GameManager.Instance is null after scene load.");
     Assert.IsNotNull(grid, "No GridManager found in the loaded scene.");
 

@@ -7,6 +7,11 @@ using System;
 /// SpendableBP = current balance (decreases on shop purchases).
 /// Also manages per-run state (round number, run active flag).
 /// </summary>
+/// <remarks>
+/// Runs Awake before default-order scripts so <see cref="Instance"/> is set
+/// before UIManager (and other consumers) subscribe to events in their own Awake.
+/// </remarks>
+[DefaultExecutionOrder(-50)]
 public class RunManager : MonoBehaviour {
   public static RunManager Instance { get; private set; }
 

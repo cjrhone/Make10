@@ -7,16 +7,14 @@ using System.Collections;
 /// Handles Main Menu animations: bouncing title, scrolling banners.
 /// </summary>
 public class MainMenuUI : MonoBehaviour {
-  [Header("Title Animation"), SerializeField] 
+  [Header("Title Animation"), SerializeField]
   private RectTransform titleCard;
 
-  [SerializeField] private float bounceHeight = 20f;
-  [SerializeField] private float bounceSpeed = 2f;
 #pragma warning disable CS0414 // Kept for Inspector visibility, rotation removed in L0
   [SerializeField] private float titleRotateAmount = 3f;
 #pragma warning restore CS0414
 
-  [Header("Banner Settings"), SerializeField] 
+  [Header("Banner Settings"), SerializeField]
   private RectTransform topBanner;
 
   [SerializeField] private RectTransform topBannerDuplicate; // Second copy for seamless loop
@@ -25,19 +23,18 @@ public class MainMenuUI : MonoBehaviour {
   [SerializeField] private float bannerScrollSpeed = 100f;
   [SerializeField] private float bannerWidth = 1500f; // Width of ONE banner text
 
-  [Header("Button References"), SerializeField] 
+  [Header("Button References"), SerializeField]
   private Button playButton; // Arcade Mode — wire to SceneFlowManager.OnPlayPressed()
 
   [SerializeField] private Button zenButton; // Zen Mode — wire to SceneFlowManager.OnZenPressed()
   [SerializeField] private Button creditsButton; // Credits — wire to SceneFlowManager.OnCreditsPressed()
-  [SerializeField] private Button shopButton; // Shop (greyed out) — wire to SceneFlowManager.OnShopPressed()
+  [SerializeField] private Button shopButton; // Shop (dev builds only, greyed out) — wire to SceneFlowManager.OnShopPressed()
   [SerializeField] private Button optionsButton; // Legacy — kept for backward compatibility
   [SerializeField] private Button quitButton; // Legacy — kept for backward compatibility
 
-  [Header("BP Display"), SerializeField] 
-  private TMP_Text bpDisplayText; // Shows "BP: X,XXX" on main menu bottom-left
+  [Header("BP Display"), SerializeField] private TMP_Text bpDisplayText; // Shows "BP: X,XXX" on main menu bottom-left
 
-  [Header("High Score Display"), SerializeField] 
+  [Header("High Score Display"), SerializeField]
   private TMP_Text highScoreDisplayText;
 
   [Header("Version Label"),
@@ -177,9 +174,16 @@ public class MainMenuUI : MonoBehaviour {
 
   /// <summary>
   /// Configure the shop button as greyed out with "Coming Soon" state.
+  /// Only shown in the Editor and Development builds (Debug.isDebugBuild); release builds
+  /// hide it entirely until the shop (Session P) ships.
   /// </summary>
   private void SetupShopButton() {
     if (shopButton == null) {
+      return;
+    }
+
+    if (!Debug.isDebugBuild) {
+      shopButton.gameObject.SetActive(false);
       return;
     }
 

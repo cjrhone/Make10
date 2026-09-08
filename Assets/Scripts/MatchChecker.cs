@@ -6,10 +6,9 @@ using System.Collections.Generic;
 /// Pure logic - no MonoBehaviour needed, but using it for easy inspector access.
 /// </summary>
 public class MatchChecker : MonoBehaviour {
-  [Header("References"), SerializeField] 
-  private GridManager gridManager;
+  [Header("References"), SerializeField] private GridManager gridManager;
 
-  [Header("Settings"), Header("Debug"), SerializeField]  
+  [Header("Settings"), Header("Debug"), SerializeField]
   private bool logMatches = true;
 
   private void Awake() {
@@ -535,8 +534,8 @@ public class MatchChecker : MonoBehaviour {
 
 /// <summary>
 /// Contains detailed information about matches found.
+/// Runtime-only result object; never serialized by Unity (HashSet/Dictionary fields are not serializable).
 /// </summary>
-[System.Serializable]
 public class MatchResult {
   public HashSet<Tile> allMatchedTiles = new();
   public List<int> matchedRows = new();

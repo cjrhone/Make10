@@ -11,19 +11,19 @@ using System.Collections.Generic;
 public class UIManager : MonoBehaviour {
   public static UIManager Instance { get; private set; }
 
-  [Header("Score Display"), SerializeField] 
+  [Header("Score Display"), SerializeField]
   private TMP_Text scoreText;
 
   [SerializeField] private Slider scoreProgressSlider;
   [SerializeField] private Image scoreProgressFillImage;
 
-  [Header("Score Progress Colors"), SerializeField] 
+  [Header("Score Progress Colors"), SerializeField]
   private Color scoreProgressStartColor = new(0.3f, 0.5f, 0.9f);
 
   [SerializeField] private Color scoreProgressMidColor = new(0.9f, 0.7f, 0.2f);
   [SerializeField] private Color scoreProgressFullColor = new(0.3f, 0.9f, 0.3f);
 
-  [Header("Score Progress Glow"), SerializeField] 
+  [Header("Score Progress Glow"), SerializeField]
   private Image scoreProgressGlow;
 
   [SerializeField] private Color scoreGlowColor = new(1f, 0.9f, 0.5f, 0.6f);
@@ -33,14 +33,14 @@ public class UIManager : MonoBehaviour {
   private int displayedScore = 0;
   private int pendingScoreToAdd = 0;
 
-  [Header("Timer Display"), SerializeField] 
+  [Header("Timer Display"), SerializeField]
   private TMP_Text timerText;
 
   [SerializeField] private TMP_Text timerShadowText;
   [SerializeField] private Image timerFillImage;
   [SerializeField] private Slider timerSlider;
 
-  [Header("Timer Colors"), SerializeField] 
+  [Header("Timer Colors"), SerializeField]
   private bool useTimerTextColorChange = false;
 
   [SerializeField] private bool useTimerFillColorChange = true;
@@ -50,7 +50,7 @@ public class UIManager : MonoBehaviour {
   [SerializeField] private float timerWarningThreshold = 20f;
   [SerializeField] private float timerDangerThreshold = 10f;
 
-  [Header("Multiplier Bar"), SerializeField] 
+  [Header("Multiplier Bar"), SerializeField]
   private GameObject multiplierPanel;
 
   [SerializeField] private Slider multiplierSlider;
@@ -58,35 +58,34 @@ public class UIManager : MonoBehaviour {
   [SerializeField] private TMP_Text multiplierTimerText;
   [SerializeField] private Image multiplierFillImage;
 
-  [Header("Multiplier Bar Colors"), SerializeField] 
+  [Header("Multiplier Bar Colors"), SerializeField]
   private Color multiplierFullColor = new(1f, 0.8f, 0.2f);
 
   [SerializeField] private Color multiplierLowColor = new(1f, 0.3f, 0.2f);
-  [SerializeField] private float multiplierLowThreshold = 2f;
 
-  [Header("Hot Streak Effect"), SerializeField] 
+  [Header("Hot Streak Effect"), SerializeField]
   private HotStreakEffect hotStreakEffect;
 
   [SerializeField] private bool enableHotStreak = true;
 
-  [Header("Hot Streak Mode UI"), SerializeField] 
+  [Header("Hot Streak Mode UI"), SerializeField]
   private GameObject hotStreakBackground;
 
   [SerializeField] private Color hotStreakFireColor1 = new(1f, 0.3f, 0.1f); // Red-orange
   [SerializeField] private Color hotStreakFireColor2 = new(1f, 0.9f, 0.2f); // Yellow
   [SerializeField] private float hotStreakPulseSpeed = 8f;
 
-  [Header("Score Popup"), SerializeField] 
+  [Header("Score Popup"), SerializeField]
   private GameObject scorePopupPrefab;
 
   [SerializeField] private Transform scorePopupParent;
 
-  [Header("Game Over"), SerializeField]  private GameObject finishTextObject;
+  [Header("Game Over"), SerializeField] private GameObject finishTextObject;
   [SerializeField] private float finishTextDuration = 1.5f;
   [SerializeField] private GameObject winScreen;
   [SerializeField] private TMP_Text winScoreText;
 
-  [Header("Win Screen Breakdown"), SerializeField] 
+  [Header("Win Screen Breakdown"), SerializeField]
   private TMP_Text scoreLabelText;
 
   [SerializeField] private TMP_Text scoreValueText;
@@ -105,17 +104,17 @@ public class UIManager : MonoBehaviour {
   [SerializeField] private float timeBonusPerSecond = 1f;
 #pragma warning restore CS0414
 
-  [Header("High Score"), SerializeField] 
-  private TMP_Text highScoreText;
+  [Header("High Score"), SerializeField] private TMP_Text highScoreText;
 
   [SerializeField] private GameObject newHighScoreBanner;
   [SerializeField] private Color newHighScoreColor = new(1f, 0.85f, 0.1f);
 
-  [Header("Star Rating"), SerializeField] 
+  [Header("Star Rating"), SerializeField]
   private Color starFilledColor = new(1f, 0.85f, 0.1f); // Gold
 
-  [SerializeField] private Color starEmptyColor = new(0.35f, 0.35f, 0.35f, 0.4f); // Dim grey
-  [SerializeField] private float starSize = 56f;
+  [SerializeField] private Color starEmptyColor = new(0.85f, 0.65f, 0.15f, 0.45f); // Dim gold (unearned slot)
+  [SerializeField] private float starSize = 88f;
+  [SerializeField] private float starGlowFalloff = 1.2f; // Lower = harder diamond edge
   [SerializeField] private float starRevealDelay = 0.3f;
   private GameObject starContainer;
   private GameObject resultsTitleObj;
@@ -125,13 +124,12 @@ public class UIManager : MonoBehaviour {
   private GameObject zenLockedTileCounterObj;
   private List<Image> starImages = new();
 
-  [Header("Unsolvable Grid Popup"), SerializeField] 
+  [Header("Unsolvable Grid Popup"), SerializeField]
   private GameObject unsolvablePopup;
 
   [SerializeField] private float unsolvablePopupDuration = 1f;
 
-  [Header("References"), SerializeField] 
-  private GameManager gameManager;
+  [Header("References"), SerializeField] private GameManager gameManager;
 
   [SerializeField] private GridManager gridManager;
 
@@ -164,7 +162,7 @@ public class UIManager : MonoBehaviour {
   // Multiplier text animation
   private float lastMultiplierValue = 1f;
 
-  [Header("Multiplier Text Animation"), SerializeField] 
+  [Header("Multiplier Text Animation"), SerializeField]
   private Color multiplierTextCoolColor = new(1f, 0.9f, 0.2f); // Yellow
 
   [SerializeField] private Color multiplierTextHotColor = new(1f, 0.2f, 0.2f); // Red at max
@@ -287,6 +285,10 @@ public class UIManager : MonoBehaviour {
     }
 
     // Initialize multiplier display to x1.00 (Arcade only)
+    if (!isZen && multiplierTimerText != null) {
+      multiplierTimerText.text = "0"; // bar value; scene placeholder is "5.0"
+    }
+
     if (!isZen && multiplierValueText != null) {
       multiplierValueText.text = "x1.00";
       multiplierValueText.transform.localScale = Vector3.one;
@@ -997,6 +999,10 @@ public class UIManager : MonoBehaviour {
       StopPulse(ref multiplierPulseCoroutine, multiplierValueText?.transform);
       StopMultiplierGlow();
       DeactivateHotStreak();
+
+      if (multiplierTimerText != null) {
+        multiplierTimerText.text = "0";
+      }
 
       if (multiplierValueText != null) {
         multiplierValueText.text = "x1.00";
@@ -1855,7 +1861,7 @@ public class UIManager : MonoBehaviour {
       starRT.sizeDelta = new Vector2(starSize, starSize);
 
       var starImg = starObj.AddComponent<Image>();
-      GlowTextureGenerator.ApplyDiamondGlow(starImg, (int)starSize);
+      GlowTextureGenerator.ApplyDiamondGlow(starImg, (int)starSize, starGlowFalloff);
       starImg.color = starEmptyColor;
       starImg.raycastTarget = false;
 
@@ -2218,6 +2224,10 @@ public class UIManager : MonoBehaviour {
       if (label != null) {
         label.gameObject.SetActive(false);
       }
+    }
+
+    if (!isZen && multiplierTimerText != null) {
+      multiplierTimerText.text = "0"; // bar value; scene placeholder is "5.0"
     }
 
     if (!isZen && multiplierValueText != null) {
