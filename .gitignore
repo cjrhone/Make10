@@ -101,3 +101,6 @@ fastlane/Preview.html
 
 # Codex MCP config
 .codex/
+
+# In-editor build output (Make10 > iOS Build Setup writes Builds/iOS)
+/Builds/
