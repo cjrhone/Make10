@@ -134,11 +134,14 @@ CASCADE MATCHES (cascadeCount >= 2):
 - Hot Streak: ×5.00 for 15s, rainbow bar, countdown shown in avatar region. Resets bar to 0 on expire.
 
 ### MakeZen Scoring
-Same base / multiplier mechanics, **except**:
-- No timer-based decay.
+Flat scoring — **no multiplier system** (`GameManager.ProcessZenSolve` calls
+`ScoringRules.PlayerSolve(lineSum, 1f, false)`):
+- Player swap line → lineSum BP. No multiplier bar, no Hot Streak, no speed bonus.
+- Cascade line → lineSum BP (flat; see `ScoringRules.CascadeSolve`).
 - Failed swap → no penalty since 1.0.1 (tiles revert visually; `GameManager.OnFailedSwap` is a no-op).
-- No per-match time bonus (fixed 300s minus penalties).
+- No per-match time bonus (fixed 300s).
 - Locked tiles with high sums score more base BP per match.
+- Pinned by `ScoringRulesTests.PlayerSolve_ZenFlat_IsLineSum` and `CascadeSolve_Zen_IsFlatLineSum`.
 
 ### Star Rating
 ```
@@ -178,12 +181,12 @@ Locked tiles (value ≥ 10) can't be selected/swapped, fall with gravity, count 
 | Setting | Arcade | MakeZen | Location |
 |---------|--------|---------|----------|
 | Game Duration | 60s | 300s | GameManager |
-| Multiplier System | Bar 0–100 | Bar 0–100 (no drain) | GameManager |
+| Multiplier System | Bar 0–100 | None (flat lineSum) | ScoringRules / GameManager |
 | Failed Swap Penalty | None | None (removed 1.0.1) | GameManager |
-| Hot Streak | ×5.00 / 15s | ×5.00 / 10s | GameManager |
+| Hot Streak | ×5.00 / 15s | None | GameManager |
 | Max Reshuffles | Unlimited | 3 | GameManager |
 | Tile Bag | 25 | 25 | TileWeightManager |
-| Speed Bonus | +5 BP within 4s | +5 BP within 4s | GameManager |
+| Speed Bonus | +5 BP within 4s | None | ScoringRules / GameManager |
 | Time Bonus/Match | None | None | GameManager |
 
 ---
