@@ -23,6 +23,9 @@ PROJECT_SETTINGS = PROJECT_ROOT / "ProjectSettings" / "ProjectSettings.asset"
 
 _CODE_RE = re.compile(r"^(  AndroidBundleVersionCode: )(\d+)\s*$", re.M)
 _NAME_RE = re.compile(r"^(  bundleVersion: )(.*)$", re.M)
+# iOS CFBundleVersion inside the buildNumber block ("    iPhone:" also appears under
+# mobileMTRendering / scriptingBackend, hence the anchored block prefix).
+_IOS_BUILD_RE = re.compile(r"^(  buildNumber:\n(?:    \w+: \S*\n)*?    iPhone: )(\d+)$", re.M)
 
 
 def read_version(settings: Path = PROJECT_SETTINGS) -> tuple[int, str]:
@@ -55,6 +58,9 @@ def bump(new_code: int | None = None, new_name: str | None = None,
     text = settings.read_text()
     text = _CODE_RE.sub(f"  AndroidBundleVersionCode: {new_code}", text, count=1)
     text = _NAME_RE.sub(f"  bundleVersion: {new_name}", text, count=1)
+    # Keep the committed iOS build number in step (BuildScript.BuildiOS writes the
+    # same value at build time; syncing here keeps the tree clean afterwards).
+    text = _IOS_BUILD_RE.sub(lambda m: f"{m.group(1)}{new_code}", text, count=1)
     settings.write_text(text)
 
     print(f"versionCode : {cur_code} -> {new_code}")
