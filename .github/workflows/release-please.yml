@@ -35,8 +35,12 @@ jobs:
       # Same workflow run, so pushing with GITHUB_TOKEN works. A separate
       # workflow triggered by the release PR would never fire: GitHub
       # suppresses workflow triggers for events raised by GITHUB_TOKEN.
+      # Runs every time, not only when release-please reports a PR: that output
+      # is set only when the PR was created or updated this run, so a commit
+      # that changes no changelog content (ci:, chore:) would otherwise leave a
+      # stale release PR unsynced. When the output is empty the step looks up
+      # the open release PR by its "autorelease: pending" label.
       - name: Sync Unity bundleVersion + AndroidBundleVersionCode into the release PR
-        if: ${{ steps.release.outputs.pr }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           # Raw JSON string, parsed with jq at runtime. Do NOT use fromJson()
@@ -50,7 +54,11 @@ jobs:
 
           BRANCH="$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')"
           if [ -z "$BRANCH" ]; then
-            echo "No release PR branch in outputs; nothing to sync."
+            BRANCH="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+              --label "autorelease: pending" --json headRefName -q '.[0].headRefName // empty')"
+          fi
+          if [ -z "$BRANCH" ]; then
+            echo "No open release PR; nothing to sync."
             exit 0
           fi
 
