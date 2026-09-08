@@ -67,9 +67,9 @@ jobs:
           # versionCode is global and monotonic on Google Play: every upload needs
           # a code strictly higher than any already used. A release is a new
           # upload, so the release PR carries main's code + 1. Reading the base
-          # from origin/main (not the PR branch) keeps this idempotent when the
+          # from main via FETCH_HEAD (not the PR branch) keeps this idempotent when the
           # step re-runs on an already-synced branch.
-          MAIN_CODE="$(git show origin/main:"$SETTINGS" | sed -nE 's/^  AndroidBundleVersionCode: ([0-9]+)\s*$/\1/p')"
+          MAIN_CODE="$(git show FETCH_HEAD:"$SETTINGS" | sed -nE 's/^  AndroidBundleVersionCode: ([0-9]+)\s*$/\1/p')"
           [ -n "$MAIN_CODE" ] || { echo "::error::AndroidBundleVersionCode not found on main"; exit 1; }
           CODE=$((MAIN_CODE + 1))
           echo "AndroidBundleVersionCode: main=$MAIN_CODE -> release=$CODE"
