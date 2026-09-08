@@ -38,6 +38,10 @@ public class MainMenuUI : MonoBehaviour
     [Header("High Score Display")]
     [SerializeField] private TMP_Text highScoreDisplayText;
 
+    [Header("Version Label")]
+    [Tooltip("Optional. If left empty a small muted label is created at runtime, bottom-right of this panel.")]
+    [SerializeField] private TMP_Text versionText;
+
     private Vector2 titleStartPos;
     private float titleStartRotation;
 
@@ -58,6 +62,9 @@ public class MainMenuUI : MonoBehaviour
 
         // Show high score on menu
         UpdateHighScoreDisplay();
+
+        // Show build version (Application.version, synced from version.txt by release-please)
+        SetupVersionLabel();
 
         // Show BP currency
         UpdateBPDisplay();
@@ -324,5 +331,35 @@ public class MainMenuUI : MonoBehaviour
         {
             button.localScale = Vector3.one;
         }
+    }
+
+    /// <summary>
+    /// Stamps BuildStamp.Version onto the menu. Uses the inspector-assigned
+    /// label if present, otherwise creates a small muted TMP label anchored to
+    /// the bottom-right of this panel so no scene wiring is required.
+    /// </summary>
+    private void SetupVersionLabel()
+    {
+        if (versionText == null)
+        {
+            var go = new GameObject("VersionLabel", typeof(RectTransform));
+            go.transform.SetParent(transform, false);
+
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(1f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(1f, 0f);
+            rt.anchoredPosition = new Vector2(-24f, 16f);
+            rt.sizeDelta = new Vector2(400f, 40f);
+
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.fontSize = UIStyleGuide.FontSizeSmall;
+            tmp.color = UIStyleGuide.ColorTextMuted;
+            tmp.alignment = TextAlignmentOptions.BottomRight;
+            tmp.raycastTarget = false;
+            versionText = tmp;
+        }
+
+        versionText.text = $"v{BuildStamp.Version}";
     }
 }

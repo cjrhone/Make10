@@ -1,0 +1,107 @@
+name: release-please
+
+# Keeps a rolling release PR from conventional commits on main; merging it
+# tags vX.Y.Z and publishes the GitHub release.
+#
+# Unity's bundleVersion / AndroidBundleVersionCode are synced by the step
+# below, NOT by release-please's extra-files. That updater needs an
+# `x-release-please-version` comment on the target line, and Unity discards
+# comments in ProjectSettings.asset whenever the editor rewrites it, so the
+# annotation would vanish the first time Project Settings was opened and
+# versions would silently stop updating. Same approach as Hot Trash Summer.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          # Falls back to GITHUB_TOKEN. With GITHUB_TOKEN the repo setting
+          # "Allow GitHub Actions to create and approve pull requests" must be on
+          # (Settings -> Actions -> General). A PAT in RELEASE_PLEASE_TOKEN avoids that.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # Same workflow run, so pushing with GITHUB_TOKEN works. A separate
+      # workflow triggered by the release PR would never fire: GitHub
+      # suppresses workflow triggers for events raised by GITHUB_TOKEN.
+      - name: Sync Unity bundleVersion + AndroidBundleVersionCode into the release PR
+        if: ${{ steps.release.outputs.pr }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # Raw JSON string, parsed with jq at runtime. Do NOT use fromJson()
+          # here: `env:` expressions are evaluated even when `if:` is false, and
+          # with no release PR this output is "", which makes fromJson('') fail
+          # the whole workflow at template level.
+          PR_JSON: ${{ steps.release.outputs.pr }}
+        run: |
+          set -euo pipefail
+          SETTINGS="ProjectSettings/ProjectSettings.asset"
+
+          BRANCH="$(printf '%s' "$PR_JSON" | jq -r '.headBranchName // empty')"
+          if [ -z "$BRANCH" ]; then
+            echo "No release PR branch in outputs; nothing to sync."
+            exit 0
+          fi
+
+          git clone --depth 1 --branch "$BRANCH" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" rp
+          cd rp
+          git fetch --depth 1 origin main
+
+          VERSION="$(tr -d '[:space:]' < version.txt)"
+          echo "Release PR version: $VERSION"
+
+          [ -f "$SETTINGS" ] || { echo "::error::Cannot find $SETTINGS"; exit 1; }
+
+          # versionCode is global and monotonic on Google Play: every upload needs
+          # a code strictly higher than any already used. A release is a new
+          # upload, so the release PR carries main's code + 1. Reading the base
+          # from origin/main (not the PR branch) keeps this idempotent when the
+          # step re-runs on an already-synced branch.
+          MAIN_CODE="$(git show origin/main:"$SETTINGS" | sed -nE 's/^  AndroidBundleVersionCode: ([0-9]+)\s*$/\1/p')"
+          [ -n "$MAIN_CODE" ] || { echo "::error::AndroidBundleVersionCode not found on main"; exit 1; }
+          CODE=$((MAIN_CODE + 1))
+          echo "AndroidBundleVersionCode: main=$MAIN_CODE -> release=$CODE"
+
+          sed -i -E "s/^(  bundleVersion: ).*/\1${VERSION}/" "$SETTINGS"
+          sed -i -E "s/^(  AndroidBundleVersionCode: ).*/\1${CODE}/" "$SETTINGS"
+          grep -qE "^  bundleVersion: ${VERSION}$" "$SETTINGS" || { echo "::error::bundleVersion sync failed"; exit 1; }
+          grep -qE "^  AndroidBundleVersionCode: ${CODE}$" "$SETTINGS" || { echo "::error::versionCode sync failed"; exit 1; }
+
+          # Build profiles embed their own PlayerSettings snapshot, and that copy
+          # wins when the profile is active. Inside the snapshot the keys are
+          # wrapped:  - line: '|   bundleVersion: 0.8'
+          # The leading space keeps this off visionOSBundleVersion /
+          # tvOSBundleVersion, which capitalise the B.
+          for PROFILE in "Assets/Settings/Build Profiles/"*.asset; do
+            [ -f "$PROFILE" ] || continue
+            grep -qE "[[:space:]]bundleVersion:[[:space:]]*[0-9]" "$PROFILE" || continue
+            sed -i -E "s/([[:space:]]bundleVersion:[[:space:]]*)[0-9][0-9.]*/\1${VERSION}/" "$PROFILE"
+            sed -i -E "s/([[:space:]]AndroidBundleVersionCode:[[:space:]]*)[0-9]+/\1${CODE}/" "$PROFILE"
+            echo "synced $(basename "$PROFILE")"
+          done
+
+          if git diff --quiet; then
+            echo "Versions already correct, nothing to push."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: sync Unity version to ${VERSION} (versionCode ${CODE})"
+          git push origin "$BRANCH"
+
+      - name: Summary
+        if: ${{ steps.release.outputs.release_created }}
+        run: echo "Released ${{ steps.release.outputs.tag_name }}" >> "$GITHUB_STEP_SUMMARY"
