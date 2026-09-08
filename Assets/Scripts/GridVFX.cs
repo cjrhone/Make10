@@ -130,7 +130,7 @@ public class GridVFX : MonoBehaviour
 
         int gridWidth = 5;
         int gridHeight = 5;
-        GridManager gm = GridManager.FindFirstObjectByType<GridManager>();
+        GridManager gm = FindAnyObjectByType<GridManager>();
         if (gm != null)
         {
             Vector2Int size = gm.GetGridSize();

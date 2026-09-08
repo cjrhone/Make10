@@ -39,6 +39,11 @@ public class TutorialBuilder : MonoBehaviour
     public void ShowTutorial1()
     {
         if (tutorial1Popup == null) CreateTutorial1();
+        if (tutorial1Popup == null)
+        {
+            Debug.LogWarning("[TutorialBuilder] Tutorial1 popup could not be created (no Canvas?)");
+            return;
+        }
         tutorial1Popup.Open();
     }
 
@@ -50,6 +55,11 @@ public class TutorialBuilder : MonoBehaviour
     public void ShowTutorial2()
     {
         if (tutorial2Popup == null) CreateTutorial2();
+        if (tutorial2Popup == null)
+        {
+            Debug.LogWarning("[TutorialBuilder] Tutorial2 popup could not be created (no Canvas?)");
+            return;
+        }
         tutorial2Popup.Open();
     }
 
@@ -70,7 +80,7 @@ public class TutorialBuilder : MonoBehaviour
 
     private void CreateTutorial1()
     {
-        Canvas canvas = FindFirstObjectByType<Canvas>();
+        Canvas canvas = FindAnyObjectByType<Canvas>();
         if (canvas == null)
         {
             Debug.LogError("[TutorialBuilder] No Canvas found!");
@@ -149,7 +159,7 @@ public class TutorialBuilder : MonoBehaviour
 
     private void CreateTutorial2()
     {
-        Canvas canvas = FindFirstObjectByType<Canvas>();
+        Canvas canvas = FindAnyObjectByType<Canvas>();
         if (canvas == null)
         {
             Debug.LogError("[TutorialBuilder] No Canvas found!");

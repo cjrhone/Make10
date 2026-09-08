@@ -98,3 +98,6 @@ fastlane/Preview.html
 # Plastic SCM
 *.private
 *.private.meta
+
+# Codex MCP config
+.codex/
