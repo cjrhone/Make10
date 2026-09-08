@@ -16,7 +16,7 @@ MakeZen is a 5-minute math meditation. Where Arcade is a sprint, MakeZen gives p
 
 ## Tech Stack & Build
 
-- **Engine:** Unity 6000.3.9f1 (Unity 6)
+- **Engine:** Unity 6000.5.4f1 (Unity 6) — see ProjectSettings/ProjectVersion.txt
 - **Scene:** `Assets/Scenes/Make10Scene.unity` (single-scene project)
 - **Canvas:** 1080×1920 portrait
 - **Input:** Unity Input System
@@ -55,7 +55,7 @@ WebBuild/, builds/     Build outputs
 | Script | Purpose |
 |--------|---------|
 | `SceneFlowManager.cs` | Scene controller, panel transitions, 9 game states |
-| `RunManager.cs` | BP currency persistence (rebuild planned in L6 Shop) |
+| `RunManager.cs` | BP currency persistence: `TotalBP`, `SpendableBP`, `BankBP()`, `SpendBP()`, `CanAfford()` |
 | `UIManager.cs` | Score/timer/multiplier display, results screen, locked tile counter |
 | `MainMenuUI.cs` | Main menu + per-mode high scores |
 | `UI/PopupWindow.cs` | Reusable popup with scrollbar/auto-size |
@@ -117,8 +117,10 @@ PLAYER SWAP MATCHES (cascadeCount == 1):
   Bar fills +10 per swap
 
 CASCADE MATCHES (cascadeCount >= 2):
-  Flat lineSum BP only — no multiplier, no bar fill, no speed bonus.
-  Bar freezes during cascade processing.
+  No multiplier, no bar fill, no speed bonus. Bar freezes during cascade processing.
+  Arcade: +1, +2, +3… BP per line in the chain (counter resets each chain).
+  MakeZen: flat lineSum BP per line.
+  (Implemented in GameManager.ProcessCascadeSolve.)
 ```
 
 ### Arcade Multiplier Bar (0–100)
@@ -129,7 +131,7 @@ CASCADE MATCHES (cascadeCount >= 2):
 ### MakeZen Scoring
 Same base / multiplier mechanics, **except**:
 - No timer-based decay.
-- Failed swap → multiplier resets to ×1, timer −3s.
+- Failed swap → no penalty since 1.0.1 (tiles revert visually; `GameManager.OnFailedSwap` is a no-op).
 - No per-match time bonus (fixed 300s minus penalties).
 - Locked tiles with high sums score more base BP per match.
 
@@ -172,7 +174,7 @@ Locked tiles (value ≥ 10) can't be selected/swapped, fall with gravity, count 
 |---------|--------|---------|----------|
 | Game Duration | 60s | 300s | GameManager |
 | Multiplier System | Bar 0–100 | Bar 0–100 (no drain) | GameManager |
-| Failed Swap Penalty | None | −3s + multiplier reset | GameManager |
+| Failed Swap Penalty | None | None (removed 1.0.1) | GameManager |
 | Hot Streak | ×5.00 / 15s | ×5.00 / 10s | GameManager |
 | Max Reshuffles | Unlimited | 3 | GameManager |
 | Tile Bag | 25 | 25 | TileWeightManager |
@@ -194,7 +196,7 @@ Locked tiles (value ≥ 10) can't be selected/swapped, fall with gravity, count 
 - FMOD migration + adaptive audio (L3/K) — also resolves current SFX glitching where the time-warning loop conflicts with PlayOneShot calls on a shared AudioSource.
 
 **Planned, not built:**
-- Shop & cosmetics (L6/P) — paper-doll avatar layers, BP-driven unlocks. Placeholder stubs `CosmeticData.cs` / `ShopManager.cs` exist; `RunManager` will be rebuilt with `TotalBP`/`SpendableBP`/`SpendBP()`.
+- Shop & cosmetics (L6/P) — paper-doll avatar layers, BP-driven unlocks. Placeholder stubs `CosmeticData.cs` / `ShopManager.cs` exist; `RunManager` already exposes `TotalBP`/`SpendableBP`/`SpendBP()`.
 - Credits, leaderboard, tutorial fixes (L7/O).
 
 ---

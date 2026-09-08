@@ -51,6 +51,31 @@ public class SceneFlowManager : MonoBehaviour
     // Track which mode the Results screen originated from (for correct back-navigation)
     public bool ResultsFromZen => resultsFromZen;
     private bool resultsFromZen = false;
+
+    // Re-entrancy guard. CurrentState is only assigned at the END of each transition
+    // sequence, so without this a double-tap during the slide starts two sequences
+    // (double StartNewRun, double SpawnGridOnly).
+    private bool isTransitioning = false;
+    public bool IsTransitioning => isTransitioning;
+
+    // GridManager is not a singleton. Cache it lazily instead of FindAnyObjectByType
+    // on every transition step.
+    private GridManager gridManagerCache;
+    private GridManager Grid
+    {
+        get
+        {
+            if (gridManagerCache == null) gridManagerCache = FindAnyObjectByType<GridManager>();
+            return gridManagerCache;
+        }
+    }
+
+    // One PopupWindow per dialog. Grabbing whichever active PopupWindow
+    // FindFirstObjectByType returned first could reuse a popup that still had
+    // OnWindowClosed handlers attached by another owner.
+    private PopupWindow shopPopup;
+    private PopupWindow creditsPopup;
+    private PopupWindow optionsPopup;
     
     #region Initialization
     
@@ -190,19 +215,19 @@ public class SceneFlowManager : MonoBehaviour
 
         TutorialBuilder.Instance.OnTutorial1Complete += () =>
         {
-            HandleButton(GameState.Tutorial1, () => StartCoroutine(Tutorial1To2()));
+            HandleButton(GameState.Tutorial1, () => RunTransition(Tutorial1To2()));
         };
 
         TutorialBuilder.Instance.OnTutorial2Complete += () =>
         {
-            HandleButton(GameState.Tutorial2, () => StartCoroutine(Tutorial2ToCountdown()));
+            HandleButton(GameState.Tutorial2, () => RunTransition(Tutorial2ToCountdown()));
         };
 
         TutorialBuilder.Instance.OnTutorialCancelled += () =>
         {
             if (CurrentState == GameState.Tutorial1 || CurrentState == GameState.Tutorial2)
             {
-                StartCoroutine(CancelTutorialToMainMenu());
+                RunTransition(CancelTutorialToMainMenu());
             }
         };
     }
@@ -315,42 +340,47 @@ public class SceneFlowManager : MonoBehaviour
     public void GoBack()
     {
         Debug.Log($"GoBack() called from state: {CurrentState}");
+        if (isTransitioning)
+        {
+            Debug.LogWarning("GoBack ignored - transition in progress");
+            return;
+        }
         AudioManager.Instance?.PlayButtonClick();
 
         switch (CurrentState)
         {
             // Overlay panels → fade out to MainMenu
             case GameState.Options:
-                StartCoroutine(CloseOverlayToMainMenu(optionsPanel));
+                RunTransition(CloseOverlayToMainMenu(optionsPanel));
                 break;
 
             // Slide panels → slide back to MainMenu
             case GameState.Quit:
-                StartCoroutine(SlideBackToMainMenu(quitPanel));
+                RunTransition(SlideBackToMainMenu(quitPanel));
                 break;
 
             // Game state → full cleanup and return to main menu
             case GameState.Game:
-                StartCoroutine(ReturnToMainMenuFromGame());
+                RunTransition(ReturnToMainMenuFromGame());
                 break;
 
             // Results → route based on which mode we came from
             case GameState.Results:
                 if (resultsFromZen)
-                    StartCoroutine(ReturnToMainMenuFromZen());
+                    RunTransition(ReturnToMainMenuFromZen());
                 else
-                    StartCoroutine(ReturnToMainMenuFromGame());
+                    RunTransition(ReturnToMainMenuFromGame());
                 break;
 
             // Zen game → vertical slide back down to main menu
             case GameState.ZenGame:
-                StartCoroutine(ReturnToMainMenuFromZen());
+                RunTransition(ReturnToMainMenuFromZen());
                 break;
 
             // Tutorial states → could go back to difficulty or cancel entirely
             case GameState.Tutorial1:
             case GameState.Tutorial2:
-                StartCoroutine(CancelTutorialToMainMenu());
+                RunTransition(CancelTutorialToMainMenu());
                 break;
 
             // Paused → resume the game
@@ -402,11 +432,11 @@ public class SceneFlowManager : MonoBehaviour
         GameManager.Instance?.DeactivateGame();
 
         // Clear the grid
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         gridManager?.ClearGrid();
 
         // Notify UIManager to hide any win/lose screens
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.HideAllGameOverScreens();
 
         // Slide back to main menu
@@ -435,10 +465,10 @@ public class SceneFlowManager : MonoBehaviour
         // Reset game mode back to Arcade (default)
         GameManager.Instance?.SetGameMode(GameManager.GameMode.Arcade);
 
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         gridManager?.ClearGrid();
 
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.HideAllGameOverScreens();
 
         // Vertical slide: game panel slides down, main menu enters from above
@@ -467,7 +497,7 @@ public class SceneFlowManager : MonoBehaviour
         yield return new WaitForSeconds(0.15f);
 
         // Clear the grid (it was spawned for tutorials)
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         gridManager?.ClearGrid();
 
         // Slide back to main menu
@@ -501,7 +531,7 @@ public class SceneFlowManager : MonoBehaviour
         // Fast path: if all managers are already initialized, skip the loading bar
         bool allReady = (AudioManager.Instance != null &&
                          GameManager.Instance != null &&
-                         FindFirstObjectByType<GridManager>() != null);
+                         Grid != null);
 
         if (allReady)
         {
@@ -547,7 +577,7 @@ public class SceneFlowManager : MonoBehaviour
 
         // Step 4: Warm up prefabs / verify GridManager (60% - 80%)
         Debug.Log("Loading: Preparing game components...");
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         if (gridManager != null)
         {
             Debug.Log("Loading: GridManager ready");
@@ -615,7 +645,7 @@ public class SceneFlowManager : MonoBehaviour
         yield return SlideTransition(mainMenuPanel, gamePanel, slideLeft: true);
 
         // Spawn grid (visible behind tutorials) but DON'T process matches yet!
-        FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
+        Grid?.SpawnGridOnly();
 
         yield return new WaitForSeconds(0.1f);
 
@@ -629,8 +659,8 @@ public class SceneFlowManager : MonoBehaviour
         yield return RunCountdown("GO!", GameState.Game, () =>
         {
             GameManager.Instance?.ActivateGame();
-            FindFirstObjectByType<GridManager>()?.OnRoundStarted();
-            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+            Grid?.OnRoundStarted();
+            Grid?.StartMatchProcessing();
 
             // Safety net: ensure pause button is visible after countdown
             // (covers cases where RunManager event subscription was missed)
@@ -816,6 +846,12 @@ public class SceneFlowManager : MonoBehaviour
     
     private void HandleButton(GameState requiredState, System.Action action)
     {
+        if (isTransitioning)
+        {
+            Debug.LogWarning($"Button ignored - transition in progress (state {CurrentState})");
+            return;
+        }
+
         if (CurrentState != requiredState)
         {
             Debug.LogWarning($"Button ignored - not in {requiredState} state (currently {CurrentState})");
@@ -827,6 +863,52 @@ public class SceneFlowManager : MonoBehaviour
     }
     
     /// <summary>
+    /// Start a transition sequence, refusing re-entry while one is already running.
+    /// All button/back-driven sequences go through here so a double-tap during the
+    /// slide animation cannot start the same sequence twice.
+    /// </summary>
+    private void RunTransition(IEnumerator sequence)
+    {
+        if (isTransitioning)
+        {
+            Debug.LogWarning("Transition ignored - another transition is in progress");
+            return;
+        }
+        StartCoroutine(TransitionGuard(sequence));
+    }
+
+    private IEnumerator TransitionGuard(IEnumerator sequence)
+    {
+        isTransitioning = true;
+        try
+        {
+            yield return sequence;
+        }
+        finally
+        {
+            isTransitioning = false;
+        }
+    }
+
+    private PopupWindow GetOrCreatePopup(ref PopupWindow cached, string name)
+    {
+        if (cached == null)
+        {
+            GameObject popupObj = new GameObject(name);
+            popupObj.transform.SetParent(mainCanvas.transform, false);
+            cached = popupObj.AddComponent<PopupWindow>();
+        }
+        return cached;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance != this) return;
+        // Procedural glow textures live in a static cache; release them with the scene owner.
+        GlowTextureGenerator.ClearCache();
+    }
+
+    /// <summary>
     /// Play button pressed - starts Arcade mode directly.
     /// </summary>
     public void OnPlayPressed()
@@ -834,7 +916,7 @@ public class SceneFlowManager : MonoBehaviour
         Debug.Log($"OnPlayPressed called! CurrentState = {CurrentState}");
         HandleButton(GameState.MainMenu, () =>
         {
-            StartCoroutine(PlaySequence());
+            RunTransition(PlaySequence());
         });
     }
 
@@ -854,7 +936,7 @@ public class SceneFlowManager : MonoBehaviour
             }
             else
             {
-                StartCoroutine(ZenNewGameSequence());
+                RunTransition(ZenNewGameSequence());
             }
         });
     }
@@ -885,13 +967,13 @@ public class SceneFlowManager : MonoBehaviour
             ("Resume", () => {
                 AudioManager.Instance?.PlayButtonClick();
                 popup.Close();
-                StartCoroutine(ZenResumeSequence());
+                RunTransition(ZenResumeSequence());
             }, UIStyleGuide.ColorButtonPrimary),
             ("New Game", () => {
                 AudioManager.Instance?.PlayButtonClick();
                 popup.Close();
                 GameManager.ClearZenSave();
-                StartCoroutine(ZenNewGameSequence());
+                RunTransition(ZenNewGameSequence());
             }, UIStyleGuide.ColorButtonSecondary)
         );
 
@@ -919,7 +1001,7 @@ public class SceneFlowManager : MonoBehaviour
         yield return VerticalSlideTransition(mainMenuPanel, gamePanel, slideUp: false);
 
         // Spawn fresh grid (visible behind the disclaimer popup)
-        FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
+        Grid?.SpawnGridOnly();
         yield return new WaitForSeconds(0.1f);
 
         // Show disclaimer popup — game waits here until player dismisses it
@@ -932,8 +1014,8 @@ public class SceneFlowManager : MonoBehaviour
         // NOW activate game and start the timer
         CurrentState = GameState.ZenGame;
         GameManager.Instance?.ActivateGame();
-        FindFirstObjectByType<GridManager>()?.OnRoundStarted();
-        FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+        Grid?.OnRoundStarted();
+        Grid?.StartMatchProcessing();
 
         // Safety net: ensure pause button is visible
         UIManager.Instance?.ShowPauseHamburger();
@@ -969,7 +1051,7 @@ public class SceneFlowManager : MonoBehaviour
         if (saveData != null)
         {
             // Restore grid from saved tile values (instead of spawning fresh)
-            GridManager gm = FindFirstObjectByType<GridManager>();
+            GridManager gm = Grid;
             gm?.RestoreGridFromSave(saveData);
 
             // Restore tile bag
@@ -980,8 +1062,8 @@ public class SceneFlowManager : MonoBehaviour
 
             // Activate game state (timer already restored by LoadZenState)
             CurrentState = GameState.ZenGame;
-            FindFirstObjectByType<GridManager>()?.OnRoundStarted();
-            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+            Grid?.OnRoundStarted();
+            Grid?.StartMatchProcessing();
 
             // Clear the save — it's been consumed (will re-save if paused again)
             GameManager.ClearZenSave();
@@ -990,13 +1072,13 @@ public class SceneFlowManager : MonoBehaviour
         {
             // Fallback: save was corrupted or empty, start fresh
             Debug.LogWarning("[Zen Resume] Save data was null — starting fresh");
-            FindFirstObjectByType<GridManager>()?.SpawnGridOnly();
+            Grid?.SpawnGridOnly();
             yield return new WaitForSeconds(0.1f);
 
             CurrentState = GameState.ZenGame;
             GameManager.Instance?.ActivateGame();
-            FindFirstObjectByType<GridManager>()?.OnRoundStarted();
-            FindFirstObjectByType<GridManager>()?.StartMatchProcessing();
+            Grid?.OnRoundStarted();
+            Grid?.StartMatchProcessing();
         }
 
         // Start zen music
@@ -1101,7 +1183,7 @@ public class SceneFlowManager : MonoBehaviour
     public void OnQuitPressed()
     {
         Debug.Log($"OnQuitPressed called! CurrentState = {CurrentState}");
-        HandleButton(GameState.MainMenu, () => StartCoroutine(QuitSequence()));
+        HandleButton(GameState.MainMenu, () => RunTransition(QuitSequence()));
     }
     
     private IEnumerator QuitSequence()
@@ -1150,13 +1232,7 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private void ShowShopComingSoonPopup()
     {
-        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
-        if (popup == null)
-        {
-            GameObject popupObj = new GameObject("ShopComingSoonPopup");
-            popupObj.transform.SetParent(mainCanvas.transform, false);
-            popup = popupObj.AddComponent<PopupWindow>();
-        }
+        PopupWindow popup = GetOrCreatePopup(ref shopPopup, "ShopComingSoonPopup");
 
         popup.SetTitle("Shop");
         popup.ClearContent();
@@ -1195,7 +1271,7 @@ public class SceneFlowManager : MonoBehaviour
         Time.timeScale = 0f;
 
         // Tell UIManager to show pause overlay
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.ShowPauseMenu();
     }
 
@@ -1212,7 +1288,7 @@ public class SceneFlowManager : MonoBehaviour
         Time.timeScale = 1f;
         CurrentState = stateBeforePause;
 
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.HidePauseMenu();
     }
 
@@ -1230,7 +1306,7 @@ public class SceneFlowManager : MonoBehaviour
         Time.timeScale = 1f;
 
         // Hide pause menu
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.HidePauseMenu();
 
         // Save Zen state before leaving so it can be resumed later
@@ -1276,7 +1352,7 @@ public class SceneFlowManager : MonoBehaviour
     
     public void OnTutorial1OkPressed()
     {
-        HandleButton(GameState.Tutorial1, () => StartCoroutine(Tutorial1To2()));
+        HandleButton(GameState.Tutorial1, () => RunTransition(Tutorial1To2()));
     }
     
     private IEnumerator Tutorial1To2()
@@ -1289,7 +1365,7 @@ public class SceneFlowManager : MonoBehaviour
     
     public void OnTutorial2GotThisPressed()
     {
-        HandleButton(GameState.Tutorial2, () => StartCoroutine(Tutorial2ToCountdown()));
+        HandleButton(GameState.Tutorial2, () => RunTransition(Tutorial2ToCountdown()));
     }
     
     private IEnumerator Tutorial2ToCountdown()
@@ -1309,14 +1385,7 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private void ShowCreditsPopup()
     {
-        // Find or create a PopupWindow
-        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
-        if (popup == null)
-        {
-            GameObject popupObj = new GameObject("CreditsPopup");
-            popupObj.transform.SetParent(mainCanvas.transform, false);
-            popup = popupObj.AddComponent<PopupWindow>();
-        }
+        PopupWindow popup = GetOrCreatePopup(ref creditsPopup, "CreditsPopup");
 
         popup.SetTitle("Credits");
         popup.ClearContent();
@@ -1373,14 +1442,7 @@ public class SceneFlowManager : MonoBehaviour
     /// </summary>
     private void ShowOptionsPopup()
     {
-        // Create a fresh PopupWindow each time (same pattern as credits)
-        PopupWindow popup = FindFirstObjectByType<PopupWindow>();
-        if (popup == null)
-        {
-            GameObject popupObj = new GameObject("OptionsPopup");
-            popupObj.transform.SetParent(mainCanvas.transform, false);
-            popup = popupObj.AddComponent<PopupWindow>();
-        }
+        PopupWindow popup = GetOrCreatePopup(ref optionsPopup, "OptionsPopup");
 
         popup.SetTitle("Options");
         popup.ClearContent();
@@ -1441,7 +1503,7 @@ public class SceneFlowManager : MonoBehaviour
     
     public void RestartWithCountdown()
     {
-        StartCoroutine(RestartWithCountdownSequence());
+        RunTransition(RestartWithCountdownSequence());
     }
     
     private IEnumerator RestartWithCountdownSequence()
@@ -1452,14 +1514,14 @@ public class SceneFlowManager : MonoBehaviour
         AudioManager.Instance?.StopMusic();
 
         // Hide any win/lose screens first
-        UIManager uiManager = FindFirstObjectByType<UIManager>();
+        UIManager uiManager = UIManager.Instance;
         uiManager?.HideAllGameOverScreens();
 
         // Advance to next round
         RunManager.Instance?.AdvanceRound();
 
         // Spawn the grid (visible during countdown) but DON'T process matches yet
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         gridManager?.SpawnGridOnly();
 
         // Reset game state (score, timer, etc.) but don't activate yet
@@ -1475,7 +1537,7 @@ public class SceneFlowManager : MonoBehaviour
     public void StartGameImmediate()
     {
         if (CurrentState != GameState.MainMenu) return;
-        StartCoroutine(StartGameImmediateSequence());
+        RunTransition(StartGameImmediateSequence());
     }
     
     private IEnumerator StartGameImmediateSequence()

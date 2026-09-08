@@ -48,6 +48,7 @@ public class LoadingBarVFX : MonoBehaviour
     private float lastProgress = 0f;
     private bool isComplete = false;
     private RectTransform rectTransform;
+    private readonly List<GameObject> burstParticles = new List<GameObject>();
 
     private void Awake()
     {
@@ -318,7 +319,7 @@ public class LoadingBarVFX : MonoBehaviour
 
     private IEnumerator CompletionBurst()
     {
-        List<GameObject> burstParticles = new List<GameObject>();
+        DestroyBurstParticles();
         float barWidth = rectTransform.rect.width;
         Vector2 burstOrigin = new Vector2(barWidth, 0);
 
@@ -398,11 +399,22 @@ public class LoadingBarVFX : MonoBehaviour
             yield return null;
         }
 
-        // Cleanup
+        DestroyBurstParticles();
+    }
+
+    private void DestroyBurstParticles()
+    {
         foreach (var p in burstParticles)
         {
             if (p != null) Destroy(p);
         }
+        burstParticles.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        // Burst runs 0.6s; if this component dies mid-burst the particles must not outlive it.
+        DestroyBurstParticles();
     }
 
     #endregion

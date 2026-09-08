@@ -219,31 +219,36 @@ public class TileWeightManager : MonoBehaviour
         }
         else
         {
+            // Largest-remainder rounding: floor every bucket, then hand the leftover
+            // slots to the buckets with the biggest fractional parts. Always yields
+            // exactly BAG_SIZE tiles and never over-represents a single value the way
+            // RoundToInt + "pad with heaviest tile" did.
+            int n = adjustedWeights.Length;
+            int[] counts = new int[n];
+            float[] remainders = new float[n];
             int placed = 0;
-            int highestWeightTile = 0;
-            float highestWeight = 0f;
 
-            for (int i = 0; i < adjustedWeights.Length; i++)
+            for (int i = 0; i < n; i++)
             {
-                int count = Mathf.RoundToInt(adjustedWeights[i] / totalWeight * BAG_SIZE);
-                for (int j = 0; j < count && placed < BAG_SIZE; j++)
-                {
-                    tileBag.Add(i);
-                    placed++;
-                }
-                if (adjustedWeights[i] > highestWeight)
-                {
-                    highestWeight = adjustedWeights[i];
-                    highestWeightTile = i;
-                }
+                float exact = adjustedWeights[i] / totalWeight * BAG_SIZE;
+                counts[i] = Mathf.FloorToInt(exact);
+                remainders[i] = exact - counts[i];
+                placed += counts[i];
             }
 
-            // Pad remaining slots with the highest-weight tile
             while (placed < BAG_SIZE)
             {
-                tileBag.Add(highestWeightTile);
+                int best = 0;
+                for (int i = 1; i < n; i++)
+                    if (remainders[i] > remainders[best]) best = i;
+                counts[best]++;
+                remainders[best] = -1f; // consumed
                 placed++;
             }
+
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < counts[i]; j++)
+                    tileBag.Add(i);
         }
 
         // Fisher-Yates shuffle
