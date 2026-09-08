@@ -56,30 +56,18 @@ public class GameManager : MonoBehaviour {
   [SerializeField] private float gameDuration = 60f;
   [Header("Scoring"), SerializeField]  private int baseMatchScore = 10;
 
-  [Header("Multiplier Bar (Arcade)"), SerializeField] 
-  private float barMax = 100f;
-
-  [SerializeField] private float barGainPerSolve = 10f;
-  [SerializeField] private float barDrainPerSecond = 1f;
+  // Multiplier bar range/gain/drain, Hot Streak multiplier, speed bonus BP and
+  // star thresholds live in ScoringRules (pure, unit-tested). Only timing knobs
+  // stay serialized here.
 
   // Zen multiplier settings removed — Zen uses flat scoring (lineSum only).
-  // Arcade multiplier is bar-based (see "Multiplier Bar" header above).
+  // Arcade multiplier is bar-based (see ScoringRules.MultiplierForBar).
 
   [Header("Hot Streak Mode"), SerializeField] 
   private float hotStreakDuration = 15f;
 
-  [SerializeField] private float hotStreakMultiplier = 5f;
-
   [Header("Speed Bonus"), SerializeField] 
   private float speedBonusThreshold = 4f; // Seconds to qualify
-
-  [SerializeField] private int speedBonusAmount = 5; // Bonus BP
-
-  [Header("Star Rating Thresholds (BP)"), SerializeField] 
-  private int star1Threshold = 300;
-
-  [SerializeField] private int star2Threshold = 600;
-  [SerializeField] private int star3Threshold = 1000;
 
   [Header("Debug Mode"), SerializeField]
 #pragma warning disable CS0414 // Inspector-assigned fields
@@ -109,9 +97,6 @@ public class GameManager : MonoBehaviour {
 
   [SerializeField] private float zenFailedSwapPenalty = 3f; // Seconds deducted on bad swap
   [SerializeField] private int zenMaxReshuffles = 3;
-  [SerializeField] private int zenStar1Threshold = 500;
-  [SerializeField] private int zenStar2Threshold = 1000;
-  [SerializeField] private int zenStar3Threshold = 2000;
 
   // High Score persistence keys
   private const string HIGH_SCORE_KEY = "Make10_HighScore";
@@ -194,27 +179,12 @@ public class GameManager : MonoBehaviour {
   /// Zen mode uses higher thresholds (longer sessions = more BP).
   /// </summary>
   public int GetStarRating (int totalBP) {
-    var t1 = CurrentMode == GameMode.Zen ? zenStar1Threshold : star1Threshold;
-    var t2 = CurrentMode == GameMode.Zen ? zenStar2Threshold : star2Threshold;
-    var t3 = CurrentMode == GameMode.Zen ? zenStar3Threshold : star3Threshold;
-    if (totalBP >= t3) {
-      return 3;
-    }
-
-    if (totalBP >= t2) {
-      return 2;
-    }
-
-    if (totalBP >= t1) {
-      return 1;
-    }
-
-    return 0;
+    return ScoringRules.StarsFor(CurrentMode, totalBP);
   }
 
-  public int Star1Threshold => CurrentMode == GameMode.Zen ? zenStar1Threshold : star1Threshold;
-  public int Star2Threshold => CurrentMode == GameMode.Zen ? zenStar2Threshold : star2Threshold;
-  public int Star3Threshold => CurrentMode == GameMode.Zen ? zenStar3Threshold : star3Threshold;
+  public int Star1Threshold => ScoringRules.StarThresholds(CurrentMode).star1;
+  public int Star2Threshold => ScoringRules.StarThresholds(CurrentMode).star2;
+  public int Star3Threshold => ScoringRules.StarThresholds(CurrentMode).star3;
 
   // Multiplier state (SolveCount exposed for performance-based tile weight ramp)
   private int solveCount = 0;
@@ -250,7 +220,7 @@ public class GameManager : MonoBehaviour {
   public bool IsMultiplierActive => multiplierBar > 0f;
   public float CurrentMultiplier => currentMultiplier;
   public float MultiplierBar => multiplierBar;
-  public float MultiplierBarMax => barMax;
+  public float MultiplierBarMax => ScoringRules.BarMax;
   public bool IsHotStreakActive => hotStreakActive;
   public float HotStreakTimer => hotStreakTimer;
   public float HotStreakDuration => hotStreakDuration;
@@ -324,19 +294,18 @@ public class GameManager : MonoBehaviour {
         EndHotStreak();
       }
 
-      // During Hot Streak, pass barMax so slider stays full
-      OnMultiplierChanged?.Invoke(true, currentMultiplier, barMax);
+      // During Hot Streak, pass BarMax so slider stays full
+      OnMultiplierChanged?.Invoke(true, currentMultiplier, ScoringRules.BarMax);
       return;
     }
 
     // Drain multiplier bar (freeze during cascades)
     if (!IsProcessing && multiplierBar > 0f) {
-      multiplierBar -= barDrainPerSecond * Time.deltaTime;
-      multiplierBar = Mathf.Max(0f, multiplierBar);
+      multiplierBar = ScoringRules.BarAfterDrain(multiplierBar, Time.deltaTime);
     }
 
     // Derive multiplier from bar level
-    var newMultiplier = GetMultiplierForBar(multiplierBar);
+    var newMultiplier = ScoringRules.MultiplierForBar(multiplierBar);
     if (Mathf.Abs(newMultiplier - currentMultiplier) > 0.01f) {
       currentMultiplier = newMultiplier;
       maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
@@ -376,30 +345,6 @@ public class GameManager : MonoBehaviour {
   /// </summary>
   private void CacheEffectiveValues() {
     // Previously cached upgrade-modified values. Now a no-op; kept for call-site compatibility.
-  }
-
-  /// <summary>
-  /// Derive multiplier tier from bar level (Arcade mode).
-  /// Tiers: 0–24 = x1, 25–49 = x1.5, 50–74 = x2, 75–99 = x2.5, 100 = x5 (Hot Streak).
-  /// </summary>
-  private float GetMultiplierForBar (float bar) {
-    if (bar >= barMax) {
-      return hotStreakMultiplier; // x5
-    }
-
-    if (bar >= 75f) {
-      return 2.5f;
-    }
-
-    if (bar >= 50f) {
-      return 2f;
-    }
-
-    if (bar >= 25f) {
-      return 1.5f;
-    }
-
-    return 1f;
   }
 
   #endregion
@@ -533,14 +478,14 @@ public class GameManager : MonoBehaviour {
       // Arcade: fill bar once per swap (not per line), check Hot Streak trigger
       if (CurrentMode == GameMode.Arcade) {
         var barBefore = multiplierBar;
-        multiplierBar = Mathf.Min(multiplierBar + barGainPerSolve, barMax);
-        currentMultiplier = GetMultiplierForBar(multiplierBar);
+        multiplierBar = ScoringRules.BarAfterSolve(multiplierBar);
+        currentMultiplier = ScoringRules.MultiplierForBar(multiplierBar);
         maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
 
         Debug.Log($"<color=yellow>Bar: {barBefore:F0} → {multiplierBar:F0} | x{currentMultiplier:F2}</color>");
 
         // Check Hot Streak trigger
-        if (multiplierBar >= barMax && !hotStreakActive) {
+        if (multiplierBar >= ScoringRules.BarMax && !hotStreakActive) {
           StartCoroutine(TriggerHotStreak());
         }
 
@@ -576,18 +521,13 @@ public class GameManager : MonoBehaviour {
   /// Zen: flat lineBaseScore (unchanged).
   /// </summary>
   private void ProcessCascadeSolve (int lineBaseScore) {
-    if (CurrentMode == GameMode.Arcade) {
-      // Arcade cascade overhaul: +1, +2, +3... BP per line cleared in the chain
-      cascadeLineCounter++;
-      var cascadeBP = cascadeLineCounter;
-      Debug.Log($"<color=grey>[CASCADE]</color> +{cascadeBP} BP (chain line #{cascadeLineCounter})");
-      CommitScore(cascadeBP);
-    }
-    else {
-      // Zen: flat lineBaseScore (original behavior)
-      Debug.Log($"<color=grey>[CASCADE]</color> +{lineBaseScore} BP (flat, no multiplier)");
-      CommitScore(lineBaseScore);
-    }
+    // chainIndex is 1-based and resets each chain (OnCascadeStart).
+    cascadeLineCounter++;
+    var cascadeBP = ScoringRules.CascadeSolve(CurrentMode, lineBaseScore, cascadeLineCounter);
+    Debug.Log(CurrentMode == GameMode.Arcade
+      ? $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (chain line #{cascadeLineCounter})"
+      : $"<color=grey>[CASCADE]</color> +{cascadeBP} BP (flat, no multiplier)");
+    CommitScore(cascadeBP);
     // Note: does NOT increment solveCount, touch multiplier, or trigger hot streak
   }
 
@@ -633,29 +573,29 @@ public class GameManager : MonoBehaviour {
   /// Bar fill and solveCount increment already handled in OnMatchCleared.
   /// </summary>
   private void ProcessArcadeSolve (List<int> tileValues, int lineBaseScore) {
-    var multipliedScore = Mathf.RoundToInt(lineBaseScore * currentMultiplier);
-    Debug.Log(
-      $"<color=green>[Arcade]</color> {lineBaseScore} × {currentMultiplier:F2} = <color=cyan>+{multipliedScore} pts</color> (bar: {multiplierBar:F0})");
-
     // Speed bonus: reward fast consecutive player solves
-    var speedBonus = 0;
     var timeSinceLastPlayerSolve = Time.time - lastPlayerSolveTime;
-    if (lastPlayerSolveTime > 0f && timeSinceLastPlayerSolve <= speedBonusThreshold) {
-      speedBonus = speedBonusAmount;
-      Debug.Log($"<color=magenta>⚡ SPEED BONUS! +{speedBonus} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
+    var speedBonus = lastPlayerSolveTime > 0f && timeSinceLastPlayerSolve <= speedBonusThreshold;
+
+    var points = ScoringRules.PlayerSolve(lineBaseScore, currentMultiplier, speedBonus);
+    Debug.Log(
+      $"<color=green>[Arcade]</color> {lineBaseScore} × {currentMultiplier:F2} = <color=cyan>+{points} pts</color> (bar: {multiplierBar:F0})");
+    if (speedBonus) {
+      Debug.Log($"<color=magenta>⚡ SPEED BONUS! +{ScoringRules.SpeedBonusBP} BP (solved in {timeSinceLastPlayerSolve:F1}s)</color>");
     }
 
     lastPlayerSolveTime = Time.time;
 
-    CommitScore(multipliedScore + speedBonus);
+    CommitScore(points);
   }
 
   /// <summary>
   /// Zen solve: flat scoring — just the line sum, no multiplier or speed bonus.
   /// </summary>
   private void ProcessZenSolve (List<int> tileValues, int lineBaseScore) {
-    Debug.Log($"<color=green>[Zen]</color> +{lineBaseScore} BP (flat)");
-    CommitScore(lineBaseScore);
+    var points = ScoringRules.PlayerSolve(lineBaseScore, 1f, false);
+    Debug.Log($"<color=green>[Zen]</color> +{points} BP (flat)");
+    CommitScore(points);
   }
 
   /// <summary>
@@ -684,16 +624,16 @@ public class GameManager : MonoBehaviour {
   /// </summary>
   private IEnumerator TriggerHotStreak() {
     Debug.Log(
-      $"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{hotStreakMultiplier} for {hotStreakDuration}s)");
+      $"<color=orange>🔥🔥🔥 HOT STREAK ACTIVATED! 🔥🔥🔥</color> (x{ScoringRules.HotStreakMultiplier} for {hotStreakDuration}s)");
 
     hotStreakActive = true;
     hotStreakTimer = hotStreakDuration;
-    currentMultiplier = hotStreakMultiplier;
+    currentMultiplier = ScoringRules.HotStreakMultiplier;
     maxMultiplierReached = Mathf.Max(maxMultiplierReached, currentMultiplier);
 
     OnHotStreakStarted?.Invoke();
     AvatarManager.Instance?.OnHotStreakStart();
-    OnMultiplierChanged?.Invoke(true, currentMultiplier, barMax);
+    OnMultiplierChanged?.Invoke(true, currentMultiplier, ScoringRules.BarMax);
 
     yield return null;
   }
@@ -743,10 +683,10 @@ public class GameManager : MonoBehaviour {
   /// lineBaseScore is the actual sum of the matched line (10, 20, 30, or 40).
   /// </summary>
   private void ProcessHotStreakSolve (List<int> tileValues = null, int lineBaseScore = 10) {
-    var multipliedScore = Mathf.RoundToInt(lineBaseScore * hotStreakMultiplier);
+    var multipliedScore = ScoringRules.PlayerSolve(lineBaseScore, ScoringRules.HotStreakMultiplier, false);
 
     Debug.Log(
-      $"<color=orange>🔥 HOT STREAK SOLVE:</color> {lineBaseScore} × {hotStreakMultiplier:F0} = <color=cyan>+{multipliedScore} pts</color>");
+      $"<color=orange>🔥 HOT STREAK SOLVE:</color> {lineBaseScore} × {ScoringRules.HotStreakMultiplier:F0} = <color=cyan>+{multipliedScore} pts</color>");
 
     CommitScore(multipliedScore);
     OnMultiplierChanged?.Invoke(true, currentMultiplier, multiplierBar);

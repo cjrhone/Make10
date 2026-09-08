@@ -18,7 +18,7 @@ pins the scoring maths.
 **Steps**
 1. `[x]` Add `Assets/Tests/EditMode/Make10.Tests.EditMode.asmdef` (references
    `Make10.Runtime`, `nunit.framework.dll`, constraint `UNITY_INCLUDE_TESTS`).
-2. `[ ]` Extract pure scoring into a static class `ScoringRules`
+2. `[x]` Extract pure scoring into a static class `ScoringRules`
    (`Assets/Scripts/ScoringRules.cs`):
    - `int PlayerSolve(int lineSum, float multiplier, bool speedBonus)`
    - `int CascadeSolve(GameMode mode, int lineSum, int chainIndex)`

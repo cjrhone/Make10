@@ -110,6 +110,11 @@ Results → [Continue/Again] or [Main Menu]
 ### Base Scoring
 Lines summing to multiples of 10 score that sum as base BP (10-sum → 10 BP, etc.).
 
+All numbers below are implemented as pure functions in `ScoringRules.cs`
+(`PlayerSolve`, `CascadeSolve`, `MultiplierForBar`, `BarAfterSolve`, `BarAfterDrain`,
+`StarsFor`) and pinned by `Assets/Tests/EditMode/ScoringRulesTests.cs`. `GameManager`
+owns the per-round state and delegates to them.
+
 ```
 PLAYER SWAP MATCHES (cascadeCount == 1):
   lineSum × currentMultiplier
@@ -120,7 +125,7 @@ CASCADE MATCHES (cascadeCount >= 2):
   No multiplier, no bar fill, no speed bonus. Bar freezes during cascade processing.
   Arcade: +1, +2, +3… BP per line in the chain (counter resets each chain).
   MakeZen: flat lineSum BP per line.
-  (Implemented in GameManager.ProcessCascadeSolve.)
+  (Implemented in ScoringRules.CascadeSolve, called from GameManager.ProcessCascadeSolve.)
 ```
 
 ### Arcade Multiplier Bar (0–100)
