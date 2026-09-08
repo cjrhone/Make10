@@ -16,18 +16,18 @@ CLAUDE.md and nobody noticed. The 5 PlayMode tests are scene smoke tests; nothin
 pins the scoring maths.
 
 **Steps**
-1. `[ ]` Add `Assets/Tests/EditMode/Make10.Tests.EditMode.asmdef` (references
+1. `[x]` Add `Assets/Tests/EditMode/Make10.Tests.EditMode.asmdef` (references
    `Make10.Runtime`, `nunit.framework.dll`, constraint `UNITY_INCLUDE_TESTS`).
-2. `[ ]` Extract pure scoring into a static class `ScoringRules`
+2. `[x]` Extract pure scoring into a static class `ScoringRules`
    (`Assets/Scripts/ScoringRules.cs`):
    - `int PlayerSolve(int lineSum, float multiplier, bool speedBonus)`
    - `int CascadeSolve(GameMode mode, int lineSum, int chainIndex)`
    - `float MultiplierForBar(float bar)` (tiers 0/25/50/75/100)
    - `int StarsFor(GameMode mode, int bp)`
    `GameManager` calls these; behaviour unchanged.
-3. `[ ]` Tests: one per rule in CLAUDE.md "Scoring & Multiplier", plus tier
+3. `[x]` Tests: one per rule in CLAUDE.md "Scoring & Multiplier", plus tier
    boundaries (24/25, 49/50, 74/75, 99/100) and the Arcade +1/+2/+3 chain.
-4. `[ ]` `TileWeightManager.RefillTileBag`: test bag is always 25 and matches
+4. `[x]` `TileWeightManager.RefillTileBag`: test bag is always 25 and matches
    largest-remainder expectation for a fixed weight table.
 
 **Done when:** `Unity -runTests -testPlatform EditMode` green; CLAUDE.md scoring
@@ -52,7 +52,7 @@ Each resolver is a plain C# class owned by `GridManager` and given a
 `MonoBehaviour` host for coroutines (or converted to `async`/UniTask later).
 
 **Steps**
-1. `[ ]` Move hint timer + `ShowHint*` into `HintSystem` (lowest coupling, proves
+1. `[x]` Move hint timer + `ShowHint*` into `HintSystem` (lowest coupling, proves
    the pattern).
 2. `[ ]` Move Zen-only methods (`AnimateZenMatch`, gravity, `ZenResetGridWithEffect`,
    locked-tile helpers) into `ZenBoardResolver`.
