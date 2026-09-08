@@ -16,7 +16,7 @@ CLAUDE.md and nobody noticed. The 5 PlayMode tests are scene smoke tests; nothin
 pins the scoring maths.
 
 **Steps**
-1. `[ ]` Add `Assets/Tests/EditMode/Make10.Tests.EditMode.asmdef` (references
+1. `[x]` Add `Assets/Tests/EditMode/Make10.Tests.EditMode.asmdef` (references
    `Make10.Runtime`, `nunit.framework.dll`, constraint `UNITY_INCLUDE_TESTS`).
 2. `[ ]` Extract pure scoring into a static class `ScoringRules`
    (`Assets/Scripts/ScoringRules.cs`):
