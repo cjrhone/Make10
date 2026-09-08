@@ -58,26 +58,22 @@ public class GridManager : MonoBehaviour {
   [SerializeField] private TileWeightManager tileWeightManager;
 
   [Header("Hint System"), SerializeField] 
-  private bool enableHints = true;
-
-  [SerializeField] private float hintDelay = 10f;
-  [SerializeField] private float hintRepeatInterval = 3f;
-  [SerializeField] private int hintParticleCount = 5;
-  [SerializeField] private float hintParticleSpeed = 120f;
-  [SerializeField] private float hintParticleLifetime = 0.5f;
-  [SerializeField] private float hintParticleSize = 12f;
-  [SerializeField] private Color hintParticleColor = new(1f, 0.9f, 0.3f, 0.9f);
+  private HintSystem.Settings hintSettings = new();
 
   private Tile[,] grid;
   private Tile selectedTile;
   private bool isProcessing = false;
 
-  // Hint system state
-  private float timeSinceLastMove = 0f;
-  private float timeSinceLastHint = 0f;
-  private bool hintActive = false;
-  private HintMove currentHint = null;
-  private List<GameObject> activeHintParticles = new();
+  // Inactivity hint timer + trail/pulse VFX. Coroutines run on this MonoBehaviour
+  // so FreezeGrid()'s StopAllCoroutines still halts them.
+  private HintSystem hintSystem;
+  private HintSystem Hint => hintSystem ??= new HintSystem(this, this, hintSettings);
+
+  /// <summary>Grid container rect — hint particles parent here.</summary>
+  internal RectTransform GridContainer => gridContainer;
+
+  /// <summary>Container size / reference size — scales hint particle geometry.</summary>
+  internal float ScaleFactor => scaleFactor;
 
   // Drag-swap state (single-swap-per-gesture)
   private bool isDragging = false;
@@ -257,188 +253,8 @@ public class GridManager : MonoBehaviour {
   }
 
   private void Update() {
-    // Only track hint timer when game is active and not processing
-    if (!enableHints) {
-      return;
-    }
-
-    if (GameManager.Instance == null || !GameManager.Instance.IsGameActive) {
-      return;
-    }
-
-    if (GameManager.Instance.CurrentMode == GameManager.GameMode.Zen) {
-      return; // No hints in Zen — let the player think
-    }
-
-    if (isProcessing) {
-      return;
-    }
-
-    timeSinceLastMove += Time.deltaTime;
-
-    // Check if it's time to show a hint
-    if (timeSinceLastMove >= hintDelay) {
-      timeSinceLastHint += Time.deltaTime;
-
-      // Show hint periodically
-      if (!hintActive || timeSinceLastHint >= hintRepeatInterval) {
-        ShowHint();
-        timeSinceLastHint = 0f;
-      }
-    }
+    Hint.Tick(Time.deltaTime, isProcessing);
   }
-
-  #region Hint System
-
-  private void ResetHintTimer() {
-    timeSinceLastMove = 0f;
-    timeSinceLastHint = 0f;
-    hintActive = false;
-    currentHint = null;
-    ClearHintParticles();
-  }
-
-  private void ShowHint() {
-    if (matchChecker == null) {
-      return;
-    }
-
-    // Find a valid move
-    currentHint = matchChecker.FindHintMove();
-
-    if (currentHint != null && currentHint.tile != null) {
-      hintActive = true;
-
-      if (currentHint.targetTile != null) {
-        // Zen: pulse both tiles to highlight the swap pair
-        StartCoroutine(PulseZenHintTiles(currentHint));
-        Debug.Log($"<color=yellow>HINT:</color> Swap {currentHint.tile} ↔ {currentHint.targetTile}");
-      }
-      else {
-        // Arcade: directional particle trail
-        StartCoroutine(SpawnHintParticles(currentHint));
-        Debug.Log($"<color=yellow>HINT:</color> Swipe {currentHint.tile} {currentHint.direction}");
-      }
-    }
-  }
-
-  /// <summary>
-  /// Zen hint: gentle scale pulse on both tiles in the hint pair.
-  /// Repeating pulses handled by the hint timer re-triggering ShowHint.
-  /// </summary>
-  private IEnumerator PulseZenHintTiles (HintMove hint) {
-    if (hint.tile == null) {
-      yield break;
-    }
-
-    // Pulse first tile
-    AnimationUtilities.PunchScale(hint.tile.GetRectTransform(), 1.1f, 0.25f);
-    yield return new WaitForSeconds(0.12f);
-
-    // Pulse second tile (staggered for visual clarity)
-    if (hint.targetTile != null) {
-      AnimationUtilities.PunchScale(hint.targetTile.GetRectTransform(), 1.1f, 0.25f);
-    }
-  }
-
-  private IEnumerator SpawnHintParticles (HintMove hint) {
-    if (hint.tile == null) {
-      yield break;
-    }
-
-    var tilePos = hint.tile.GetRectTransform().anchoredPosition;
-    var direction = hint.GetDirectionVector();
-
-    // Spawn particles in a burst
-    for (var i = 0; i < hintParticleCount; i++) {
-      SpawnSingleHintParticle(tilePos, direction, i * 0.06f);
-      yield return new WaitForSeconds(0.04f);
-    }
-  }
-
-  private void SpawnSingleHintParticle (Vector2 startPos, Vector2 direction, float delay) {
-    StartCoroutine(AnimateHintParticle(startPos, direction, delay));
-  }
-
-  private IEnumerator AnimateHintParticle (Vector2 startPos, Vector2 direction, float delay) {
-    yield return new WaitForSeconds(delay);
-
-    // Create particle
-    var particle = new GameObject("HintParticle");
-    particle.transform.SetParent(gridContainer, false);
-    activeHintParticles.Add(particle);
-
-    var rt = particle.AddComponent<RectTransform>();
-
-    // Start slightly behind center, end ahead (scaled)
-    var startOffset = -20f * scaleFactor;
-    var endOffset = 60f * scaleFactor;
-    rt.anchoredPosition = startPos + direction * startOffset;
-    rt.sizeDelta = new Vector2(hintParticleSize * scaleFactor, hintParticleSize * scaleFactor);
-    rt.localEulerAngles = new Vector3(0, 0, 45f); // Diamond shape
-
-    var img = particle.AddComponent<Image>();
-    img.color = hintParticleColor;
-    img.raycastTarget = false;
-
-    // Animate: move in direction, fade out, shrink
-    var elapsed = 0f;
-    var velocity = direction * hintParticleSpeed * scaleFactor;
-
-    // Add slight randomness (scaled)
-    var wobble = Random.Range(-15f, 15f) * scaleFactor;
-    var perpendicular = new Vector2(-direction.y, direction.x);
-
-    while (elapsed < hintParticleLifetime) {
-      if (particle == null) {
-        yield break;
-      }
-
-      elapsed += Time.deltaTime;
-      var t = elapsed / hintParticleLifetime;
-
-      // Move forward
-      var pos = startPos + direction * Mathf.Lerp(startOffset, endOffset, t);
-      pos += perpendicular * Mathf.Sin(t * Mathf.PI * 2f) * wobble * (1f - t);
-      rt.anchoredPosition = pos;
-
-      // Fade: appear quickly, fade out slowly
-      float alpha;
-      if (t < 0.2f) {
-        alpha = t / 0.2f; // Fade in
-      }
-      else {
-        alpha = 1f - (t - 0.2f) / 0.8f; // Fade out
-      }
-
-      img.color = new Color(hintParticleColor.r, hintParticleColor.g, hintParticleColor.b,
-        hintParticleColor.a * alpha);
-
-      // Scale: start small, grow, then shrink
-      var scale = Mathf.Sin(t * Mathf.PI) * 1.2f + 0.3f;
-      rt.localScale = Vector3.one * scale;
-
-      yield return null;
-    }
-
-    // Cleanup
-    if (particle != null) {
-      activeHintParticles.Remove(particle);
-      Destroy(particle);
-    }
-  }
-
-  private void ClearHintParticles() {
-    foreach (var p in activeHintParticles) {
-      if (p != null) {
-        Destroy(p);
-      }
-    }
-
-    activeHintParticles.Clear();
-  }
-
-  #endregion
 
   public void SpawnGrid() {
     Debug.Log("GridManager.SpawnGrid() called");
@@ -454,7 +270,7 @@ public class GridManager : MonoBehaviour {
     UpdateGridSizeFromDifficulty();
 
     ClearGrid();
-    ResetHintTimer();
+    Hint.Reset();
 
     // Clear swap refs so the first ProcessMatchesCoroutine call
     // (from StartMatchProcessing) doesn't fire OnFailedSwap
@@ -551,7 +367,7 @@ public class GridManager : MonoBehaviour {
     }
 
     // Reset hint timer on any interaction
-    ResetHintTimer();
+    Hint.Reset();
 
     if (selectedTile == null) {
       selectedTile = tile;
@@ -612,7 +428,7 @@ public class GridManager : MonoBehaviour {
     }
 
     // Reset hint timer on any interaction
-    ResetHintTimer();
+    Hint.Reset();
 
     var neighborX = tile.GridX;
     var neighborY = tile.GridY;
@@ -673,7 +489,7 @@ public class GridManager : MonoBehaviour {
     isProcessing = true;
 
     if (!isRevert) {
-      ResetHintTimer();
+      Hint.Reset();
       AudioManager.Instance?.PlaySwapSound();
 
       // MakeZen: track swapped tiles for merge position logic
@@ -818,7 +634,7 @@ public class GridManager : MonoBehaviour {
     tile.GetRectTransform().SetAsLastSibling();
 
     AudioManager.Instance?.PlayTileSelect();
-    ResetHintTimer();
+    Hint.Reset();
 
     Debug.Log($"Drag started: {tile}");
   }
@@ -1362,7 +1178,7 @@ public class GridManager : MonoBehaviour {
     GameManager.Instance?.OnCascadeEnd();
 
     // Reset hint timer after cascade completes
-    ResetHintTimer();
+    Hint.Reset();
 
     if (matchChecker != null && !matchChecker.HasValidMoves()) {
       // Zen mode: use a reshuffle if available, otherwise game over
@@ -2414,7 +2230,7 @@ public class GridManager : MonoBehaviour {
   }
 
   public void ClearGrid() {
-    ClearHintParticles();
+    Hint.ClearParticles();
 
     if (grid != null) {
       for (var y = 0; y < gridHeight; y++)
@@ -2468,7 +2284,7 @@ public class GridManager : MonoBehaviour {
 
   [ContextMenu("Force Show Hint")]
   public void DebugForceHint() {
-    ShowHint();
+    Hint.ShowHint();
   }
 
   [ContextMenu("Debug: Set Corner Tiles to Locked (10, 20, 30)")]
@@ -2526,7 +2342,7 @@ public class GridManager : MonoBehaviour {
 
   public void StartMatchProcessing() {
     Debug.Log("GridManager.StartMatchProcessing() called - let the freebies flow!");
-    ResetHintTimer();
+    Hint.Reset();
     StartCoroutine(ProcessMatchesCoroutine());
   }
 

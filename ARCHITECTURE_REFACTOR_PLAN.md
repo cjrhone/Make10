@@ -52,7 +52,7 @@ Each resolver is a plain C# class owned by `GridManager` and given a
 `MonoBehaviour` host for coroutines (or converted to `async`/UniTask later).
 
 **Steps**
-1. `[ ]` Move hint timer + `ShowHint*` into `HintSystem` (lowest coupling, proves
+1. `[x]` Move hint timer + `ShowHint*` into `HintSystem` (lowest coupling, proves
    the pattern).
 2. `[ ]` Move Zen-only methods (`AnimateZenMatch`, gravity, `ZenResetGridWithEffect`,
    locked-tile helpers) into `ZenBoardResolver`.
