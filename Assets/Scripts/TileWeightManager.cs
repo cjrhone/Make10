@@ -32,7 +32,9 @@ public class TileWeightManager : MonoBehaviour {
 
   // Tile bag system (Tetris-style consistent distribution)
   private List<int> tileBag = new();
-  private const int BAG_SIZE = 25; // Refill after 25 draws
+
+  /// <summary>Bag size — every refill yields exactly this many tiles.</summary>
+  public const int BAG_SIZE = 25; // Refill after 25 draws
 
   // Cached weight array
   private float[] weights;
@@ -227,36 +229,8 @@ public class TileWeightManager : MonoBehaviour {
       }
     }
     else {
-      // Largest-remainder rounding: floor every bucket, then hand the leftover
-      // slots to the buckets with the biggest fractional parts. Always yields
-      // exactly BAG_SIZE tiles and never over-represents a single value the way
-      // RoundToInt + "pad with heaviest tile" did.
-      var n = adjustedWeights.Length;
-      var counts = new int[n];
-      var remainders = new float[n];
-      var placed = 0;
-
-      for (var i = 0; i < n; i++) {
-        var exact = adjustedWeights[i] / totalWeight * BAG_SIZE;
-        counts[i] = Mathf.FloorToInt(exact);
-        remainders[i] = exact - counts[i];
-        placed += counts[i];
-      }
-
-      while (placed < BAG_SIZE) {
-        var best = 0;
-        for (var i = 1; i < n; i++) {
-          if (remainders[i] > remainders[best]) {
-            best = i;
-          }
-        }
-
-        counts[best]++;
-        remainders[best] = -1f; // consumed
-        placed++;
-      }
-
-      for (var i = 0; i < n; i++)
+      var counts = BagCountsFor(adjustedWeights, BAG_SIZE);
+      for (var i = 0; i < counts.Length; i++)
       for (var j = 0; j < counts[i]; j++) {
         tileBag.Add(i);
       }
@@ -269,6 +243,48 @@ public class TileWeightManager : MonoBehaviour {
       tileBag[i] = tileBag[j];
       tileBag[j] = temp;
     }
+  }
+
+  /// <summary>
+  /// Largest-remainder rounding of <paramref name="weights"/> into <paramref name="bagSize"/>
+  /// slots: floor every bucket, then hand the leftover slots to the buckets with the
+  /// biggest fractional parts (ties go to the lower index). Always yields exactly
+  /// <paramref name="bagSize"/> tiles and never over-represents a single value the way
+  /// RoundToInt + "pad with heaviest tile" did. Pure — see TileWeightManagerTests.
+  /// Precondition: the weights sum to a positive value.
+  /// </summary>
+  public static int[] BagCountsFor (float[] weights, int bagSize) {
+    var totalWeight = 0f;
+    for (var i = 0; i < weights.Length; i++) {
+      totalWeight += weights[i];
+    }
+
+    var n = weights.Length;
+    var counts = new int[n];
+    var remainders = new float[n];
+    var placed = 0;
+
+    for (var i = 0; i < n; i++) {
+      var exact = weights[i] / totalWeight * bagSize;
+      counts[i] = Mathf.FloorToInt(exact);
+      remainders[i] = exact - counts[i];
+      placed += counts[i];
+    }
+
+    while (placed < bagSize) {
+      var best = 0;
+      for (var i = 1; i < n; i++) {
+        if (remainders[i] > remainders[best]) {
+          best = i;
+        }
+      }
+
+      counts[best]++;
+      remainders[best] = -1f; // consumed
+      placed++;
+    }
+
+    return counts;
   }
 
   /// <summary>
