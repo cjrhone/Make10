@@ -66,6 +66,7 @@ public class SafeAreaHandler : MonoBehaviour {
     // Awake: safeArea already in device pixels, Screen.width/height still the editor window).
     // Leave the previous anchors alone and try again next frame instead of insetting nonsense.
     if (safeArea.xMax > screenSize.x + 1f || safeArea.yMax > screenSize.y + 1f) {
+      Debug.Log($"[SafeAreaHandler] skipped: safeArea={safeArea} does not fit screen={screenSize}");
       lastSafeArea = default;
       lastScreenSize = default;
       return;
@@ -85,6 +86,7 @@ public class SafeAreaHandler : MonoBehaviour {
     rectTransform.anchorMax = anchorMax;
     rectTransform.offsetMin = Vector2.zero;
     rectTransform.offsetMax = Vector2.zero;
+    Debug.Log($"[SafeAreaHandler] applied: safeArea={safeArea} screen={screenSize} anchors={anchorMin}-{anchorMax}");
 
 #if UNITY_EDITOR
     // Log only when safe area actually changes and has insets

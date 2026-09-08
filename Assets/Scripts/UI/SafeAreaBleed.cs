@@ -19,6 +19,12 @@ using UnityEngine.UI;
 /// The host's own Image is disabled, not removed, so its serialized colour/sprite stay the
 /// source of truth: they are mirrored onto the bleed child every frame, so colour tweens and
 /// CanvasGroup fades on the panel keep working.
+///
+/// Panels that carry a <see cref="RectMask2D"/> (MainMenuPanel, GamePanel, CreditsPanel clip
+/// their marquee banners during slide transitions) would clip the bleed child back to the
+/// panel rect. Every mask between the host and the safe-area container therefore gets negative
+/// padding on the bled sides, which widens its clip rect by the same amount. Horizontal
+/// clipping is untouched.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
 [DisallowMultipleComponent]
@@ -37,6 +43,8 @@ public class SafeAreaBleed : MonoBehaviour {
   private Image bleedImage;
   private RectTransform canvasRect;
   private bool dirty = true;
+  private Vector4 lastHostBounds;
+  private Vector4 lastExtension = new(-1f, -1f, -1f, -1f);
 
   /// <summary>The runtime-created child that actually draws the background, or null before setup.</summary>
   public RectTransform BleedChild => bleed;
@@ -54,6 +62,15 @@ public class SafeAreaBleed : MonoBehaviour {
   }
 
   private void LateUpdate() {
+    // Position changes (panel slide transitions) do not raise OnRectTransformDimensionsChange,
+    // so also re-measure whenever the host's world rect moved.
+    if (!dirty && host != null) {
+      var bounds = WorldBounds(host);
+      if (bounds != lastHostBounds) {
+        dirty = true;
+      }
+    }
+
     if (dirty) {
       Apply();
     }
@@ -72,7 +89,14 @@ public class SafeAreaBleed : MonoBehaviour {
       return;
     }
 
-    var extension = ComputeExtension(host, ResolveSafeArea(), canvasRect, flushTolerance);
+    var safe = ResolveSafeArea();
+    var extension = ComputeExtension(host, safe, canvasRect, flushTolerance);
+    lastHostBounds = WorldBounds(host);
+
+    if (extension != lastExtension) {
+      lastExtension = extension;
+      Debug.Log($"[SafeAreaBleed] {name}: host={WorldBounds(host)} safe={(safe != null ? WorldBounds(safe).ToString() : "none")} canvas={WorldBounds(canvasRect)} ext(l,b,r,t)={extension}");
+    }
 
     // Extension is measured in world units; convert to the host's local units.
     var scale = host.lossyScale;
@@ -81,6 +105,8 @@ public class SafeAreaBleed : MonoBehaviour {
 
     bleed.offsetMin = new Vector2(-extension.x / sx, -extension.y / sy);
     bleed.offsetMax = new Vector2(extension.z / sx, extension.w / sy);
+
+    WidenAncestorMasks(extension);
 
     if (bleed.GetSiblingIndex() != 0) {
       bleed.SetAsFirstSibling();
@@ -109,6 +135,32 @@ public class SafeAreaBleed : MonoBehaviour {
     var top = Mathf.Abs(h.w - s.w) <= tolerance ? Mathf.Max(0f, c.w - h.w) : 0f;
 
     return new Vector4(left, bottom, right, top);
+  }
+
+  /// <summary>
+  /// RectMask2D clips to its rect plus padding, measured in root-canvas units. Negative padding
+  /// widens the clip. Merge (never shrink) so several bleeding panels under one mask, e.g.
+  /// GamePanel and its CharacterPanel, all fit.
+  /// </summary>
+  private void WidenAncestorMasks (Vector4 extensionWorld) {
+    var container = ResolveSafeArea();
+    var canvasScale = canvasRect.lossyScale;
+    var cx = Mathf.Approximately(canvasScale.x, 0f) ? 1f : canvasScale.x;
+    var cy = Mathf.Approximately(canvasScale.y, 0f) ? 1f : canvasScale.y;
+    var wanted = new Vector4(-extensionWorld.x / cx, -extensionWorld.y / cy, -extensionWorld.z / cx, -extensionWorld.w / cy);
+
+    for (var t = host; t != null && t != container && t != canvasRect; t = t.parent as RectTransform) {
+      var mask = t.GetComponent<RectMask2D>();
+      if (mask == null) {
+        continue;
+      }
+
+      var merged = Vector4.Min(mask.padding, wanted);
+      if (merged != mask.padding) {
+        mask.padding = merged;
+        Debug.Log($"[SafeAreaBleed] {name}: widened RectMask2D on {t.name} to padding={merged}");
+      }
+    }
   }
 
   /// <summary>World-space (xMin, yMin, xMax, yMax) of a RectTransform.</summary>

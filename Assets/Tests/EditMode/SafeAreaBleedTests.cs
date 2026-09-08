@@ -106,6 +106,44 @@ public class SafeAreaBleedTests {
   }
 
   [Test]
+  public void MaskedPanel_MaskPaddingWidensOnBledSidesOnly() {
+    // MainMenuPanel / GamePanel / CreditsPanel carry a RectMask2D; without widening it the bleed
+    // child is clipped back to the panel and the insets show through (seen on the 1.2.1 build).
+    var panel = MakePanel("MainMenuPanel", Vector2.zero, Vector2.one);
+    var mask = panel.gameObject.AddComponent<RectMask2D>();
+    var bleed = panel.gameObject.AddComponent<SafeAreaBleed>();
+    bleed.Apply();
+
+    Assert.AreEqual(0f, mask.padding.x, Tol, "left untouched");
+    Assert.AreEqual(-BottomInset, mask.padding.y, Tol, "bottom widened by the home-indicator inset");
+    Assert.AreEqual(0f, mask.padding.z, Tol, "right untouched");
+    Assert.AreEqual(-TopInset, mask.padding.w, Tol, "top widened by the notch inset");
+  }
+
+  [Test]
+  public void NestedPanel_WidensAncestorMask_WithoutShrinkingIt() {
+    // CharacterPanel sits inside GamePanel's mask and only bleeds upward.
+    var game = MakePanel("GamePanel", Vector2.zero, Vector2.one);
+    var mask = game.gameObject.AddComponent<RectMask2D>();
+    mask.padding = new Vector4(0f, -BottomInset, 0f, 0f); // as if GamePanel's own bleed ran first
+
+    var character = new GameObject("CharacterPanel", typeof(RectTransform), typeof(Image));
+    character.transform.SetParent(game, false);
+    var rt = (RectTransform)character.transform;
+    rt.anchorMin = new Vector2(0f, 0.6f);
+    rt.anchorMax = Vector2.one;
+    rt.offsetMin = Vector2.zero;
+    rt.offsetMax = Vector2.zero;
+
+    character.AddComponent<SafeAreaBleed>().Apply();
+
+    Assert.AreEqual(-TopInset, mask.padding.w, Tol, "ancestor mask widened at the top");
+    Assert.AreEqual(-BottomInset, mask.padding.y, Tol, "existing bottom widening kept");
+    Assert.AreEqual(0f, mask.padding.x, Tol);
+    Assert.AreEqual(0f, mask.padding.z, Tol);
+  }
+
+  [Test]
   public void Apply_IsIdempotent_ReusesChild() {
     var panel = MakePanel("ShopPanel", Vector2.zero, Vector2.one);
     var bleed = panel.gameObject.AddComponent<SafeAreaBleed>();
