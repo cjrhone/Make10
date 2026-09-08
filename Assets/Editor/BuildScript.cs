@@ -42,6 +42,7 @@ public static class BuildScript {
     if (!string.IsNullOrEmpty(keystorePath)) {
       PlayerSettings.Android.keystoreName = keystorePath;
     }
+
     PlayerSettings.Android.keystorePass = keystorePass;
     PlayerSettings.Android.keyaliasPass = aliasPass;
 
@@ -78,7 +79,8 @@ public static class BuildScript {
     var summary = report.summary;
 
     if (summary.result == BuildResult.Succeeded) {
-      Debug.Log($"[BuildScript] SUCCESS: {summary.totalSize / (1024 * 1024)} MB in {summary.totalTime.TotalSeconds:F0}s -> {output}");
+      Debug.Log(
+        $"[BuildScript] SUCCESS: {summary.totalSize / (1024 * 1024)} MB in {summary.totalTime.TotalSeconds:F0}s -> {output}");
       EditorApplication.Exit(0);
     }
     else {
@@ -86,7 +88,7 @@ public static class BuildScript {
     }
   }
 
-  private static void Fail(string message) {
+  private static void Fail (string message) {
     Debug.LogError("[BuildScript] " + message);
     EditorApplication.Exit(1);
   }

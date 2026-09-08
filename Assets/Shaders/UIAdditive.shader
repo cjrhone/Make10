@@ -72,16 +72,16 @@ Shader "UI/Additive"
 
             struct appdata_t
             {
-                float4 vertex   : POSITION;
-                float4 color    : COLOR;
+                float4 vertex : POSITION;
+                float4 color : COLOR;
                 float2 texcoord : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
-                float4 vertex   : SV_POSITION;
-                fixed4 color    : COLOR;
+                float4 vertex : SV_POSITION;
+                fixed4 color : COLOR;
                 float2 texcoord : TEXCOORD0;
                 float4 worldPosition : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
@@ -145,7 +145,7 @@ Shader "UI/Additive"
                 #endif
 
                 #ifdef UNITY_UI_ALPHACLIP
-                clip (color.a - 0.001);
+                clip(color.a - 0.001);
                 #endif
 
                 // Premultiply alpha for proper additive fade-out

@@ -6,276 +6,280 @@ using System;
 /// Builds and manages beautiful tutorial popups using the PopupWindow system.
 /// Replaces the old scene-based grey tutorial panels with styled, animated windows.
 /// </summary>
-public class TutorialBuilder : MonoBehaviour
-{
-    public static TutorialBuilder Instance { get; private set; }
+public class TutorialBuilder : MonoBehaviour {
+  public static TutorialBuilder Instance { get; private set; }
 
-    private PopupWindow tutorial1Popup;
-    private PopupWindow tutorial2Popup;
+  private PopupWindow tutorial1Popup;
+  private PopupWindow tutorial2Popup;
 
-    // Tracks whether a popup close was triggered by a content button (GOT IT, LET'S GO, BACK)
-    // vs the X close button. Prevents OnTutorialCancelled from firing on normal advancement.
-    private bool isAdvancing = false;
+  // Tracks whether a popup close was triggered by a content button (GOT IT, LET'S GO, BACK)
+  // vs the X close button. Prevents OnTutorialCancelled from firing on normal advancement.
+  private bool isAdvancing = false;
 
-    // Callbacks for SceneFlowManager
-    public event Action OnTutorial1Complete;
-    public event Action OnTutorial2Complete;
-    public event Action OnTutorialCancelled;
+  // Callbacks for SceneFlowManager
+  public event Action OnTutorial1Complete;
+  public event Action OnTutorial2Complete;
+  public event Action OnTutorialCancelled;
 
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
+  private void Awake() {
+    if (Instance != null && Instance != this) {
+      Destroy(gameObject);
+      return;
     }
 
-    // ==========================================
-    // PUBLIC API
-    // ==========================================
+    Instance = this;
+  }
 
-    public void ShowTutorial1()
-    {
-        if (tutorial1Popup == null) CreateTutorial1();
-        if (tutorial1Popup == null)
-        {
-            Debug.LogWarning("[TutorialBuilder] Tutorial1 popup could not be created (no Canvas?)");
-            return;
-        }
-        tutorial1Popup.Open();
+  // ==========================================
+  // PUBLIC API
+  // ==========================================
+
+  public void ShowTutorial1() {
+    if (tutorial1Popup == null) {
+      CreateTutorial1();
     }
 
-    public void HideTutorial1()
-    {
-        if (tutorial1Popup != null) tutorial1Popup.Close();
+    if (tutorial1Popup == null) {
+      Debug.LogWarning("[TutorialBuilder] Tutorial1 popup could not be created (no Canvas?)");
+      return;
     }
 
-    public void ShowTutorial2()
-    {
-        if (tutorial2Popup == null) CreateTutorial2();
-        if (tutorial2Popup == null)
-        {
-            Debug.LogWarning("[TutorialBuilder] Tutorial2 popup could not be created (no Canvas?)");
-            return;
-        }
-        tutorial2Popup.Open();
+    tutorial1Popup.Open();
+  }
+
+  public void HideTutorial1() {
+    if (tutorial1Popup != null) {
+      tutorial1Popup.Close();
+    }
+  }
+
+  public void ShowTutorial2() {
+    if (tutorial2Popup == null) {
+      CreateTutorial2();
     }
 
-    public void HideTutorial2()
-    {
-        if (tutorial2Popup != null) tutorial2Popup.Close();
+    if (tutorial2Popup == null) {
+      Debug.LogWarning("[TutorialBuilder] Tutorial2 popup could not be created (no Canvas?)");
+      return;
     }
 
-    public void HideCurrentTutorial()
-    {
-        if (tutorial1Popup != null && tutorial1Popup.gameObject.activeSelf) tutorial1Popup.Close();
-        if (tutorial2Popup != null && tutorial2Popup.gameObject.activeSelf) tutorial2Popup.Close();
+    tutorial2Popup.Open();
+  }
+
+  public void HideTutorial2() {
+    if (tutorial2Popup != null) {
+      tutorial2Popup.Close();
+    }
+  }
+
+  public void HideCurrentTutorial() {
+    if (tutorial1Popup != null && tutorial1Popup.gameObject.activeSelf) {
+      tutorial1Popup.Close();
     }
 
-    // ==========================================
-    // TUTORIAL 1: HOW TO PLAY
-    // ==========================================
+    if (tutorial2Popup != null && tutorial2Popup.gameObject.activeSelf) {
+      tutorial2Popup.Close();
+    }
+  }
 
-    private void CreateTutorial1()
-    {
-        Canvas canvas = FindAnyObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("[TutorialBuilder] No Canvas found!");
-            return;
-        }
+  // ==========================================
+  // TUTORIAL 1: HOW TO PLAY
+  // ==========================================
 
-        GameObject popupObj = new GameObject("Tutorial1Popup");
-        popupObj.transform.SetParent(canvas.transform, false);
-
-        tutorial1Popup = popupObj.AddComponent<PopupWindow>();
-        tutorial1Popup.SetAutoSizeMode(950f, 500f, 1400f, enableScrollbar: true);
-
-        // Wire close button (X) to cancel tutorial
-        // Only fires OnTutorialCancelled if the close wasn't triggered by a content button
-        tutorial1Popup.OnWindowClosed += () =>
-        {
-            if (!isAdvancing)
-                OnTutorialCancelled?.Invoke();
-            isAdvancing = false;
-        };
-
-        BuildTutorial1Content();
+  private void CreateTutorial1() {
+    var canvas = FindAnyObjectByType<Canvas>();
+    if (canvas == null) {
+      Debug.LogError("[TutorialBuilder] No Canvas found!");
+      return;
     }
 
-    private void BuildTutorial1Content()
-    {
-        tutorial1Popup.SetTitle("HOW TO PLAY");
-        tutorial1Popup.ClearContent();
+    var popupObj = new GameObject("Tutorial1Popup");
+    popupObj.transform.SetParent(canvas.transform, false);
 
-        // Main headline
-        tutorial1Popup.AddText("MAKE 10!", UIStyleGuide.FontSizeHeadline,
-            UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+    tutorial1Popup = popupObj.AddComponent<PopupWindow>();
+    tutorial1Popup.SetAutoSizeMode(950f, 500f, 1400f, true);
 
-        tutorial1Popup.AddSpacer(6);
+    // Wire close button (X) to cancel tutorial
+    // Only fires OnTutorialCancelled if the close wasn't triggered by a content button
+    tutorial1Popup.OnWindowClosed += () => {
+      if (!isAdvancing) {
+        OnTutorialCancelled?.Invoke();
+      }
 
-        // Description — single line, tightened from two lines so the popup
-        // fits a narrow iPhone canvas without pushing the GOT IT button off-screen.
-        tutorial1Popup.AddBody("Swap tiles so any row or column sums to 10.");
+      isAdvancing = false;
+    };
 
-        tutorial1Popup.AddSpacer(12);
+    BuildTutorial1Content();
+  }
 
-        // Demo widget container
-        AddDemoWidget(tutorial1Popup);
+  private void BuildTutorial1Content() {
+    tutorial1Popup.SetTitle("HOW TO PLAY");
+    tutorial1Popup.ClearContent();
 
-        tutorial1Popup.AddSpacer(12);
+    // Main headline
+    tutorial1Popup.AddText("MAKE 10!", UIStyleGuide.FontSizeHeadline,
+      UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
 
-        // Divider
-        tutorial1Popup.AddDivider(UIStyleGuide.ColorBorder);
+    tutorial1Popup.AddSpacer(6);
 
-        tutorial1Popup.AddSpacer(6);
+    // Description — single line, tightened from two lines so the popup
+    // fits a narrow iPhone canvas without pushing the GOT IT button off-screen.
+    tutorial1Popup.AddBody("Swap tiles so any row or column sums to 10.");
 
-        // Controls section — three lines collapsed into one (the three actions
-        // are equivalent ways to swap, no need to list them on separate lines).
-        tutorial1Popup.AddSubheading("CONTROLS", UIStyleGuide.ColorTextAccent);
+    tutorial1Popup.AddSpacer(12);
 
-        tutorial1Popup.AddSpacer(4);
+    // Demo widget container
+    AddDemoWidget(tutorial1Popup);
 
-        tutorial1Popup.AddBody("Tap two adjacent tiles, swipe, or drag.");
+    tutorial1Popup.AddSpacer(12);
 
-        tutorial1Popup.AddSpacer(16);
+    // Divider
+    tutorial1Popup.AddDivider(UIStyleGuide.ColorBorder);
 
-        // GOT IT button
-        tutorial1Popup.AddButton("GOT IT", () =>
-        {
-            isAdvancing = true;
-            tutorial1Popup.Close();
-            OnTutorial1Complete?.Invoke();
-        }, UIStyleGuide.ColorButtonPrimary);
+    tutorial1Popup.AddSpacer(6);
 
-        tutorial1Popup.RefreshAutoSize();
+    // Controls section — three lines collapsed into one (the three actions
+    // are equivalent ways to swap, no need to list them on separate lines).
+    tutorial1Popup.AddSubheading("CONTROLS", UIStyleGuide.ColorTextAccent);
+
+    tutorial1Popup.AddSpacer(4);
+
+    tutorial1Popup.AddBody("Tap two adjacent tiles, swipe, or drag.");
+
+    tutorial1Popup.AddSpacer(16);
+
+    // GOT IT button
+    tutorial1Popup.AddButton("GOT IT", () => {
+      isAdvancing = true;
+      tutorial1Popup.Close();
+      OnTutorial1Complete?.Invoke();
+    }, UIStyleGuide.ColorButtonPrimary);
+
+    tutorial1Popup.RefreshAutoSize();
+  }
+
+  // ==========================================
+  // TUTORIAL 2: SCORING
+  // ==========================================
+
+  private void CreateTutorial2() {
+    var canvas = FindAnyObjectByType<Canvas>();
+    if (canvas == null) {
+      Debug.LogError("[TutorialBuilder] No Canvas found!");
+      return;
     }
 
-    // ==========================================
-    // TUTORIAL 2: SCORING
-    // ==========================================
+    var popupObj = new GameObject("Tutorial2Popup");
+    popupObj.transform.SetParent(canvas.transform, false);
 
-    private void CreateTutorial2()
-    {
-        Canvas canvas = FindAnyObjectByType<Canvas>();
-        if (canvas == null)
-        {
-            Debug.LogError("[TutorialBuilder] No Canvas found!");
-            return;
-        }
+    tutorial2Popup = popupObj.AddComponent<PopupWindow>();
+    tutorial2Popup.SetAutoSizeMode(950f, 500f, 1400f, true);
 
-        GameObject popupObj = new GameObject("Tutorial2Popup");
-        popupObj.transform.SetParent(canvas.transform, false);
+    // Wire close button (X) to cancel tutorial
+    // Only fires OnTutorialCancelled if the close wasn't triggered by a content button
+    tutorial2Popup.OnWindowClosed += () => {
+      if (!isAdvancing) {
+        OnTutorialCancelled?.Invoke();
+      }
 
-        tutorial2Popup = popupObj.AddComponent<PopupWindow>();
-        tutorial2Popup.SetAutoSizeMode(950f, 500f, 1400f, enableScrollbar: true);
+      isAdvancing = false;
+    };
 
-        // Wire close button (X) to cancel tutorial
-        // Only fires OnTutorialCancelled if the close wasn't triggered by a content button
-        tutorial2Popup.OnWindowClosed += () =>
-        {
-            if (!isAdvancing)
-                OnTutorialCancelled?.Invoke();
-            isAdvancing = false;
-        };
+    BuildTutorial2Content();
+  }
 
-        BuildTutorial2Content();
+  private void BuildTutorial2Content() {
+    tutorial2Popup.SetTitle("SCORING");
+    tutorial2Popup.ClearContent();
+
+    // Main headline
+    tutorial2Popup.AddText("EARN BIG!", UIStyleGuide.FontSizeHeadline,
+      UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+
+    tutorial2Popup.AddSpacer(6);
+
+    // Description
+    tutorial2Popup.AddBody("Every Make 10 earns Brain Points.");
+
+    tutorial2Popup.AddSpacer(8);
+    tutorial2Popup.AddDivider(UIStyleGuide.ColorBorder);
+    tutorial2Popup.AddSpacer(6);
+
+    // Multiplier section (Arcade) \u2014 collapsed to single line.
+    tutorial2Popup.AddSubheading("MULTIPLIER", UIStyleGuide.ColorTextAccent);
+    tutorial2Popup.AddSpacer(2);
+    tutorial2Popup.AddBody("Solve fast to boost your score up to \u00d75.");
+
+    tutorial2Popup.AddSpacer(8);
+
+    // Hot Streak section (Arcade) \u2014 collapsed to single line.
+    var hotStreakColor = new Color(1f, 0.5f, 0.15f); // Orange
+    tutorial2Popup.AddSubheading("HOT STREAK", hotStreakColor);
+    tutorial2Popup.AddSpacer(2);
+    tutorial2Popup.AddBody("Fill the bar for 15s of \u00d75 scoring!");
+
+    tutorial2Popup.AddSpacer(8);
+
+    // Time Bonus section \u2014 already a single line, just trim leading spacer.
+    tutorial2Popup.AddSubheading("TIME BONUS", UIStyleGuide.ColorInfo);
+    tutorial2Popup.AddSpacer(2);
+    tutorial2Popup.AddBody("+1 BP every second played.");
+
+    tutorial2Popup.AddSpacer(16);
+
+    // LET'S GO! button
+    tutorial2Popup.AddButton("LET'S GO!", () => {
+      isAdvancing = true;
+      tutorial2Popup.Close();
+      OnTutorial2Complete?.Invoke();
+    }, UIStyleGuide.ColorButtonPrimary);
+
+    tutorial2Popup.RefreshAutoSize();
+  }
+
+  // ==========================================
+  // DEMO WIDGET INTEGRATION
+  // ==========================================
+
+  /// <summary>
+  /// Creates a TutorialDemoWidget embedded inside the popup's content area.
+  /// </summary>
+  private void AddDemoWidget (PopupWindow popup) {
+    var contentArea = popup.GetContentArea();
+    if (contentArea == null) {
+      return;
     }
 
-    private void BuildTutorial2Content()
-    {
-        tutorial2Popup.SetTitle("SCORING");
-        tutorial2Popup.ClearContent();
+    // Create a container with fixed height for the demo
+    var demoContainer = new GameObject("DemoWidgetContainer");
+    demoContainer.transform.SetParent(contentArea, false);
 
-        // Main headline
-        tutorial2Popup.AddText("EARN BIG!", UIStyleGuide.FontSizeHeadline,
-            UIStyleGuide.ColorTextAccent, TMPro.TextAlignmentOptions.Center, TMPro.FontStyles.Bold);
+    var containerRT = demoContainer.AddComponent<RectTransform>();
+    containerRT.sizeDelta = new Vector2(0, 80f); // Height for the tile row
 
-        tutorial2Popup.AddSpacer(6);
+    var le = demoContainer.AddComponent<LayoutElement>();
+    le.minHeight = 80f;
+    le.preferredHeight = 80f;
+    le.flexibleWidth = 1f;
 
-        // Description
-        tutorial2Popup.AddBody("Every Make 10 earns Brain Points.");
+    // Create inner rect for the demo widget to use as its container
+    var innerContainer = new GameObject("DemoInner");
+    innerContainer.transform.SetParent(demoContainer.transform, false);
 
-        tutorial2Popup.AddSpacer(8);
-        tutorial2Popup.AddDivider(UIStyleGuide.ColorBorder);
-        tutorial2Popup.AddSpacer(6);
+    var innerRT = innerContainer.AddComponent<RectTransform>();
+    innerRT.anchorMin = Vector2.zero;
+    innerRT.anchorMax = Vector2.one;
+    innerRT.sizeDelta = Vector2.zero;
+    innerRT.anchoredPosition = Vector2.zero;
 
-        // Multiplier section (Arcade) \u2014 collapsed to single line.
-        tutorial2Popup.AddSubheading("MULTIPLIER", UIStyleGuide.ColorTextAccent);
-        tutorial2Popup.AddSpacer(2);
-        tutorial2Popup.AddBody("Solve fast to boost your score up to \u00d75.");
+    // Add the demo widget component
+    var demoWidget = demoContainer.AddComponent<TutorialDemoWidget>();
+    demoWidget.SetContainer(innerRT);
+  }
 
-        tutorial2Popup.AddSpacer(8);
-
-        // Hot Streak section (Arcade) \u2014 collapsed to single line.
-        Color hotStreakColor = new Color(1f, 0.5f, 0.15f); // Orange
-        tutorial2Popup.AddSubheading("HOT STREAK", hotStreakColor);
-        tutorial2Popup.AddSpacer(2);
-        tutorial2Popup.AddBody("Fill the bar for 15s of \u00d75 scoring!");
-
-        tutorial2Popup.AddSpacer(8);
-
-        // Time Bonus section \u2014 already a single line, just trim leading spacer.
-        tutorial2Popup.AddSubheading("TIME BONUS", UIStyleGuide.ColorInfo);
-        tutorial2Popup.AddSpacer(2);
-        tutorial2Popup.AddBody("+1 BP every second played.");
-
-        tutorial2Popup.AddSpacer(16);
-
-        // LET'S GO! button
-        tutorial2Popup.AddButton("LET'S GO!", () =>
-        {
-            isAdvancing = true;
-            tutorial2Popup.Close();
-            OnTutorial2Complete?.Invoke();
-        }, UIStyleGuide.ColorButtonPrimary);
-
-        tutorial2Popup.RefreshAutoSize();
+  private void OnDestroy() {
+    if (Instance == this) {
+      Instance = null;
     }
-
-    // ==========================================
-    // DEMO WIDGET INTEGRATION
-    // ==========================================
-
-    /// <summary>
-    /// Creates a TutorialDemoWidget embedded inside the popup's content area.
-    /// </summary>
-    private void AddDemoWidget(PopupWindow popup)
-    {
-        Transform contentArea = popup.GetContentArea();
-        if (contentArea == null) return;
-
-        // Create a container with fixed height for the demo
-        GameObject demoContainer = new GameObject("DemoWidgetContainer");
-        demoContainer.transform.SetParent(contentArea, false);
-
-        RectTransform containerRT = demoContainer.AddComponent<RectTransform>();
-        containerRT.sizeDelta = new Vector2(0, 80f); // Height for the tile row
-
-        LayoutElement le = demoContainer.AddComponent<LayoutElement>();
-        le.minHeight = 80f;
-        le.preferredHeight = 80f;
-        le.flexibleWidth = 1f;
-
-        // Create inner rect for the demo widget to use as its container
-        GameObject innerContainer = new GameObject("DemoInner");
-        innerContainer.transform.SetParent(demoContainer.transform, false);
-
-        RectTransform innerRT = innerContainer.AddComponent<RectTransform>();
-        innerRT.anchorMin = Vector2.zero;
-        innerRT.anchorMax = Vector2.one;
-        innerRT.sizeDelta = Vector2.zero;
-        innerRT.anchoredPosition = Vector2.zero;
-
-        // Add the demo widget component
-        TutorialDemoWidget demoWidget = demoContainer.AddComponent<TutorialDemoWidget>();
-        demoWidget.SetContainer(innerRT);
-    }
-
-    private void OnDestroy()
-    {
-        if (Instance == this) Instance = null;
-    }
+  }
 }

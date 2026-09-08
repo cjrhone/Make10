@@ -8,7 +8,6 @@ using UnityEngine;
 /// Manages the shop UI: category tabs, item grid, purchase flow, live avatar preview.
 /// Placeholder — singleton + UI wiring + purchase logic will be added during Session P.
 /// </summary>
-public class ShopManager : MonoBehaviour
-{
-    public static ShopManager Instance { get; private set; }
+public class ShopManager : MonoBehaviour {
+  public static ShopManager Instance { get; private set; }
 }

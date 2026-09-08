@@ -12,75 +12,72 @@ using UnityEngine;
 /// respect the safe area should be children of this GameObject.
 /// </summary>
 [RequireComponent(typeof(RectTransform))]
-public class SafeAreaHandler : MonoBehaviour
-{
-    private RectTransform rectTransform;
-    private Canvas rootCanvas;
-    private Rect lastSafeArea;
+public class SafeAreaHandler : MonoBehaviour {
+  private RectTransform rectTransform;
+  private Canvas rootCanvas;
+  private Rect lastSafeArea;
 
-    private void Awake()
-    {
-        rectTransform = GetComponent<RectTransform>();
-        rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+  private void Awake() {
+    rectTransform = GetComponent<RectTransform>();
+    rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
 
-        // Start with full stretch
-        rectTransform.anchorMin = Vector2.zero;
-        rectTransform.anchorMax = Vector2.one;
-        rectTransform.offsetMin = Vector2.zero;
-        rectTransform.offsetMax = Vector2.zero;
+    // Start with full stretch
+    rectTransform.anchorMin = Vector2.zero;
+    rectTransform.anchorMax = Vector2.one;
+    rectTransform.offsetMin = Vector2.zero;
+    rectTransform.offsetMax = Vector2.zero;
 
-        ApplySafeArea();
+    ApplySafeArea();
+  }
+
+  private void Update() {
+    // Only recalculate if safe area changed
+    if (Screen.safeArea != lastSafeArea) {
+      ApplySafeArea();
+    }
+  }
+
+  private void ApplySafeArea() {
+    var safeArea = Screen.safeArea;
+    lastSafeArea = safeArea;
+
+    if (rootCanvas == null) {
+      rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
+      if (rootCanvas == null) {
+        return;
+      }
     }
 
-    private void Update()
-    {
-        // Only recalculate if safe area changed
-        if (Screen.safeArea != lastSafeArea)
-        {
-            ApplySafeArea();
-        }
+    // Convert safe area from screen space to canvas space
+    // For Screen Space - Overlay canvas, we need to convert pixel values to anchor values
+    var screenSize = new Vector2(Screen.width, Screen.height);
+
+    // Avoid division by zero
+    if (screenSize.x <= 0 || screenSize.y <= 0) {
+      return;
     }
 
-    private void ApplySafeArea()
-    {
-        Rect safeArea = Screen.safeArea;
-        lastSafeArea = safeArea;
+    // Convert safe area rect to anchor values (0-1 range)
+    var anchorMin = safeArea.position / screenSize;
+    var anchorMax = (safeArea.position + safeArea.size) / screenSize;
 
-        if (rootCanvas == null)
-        {
-            rootCanvas = GetComponentInParent<Canvas>()?.rootCanvas;
-            if (rootCanvas == null) return;
-        }
+    // Clamp to valid range
+    anchorMin.x = Mathf.Clamp01(anchorMin.x);
+    anchorMin.y = Mathf.Clamp01(anchorMin.y);
+    anchorMax.x = Mathf.Clamp01(anchorMax.x);
+    anchorMax.y = Mathf.Clamp01(anchorMax.y);
 
-        // Convert safe area from screen space to canvas space
-        // For Screen Space - Overlay canvas, we need to convert pixel values to anchor values
-        Vector2 screenSize = new Vector2(Screen.width, Screen.height);
-
-        // Avoid division by zero
-        if (screenSize.x <= 0 || screenSize.y <= 0) return;
-
-        // Convert safe area rect to anchor values (0-1 range)
-        Vector2 anchorMin = safeArea.position / screenSize;
-        Vector2 anchorMax = (safeArea.position + safeArea.size) / screenSize;
-
-        // Clamp to valid range
-        anchorMin.x = Mathf.Clamp01(anchorMin.x);
-        anchorMin.y = Mathf.Clamp01(anchorMin.y);
-        anchorMax.x = Mathf.Clamp01(anchorMax.x);
-        anchorMax.y = Mathf.Clamp01(anchorMax.y);
-
-        rectTransform.anchorMin = anchorMin;
-        rectTransform.anchorMax = anchorMax;
-        rectTransform.offsetMin = Vector2.zero;
-        rectTransform.offsetMax = Vector2.zero;
+    rectTransform.anchorMin = anchorMin;
+    rectTransform.anchorMax = anchorMax;
+    rectTransform.offsetMin = Vector2.zero;
+    rectTransform.offsetMax = Vector2.zero;
 
 #if UNITY_EDITOR
-        // Log only when safe area actually changes and has insets
-        if (safeArea.x > 0 || safeArea.y > 0 ||
-            safeArea.width < screenSize.x || safeArea.height < screenSize.y)
-        {
-            Debug.Log($"[Make10] SafeArea applied: {safeArea} on screen {screenSize}");
-        }
-#endif
+    // Log only when safe area actually changes and has insets
+    if (safeArea.x > 0 || safeArea.y > 0 ||
+        safeArea.width < screenSize.x || safeArea.height < screenSize.y) {
+      Debug.Log($"[Make10] SafeArea applied: {safeArea} on screen {screenSize}");
     }
+#endif
+  }
 }

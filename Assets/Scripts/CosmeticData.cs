@@ -10,6 +10,4 @@ using UnityEngine;
 /// will be added during Session P.
 /// </summary>
 [CreateAssetMenu(fileName = "CosmeticData", menuName = "Make10/Cosmetic Data", order = 0)]
-public class CosmeticData : ScriptableObject
-{
-}
+public class CosmeticData : ScriptableObject { }

@@ -6,360 +6,349 @@ using System.Collections;
 /// <summary>
 /// Handles Main Menu animations: bouncing title, scrolling banners.
 /// </summary>
-public class MainMenuUI : MonoBehaviour
-{
-    [Header("Title Animation")]
-    [SerializeField] private RectTransform titleCard;
-    [SerializeField] private float bounceHeight = 20f;
-    [SerializeField] private float bounceSpeed = 2f;
-    #pragma warning disable CS0414 // Kept for Inspector visibility, rotation removed in L0
-    [SerializeField] private float titleRotateAmount = 3f;
-    #pragma warning restore CS0414
-    
-    [Header("Banner Settings")]
-    [SerializeField] private RectTransform topBanner;
-    [SerializeField] private RectTransform topBannerDuplicate; // Second copy for seamless loop
-    [SerializeField] private RectTransform bottomBanner;
-    [SerializeField] private RectTransform bottomBannerDuplicate; // Second copy for seamless loop
-    [SerializeField] private float bannerScrollSpeed = 100f;
-    [SerializeField] private float bannerWidth = 1500f; // Width of ONE banner text
-    
-    [Header("Button References")]
-    [SerializeField] private Button playButton;         // Arcade Mode — wire to SceneFlowManager.OnPlayPressed()
-    [SerializeField] private Button zenButton;           // Zen Mode — wire to SceneFlowManager.OnZenPressed()
-    [SerializeField] private Button creditsButton;       // Credits — wire to SceneFlowManager.OnCreditsPressed()
-    [SerializeField] private Button shopButton;          // Shop (greyed out) — wire to SceneFlowManager.OnShopPressed()
-    [SerializeField] private Button optionsButton;       // Legacy — kept for backward compatibility
-    [SerializeField] private Button quitButton;          // Legacy — kept for backward compatibility
+public class MainMenuUI : MonoBehaviour {
+  [Header("Title Animation"), SerializeField] 
+  private RectTransform titleCard;
 
-    [Header("BP Display")]
-    [SerializeField] private TMP_Text bpDisplayText;     // Shows "BP: X,XXX" on main menu bottom-left
+  [SerializeField] private float bounceHeight = 20f;
+  [SerializeField] private float bounceSpeed = 2f;
+#pragma warning disable CS0414 // Kept for Inspector visibility, rotation removed in L0
+  [SerializeField] private float titleRotateAmount = 3f;
+#pragma warning restore CS0414
 
-    [Header("High Score Display")]
-    [SerializeField] private TMP_Text highScoreDisplayText;
+  [Header("Banner Settings"), SerializeField] 
+  private RectTransform topBanner;
 
-    [Header("Version Label")]
-    [Tooltip("Optional. If left empty a small muted label is created at runtime, bottom-right of this panel.")]
-    [SerializeField] private TMP_Text versionText;
+  [SerializeField] private RectTransform topBannerDuplicate; // Second copy for seamless loop
+  [SerializeField] private RectTransform bottomBanner;
+  [SerializeField] private RectTransform bottomBannerDuplicate; // Second copy for seamless loop
+  [SerializeField] private float bannerScrollSpeed = 100f;
+  [SerializeField] private float bannerWidth = 1500f; // Width of ONE banner text
 
-    private Vector2 titleStartPos;
-    private float titleStartRotation;
+  [Header("Button References"), SerializeField] 
+  private Button playButton; // Arcade Mode — wire to SceneFlowManager.OnPlayPressed()
 
-    private void Start()
-    {
-        // Store initial title position
-        if (titleCard != null)
-        {
-            titleStartPos = titleCard.anchoredPosition;
-            titleStartRotation = titleCard.localEulerAngles.z;
+  [SerializeField] private Button zenButton; // Zen Mode — wire to SceneFlowManager.OnZenPressed()
+  [SerializeField] private Button creditsButton; // Credits — wire to SceneFlowManager.OnCreditsPressed()
+  [SerializeField] private Button shopButton; // Shop (greyed out) — wire to SceneFlowManager.OnShopPressed()
+  [SerializeField] private Button optionsButton; // Legacy — kept for backward compatibility
+  [SerializeField] private Button quitButton; // Legacy — kept for backward compatibility
+
+  [Header("BP Display"), SerializeField] 
+  private TMP_Text bpDisplayText; // Shows "BP: X,XXX" on main menu bottom-left
+
+  [Header("High Score Display"), SerializeField] 
+  private TMP_Text highScoreDisplayText;
+
+  [Header("Version Label"),
+   Tooltip("Optional. If left empty a small muted label is created at runtime, bottom-right of this panel."),
+   SerializeField]
+  private TMP_Text versionText;
+
+  private Vector2 titleStartPos;
+  private float titleStartRotation;
+
+  private void Start() {
+    // Store initial title position
+    if (titleCard != null) {
+      titleStartPos = titleCard.anchoredPosition;
+      titleStartRotation = titleCard.localEulerAngles.z;
+    }
+
+    // Setup button listeners
+    SetupButtons();
+
+    // Configure shop button as greyed out
+    SetupShopButton();
+
+    // Show high score on menu
+    UpdateHighScoreDisplay();
+
+    // Show build version (Application.version, synced from version.txt by release-please)
+    SetupVersionLabel();
+
+    // Show BP currency
+    UpdateBPDisplay();
+
+    // Subscribe to BP changes so display updates after rounds
+    if (RunManager.Instance != null) {
+      RunManager.Instance.OnBPChanged += OnBPChanged;
+    }
+
+    // Start animations
+    StartCoroutine(AnimateTitle());
+  }
+
+  private void OnEnable() {
+    // Refresh high score and BP every time menu becomes visible
+    UpdateHighScoreDisplay();
+    UpdateBPDisplay();
+  }
+
+  private void OnDestroy() {
+    // Unsubscribe to prevent memory leaks
+    if (RunManager.Instance != null) {
+      RunManager.Instance.OnBPChanged -= OnBPChanged;
+    }
+  }
+
+  private void OnBPChanged (int _) {
+    UpdateBPDisplay();
+    UpdateHighScoreDisplay();
+  }
+
+  /// <summary>
+  /// Update the high score display on the main menu.
+  /// Shows BP-based high scores (total BP per round, not raw score).
+  /// </summary>
+  private void UpdateHighScoreDisplay() {
+    if (highScoreDisplayText == null) {
+      return;
+    }
+
+    // Use BP high score keys (the real player-facing score including bonuses)
+    var arcadeBestBP = PlayerPrefs.GetInt("Make10_HighScoreBP", 0);
+    var arcadeGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
+    var zenBestBP = PlayerPrefs.GetInt("Make10_ZenHighScoreBP", 0);
+    var zenGames = PlayerPrefs.GetInt("Make10_ZenTotalGames", 0);
+
+    if (arcadeGames > 0 || zenGames > 0) {
+      var display = "";
+      if (arcadeGames > 0) {
+        display += $"Arcade Best: {arcadeBestBP:N0} BP";
+      }
+
+      if (zenGames > 0) {
+        if (display.Length > 0) {
+          display += "  |  ";
         }
 
-        // Setup button listeners
-        SetupButtons();
+        display += $"Zen Best: {zenBestBP:N0} BP";
+      }
 
-        // Configure shop button as greyed out
-        SetupShopButton();
-
-        // Show high score on menu
-        UpdateHighScoreDisplay();
-
-        // Show build version (Application.version, synced from version.txt by release-please)
-        SetupVersionLabel();
-
-        // Show BP currency
-        UpdateBPDisplay();
-
-        // Subscribe to BP changes so display updates after rounds
-        if (RunManager.Instance != null)
-            RunManager.Instance.OnBPChanged += OnBPChanged;
-
-        // Start animations
-        StartCoroutine(AnimateTitle());
+      highScoreDisplayText.text = display;
+      highScoreDisplayText.gameObject.SetActive(true);
     }
-
-    private void OnEnable()
-    {
-        // Refresh high score and BP every time menu becomes visible
-        UpdateHighScoreDisplay();
-        UpdateBPDisplay();
+    else {
+      highScoreDisplayText.gameObject.SetActive(false);
     }
+  }
 
-    private void OnDestroy()
-    {
-        // Unsubscribe to prevent memory leaks
-        if (RunManager.Instance != null)
-            RunManager.Instance.OnBPChanged -= OnBPChanged;
-    }
+  private void Update() {
+    // Scroll banners continuously (seamless loop with duplicates)
+    ScrollBannerPair(topBanner, topBannerDuplicate, 1f); // Scroll right
+    ScrollBannerPair(bottomBanner, bottomBannerDuplicate, -1f); // Scroll left
+  }
 
-    private void OnBPChanged(int _)
-    {
-        UpdateBPDisplay();
-        UpdateHighScoreDisplay();
-    }
-
-    /// <summary>
-    /// Update the high score display on the main menu.
-    /// Shows BP-based high scores (total BP per round, not raw score).
-    /// </summary>
-    private void UpdateHighScoreDisplay()
-    {
-        if (highScoreDisplayText == null) return;
-
-        // Use BP high score keys (the real player-facing score including bonuses)
-        int arcadeBestBP = PlayerPrefs.GetInt("Make10_HighScoreBP", 0);
-        int arcadeGames = PlayerPrefs.GetInt("Make10_TotalGames", 0);
-        int zenBestBP = PlayerPrefs.GetInt("Make10_ZenHighScoreBP", 0);
-        int zenGames = PlayerPrefs.GetInt("Make10_ZenTotalGames", 0);
-
-        if (arcadeGames > 0 || zenGames > 0)
-        {
-            string display = "";
-            if (arcadeGames > 0)
-                display += $"Arcade Best: {arcadeBestBP:N0} BP";
-            if (zenGames > 0)
-            {
-                if (display.Length > 0) display += "  |  ";
-                display += $"Zen Best: {zenBestBP:N0} BP";
-            }
-            highScoreDisplayText.text = display;
-            highScoreDisplayText.gameObject.SetActive(true);
+  /// <summary>
+  /// Setup button click listeners.
+  /// Buttons can be wired in Inspector OR set up here in code.
+  /// Code-based wiring only runs for buttons that have a reference assigned
+  /// but no Inspector onClick events.
+  /// </summary>
+  private void SetupButtons() {
+    // Wire Zen button if assigned but not yet wired
+    if (zenButton != null && zenButton.onClick.GetPersistentEventCount() == 0) {
+      zenButton.onClick.AddListener(() => {
+        if (SceneFlowManager.Instance != null) {
+          SceneFlowManager.Instance.OnZenPressed();
         }
-        else
-        {
-            highScoreDisplayText.gameObject.SetActive(false);
-        }
-    }
-    
-    private void Update()
-    {
-        // Scroll banners continuously (seamless loop with duplicates)
-        ScrollBannerPair(topBanner, topBannerDuplicate, 1f);  // Scroll right
-        ScrollBannerPair(bottomBanner, bottomBannerDuplicate, -1f); // Scroll left
-    }
-    
-    /// <summary>
-    /// Setup button click listeners.
-    /// Buttons can be wired in Inspector OR set up here in code.
-    /// Code-based wiring only runs for buttons that have a reference assigned
-    /// but no Inspector onClick events.
-    /// </summary>
-    private void SetupButtons()
-    {
-        // Wire Zen button if assigned but not yet wired
-        if (zenButton != null && zenButton.onClick.GetPersistentEventCount() == 0)
-        {
-            zenButton.onClick.AddListener(() => {
-                if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnZenPressed();
-            });
-        }
-
-        // Wire Credits button if assigned but not yet wired
-        if (creditsButton != null && creditsButton.onClick.GetPersistentEventCount() == 0)
-        {
-            creditsButton.onClick.AddListener(() => {
-                if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnCreditsPressed();
-            });
-        }
-
-        // Wire Shop button if assigned but not yet wired
-        if (shopButton != null && shopButton.onClick.GetPersistentEventCount() == 0)
-        {
-            shopButton.onClick.AddListener(() => {
-                if (SceneFlowManager.Instance != null)
-                    SceneFlowManager.Instance.OnShopPressed();
-            });
-        }
+      });
     }
 
-    /// <summary>
-    /// Configure the shop button as greyed out with "Coming Soon" state.
-    /// </summary>
-    private void SetupShopButton()
-    {
-        if (shopButton == null) return;
-
-        // Keep tappable so the popup can show, but style it as muted
-        shopButton.interactable = true;
-
-        ColorBlock colors = shopButton.colors;
-        colors.normalColor = new Color(0.4f, 0.4f, 0.4f, 0.6f);
-        colors.highlightedColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
-        colors.pressedColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
-        shopButton.colors = colors;
-
-        // Add "Coming Soon" label if the button has a text child
-        TMP_Text buttonText = shopButton.GetComponentInChildren<TMP_Text>();
-        if (buttonText != null)
-        {
-            buttonText.text = "Shop";
-            buttonText.color = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+    // Wire Credits button if assigned but not yet wired
+    if (creditsButton != null && creditsButton.onClick.GetPersistentEventCount() == 0) {
+      creditsButton.onClick.AddListener(() => {
+        if (SceneFlowManager.Instance != null) {
+          SceneFlowManager.Instance.OnCreditsPressed();
         }
+      });
     }
 
-    /// <summary>
-    /// Update the BP currency display on the main menu.
-    /// Shows persistent spendable BP from RunManager.
-    /// </summary>
-    private void UpdateBPDisplay()
-    {
-        if (bpDisplayText == null) return;
-
-        int spendableBP = RunManager.Instance != null
-            ? RunManager.Instance.SpendableBP
-            : PlayerPrefs.GetInt("Make10_SpendableBP", 0);
-        bpDisplayText.text = $"BP: {spendableBP:N0}";
-        bpDisplayText.gameObject.SetActive(true);
-    }
-    
-    /// <summary>
-    /// Gentle idle animation for the title card.
-    /// Subtle vertical float + soft breathing scale on offset sine waves.
-    /// </summary>
-    private IEnumerator AnimateTitle()
-    {
-        // Subtle parameters — barely perceptible, keeps the menu feeling alive
-        const float floatAmount = 6f;       // pixels of vertical drift (was 20)
-        const float floatSpeed = 1.2f;      // slow, meditative pace
-        const float breatheAmount = 0.012f; // 1.2% scale variation
-        const float breatheSpeed = 0.8f;    // slightly slower than float for organic feel
-
-        while (true)
-        {
-            if (titleCard != null)
-            {
-                // Vertical float — eased sine for smooth turnaround at peaks
-                float floatT = (Mathf.Sin(Time.time * floatSpeed) + 1f) / 2f;
-                float easedFloat = AnimationUtilities.EaseInOutCubic(floatT);
-                float yOffset = Mathf.Lerp(-floatAmount, floatAmount, easedFloat);
-                titleCard.anchoredPosition = titleStartPos + new Vector2(0, yOffset);
-
-                // Breathing scale — offset phase so it doesn't sync with float
-                float breatheT = (Mathf.Sin(Time.time * breatheSpeed + 1.5f) + 1f) / 2f;
-                float scale = 1f + Mathf.Lerp(-breatheAmount, breatheAmount, breatheT);
-                titleCard.localScale = new Vector3(scale, scale, 1f);
-
-                titleCard.localEulerAngles = Vector3.zero;
-            }
-
-            yield return null;
+    // Wire Shop button if assigned but not yet wired
+    if (shopButton != null && shopButton.onClick.GetPersistentEventCount() == 0) {
+      shopButton.onClick.AddListener(() => {
+        if (SceneFlowManager.Instance != null) {
+          SceneFlowManager.Instance.OnShopPressed();
         }
+      });
     }
-    
-    /// <summary>
-    /// Scroll a banner pair horizontally for seamless looping.
-    /// When one banner scrolls off-screen, it repositions behind the other.
-    /// </summary>
-    private void ScrollBannerPair(RectTransform banner1, RectTransform banner2, float direction)
-    {
-        if (banner1 == null) return;
-        
-        // Move banner 1
-        Vector2 pos1 = banner1.anchoredPosition;
-        pos1.x += direction * bannerScrollSpeed * Time.deltaTime;
+  }
+
+  /// <summary>
+  /// Configure the shop button as greyed out with "Coming Soon" state.
+  /// </summary>
+  private void SetupShopButton() {
+    if (shopButton == null) {
+      return;
+    }
+
+    // Keep tappable so the popup can show, but style it as muted
+    shopButton.interactable = true;
+
+    var colors = shopButton.colors;
+    colors.normalColor = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+    colors.highlightedColor = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+    colors.pressedColor = new Color(0.35f, 0.35f, 0.35f, 0.6f);
+    shopButton.colors = colors;
+
+    // Add "Coming Soon" label if the button has a text child
+    var buttonText = shopButton.GetComponentInChildren<TMP_Text>();
+    if (buttonText != null) {
+      buttonText.text = "Shop";
+      buttonText.color = new Color(0.6f, 0.6f, 0.6f, 0.7f);
+    }
+  }
+
+  /// <summary>
+  /// Update the BP currency display on the main menu.
+  /// Shows persistent spendable BP from RunManager.
+  /// </summary>
+  private void UpdateBPDisplay() {
+    if (bpDisplayText == null) {
+      return;
+    }
+
+    var spendableBP = RunManager.Instance != null ?
+      RunManager.Instance.SpendableBP :
+      PlayerPrefs.GetInt("Make10_SpendableBP", 0);
+    bpDisplayText.text = $"BP: {spendableBP:N0}";
+    bpDisplayText.gameObject.SetActive(true);
+  }
+
+  /// <summary>
+  /// Gentle idle animation for the title card.
+  /// Subtle vertical float + soft breathing scale on offset sine waves.
+  /// </summary>
+  private IEnumerator AnimateTitle() {
+    // Subtle parameters — barely perceptible, keeps the menu feeling alive
+    const float floatAmount = 6f; // pixels of vertical drift (was 20)
+    const float floatSpeed = 1.2f; // slow, meditative pace
+    const float breatheAmount = 0.012f; // 1.2% scale variation
+    const float breatheSpeed = 0.8f; // slightly slower than float for organic feel
+
+    while (true) {
+      if (titleCard != null) {
+        // Vertical float — eased sine for smooth turnaround at peaks
+        var floatT = (Mathf.Sin(Time.time * floatSpeed) + 1f) / 2f;
+        var easedFloat = AnimationUtilities.EaseInOutCubic(floatT);
+        var yOffset = Mathf.Lerp(-floatAmount, floatAmount, easedFloat);
+        titleCard.anchoredPosition = titleStartPos + new Vector2(0, yOffset);
+
+        // Breathing scale — offset phase so it doesn't sync with float
+        var breatheT = (Mathf.Sin(Time.time * breatheSpeed + 1.5f) + 1f) / 2f;
+        var scale = 1f + Mathf.Lerp(-breatheAmount, breatheAmount, breatheT);
+        titleCard.localScale = new Vector3(scale, scale, 1f);
+
+        titleCard.localEulerAngles = Vector3.zero;
+      }
+
+      yield return null;
+    }
+  }
+
+  /// <summary>
+  /// Scroll a banner pair horizontally for seamless looping.
+  /// When one banner scrolls off-screen, it repositions behind the other.
+  /// </summary>
+  private void ScrollBannerPair (RectTransform banner1, RectTransform banner2, float direction) {
+    if (banner1 == null) {
+      return;
+    }
+
+    // Move banner 1
+    var pos1 = banner1.anchoredPosition;
+    pos1.x += direction * bannerScrollSpeed * Time.deltaTime;
+    banner1.anchoredPosition = pos1;
+
+    // Move banner 2 (if exists)
+    if (banner2 != null) {
+      var pos2 = banner2.anchoredPosition;
+      pos2.x += direction * bannerScrollSpeed * Time.deltaTime;
+      banner2.anchoredPosition = pos2;
+
+      // Check if either banner needs to wrap around
+      if (direction > 0) // Scrolling right
+      {
+        if (pos1.x > bannerWidth) {
+          pos1.x = pos2.x - bannerWidth;
+          banner1.anchoredPosition = pos1;
+        }
+
+        if (pos2.x > bannerWidth) {
+          pos2.x = pos1.x - bannerWidth;
+          banner2.anchoredPosition = pos2;
+        }
+      }
+      else // Scrolling left
+      {
+        if (pos1.x < -bannerWidth) {
+          pos1.x = pos2.x + bannerWidth;
+          banner1.anchoredPosition = pos1;
+        }
+
+        if (pos2.x < -bannerWidth) {
+          pos2.x = pos1.x + bannerWidth;
+          banner2.anchoredPosition = pos2;
+        }
+      }
+    }
+    else {
+      // Fallback for single banner (will have gaps)
+      if (direction > 0 && pos1.x > bannerWidth / 2f) {
+        pos1.x -= bannerWidth;
         banner1.anchoredPosition = pos1;
-        
-        // Move banner 2 (if exists)
-        if (banner2 != null)
-        {
-            Vector2 pos2 = banner2.anchoredPosition;
-            pos2.x += direction * bannerScrollSpeed * Time.deltaTime;
-            banner2.anchoredPosition = pos2;
-            
-            // Check if either banner needs to wrap around
-            if (direction > 0) // Scrolling right
-            {
-                if (pos1.x > bannerWidth)
-                {
-                    pos1.x = pos2.x - bannerWidth;
-                    banner1.anchoredPosition = pos1;
-                }
-                if (pos2.x > bannerWidth)
-                {
-                    pos2.x = pos1.x - bannerWidth;
-                    banner2.anchoredPosition = pos2;
-                }
-            }
-            else // Scrolling left
-            {
-                if (pos1.x < -bannerWidth)
-                {
-                    pos1.x = pos2.x + bannerWidth;
-                    banner1.anchoredPosition = pos1;
-                }
-                if (pos2.x < -bannerWidth)
-                {
-                    pos2.x = pos1.x + bannerWidth;
-                    banner2.anchoredPosition = pos2;
-                }
-            }
-        }
-        else
-        {
-            // Fallback for single banner (will have gaps)
-            if (direction > 0 && pos1.x > bannerWidth / 2f)
-            {
-                pos1.x -= bannerWidth;
-                banner1.anchoredPosition = pos1;
-            }
-            else if (direction < 0 && pos1.x < -bannerWidth / 2f)
-            {
-                pos1.x += bannerWidth;
-                banner1.anchoredPosition = pos1;
-            }
-        }
+      }
+      else if (direction < 0 && pos1.x < -bannerWidth / 2f) {
+        pos1.x += bannerWidth;
+        banner1.anchoredPosition = pos1;
+      }
     }
-    
-    /// <summary>
-    /// Button hover effect (optional, call from EventTrigger).
-    /// </summary>
-    public void OnButtonHover(RectTransform button)
-    {
-        if (button != null)
-        {
-            button.localScale = Vector3.one * 1.1f;
-        }
+  }
+
+  /// <summary>
+  /// Button hover effect (optional, call from EventTrigger).
+  /// </summary>
+  public void OnButtonHover (RectTransform button) {
+    if (button != null) {
+      button.localScale = Vector3.one * 1.1f;
     }
-    
-    /// <summary>
-    /// Button exit hover effect.
-    /// </summary>
-    public void OnButtonExit(RectTransform button)
-    {
-        if (button != null)
-        {
-            button.localScale = Vector3.one;
-        }
+  }
+
+  /// <summary>
+  /// Button exit hover effect.
+  /// </summary>
+  public void OnButtonExit (RectTransform button) {
+    if (button != null) {
+      button.localScale = Vector3.one;
+    }
+  }
+
+  /// <summary>
+  /// Stamps BuildStamp.Version onto the menu. Uses the inspector-assigned
+  /// label if present, otherwise creates a small muted TMP label anchored to
+  /// the bottom-right of this panel so no scene wiring is required.
+  /// </summary>
+  private void SetupVersionLabel() {
+    if (versionText == null) {
+      var go = new GameObject("VersionLabel", typeof(RectTransform));
+      go.transform.SetParent(transform, false);
+
+      var rt = go.GetComponent<RectTransform>();
+      rt.anchorMin = new Vector2(1f, 0f);
+      rt.anchorMax = new Vector2(1f, 0f);
+      rt.pivot = new Vector2(1f, 0f);
+      rt.anchoredPosition = new Vector2(-24f, 16f);
+      rt.sizeDelta = new Vector2(400f, 40f);
+
+      var tmp = go.AddComponent<TextMeshProUGUI>();
+      tmp.fontSize = UIStyleGuide.FontSizeSmall;
+      tmp.color = UIStyleGuide.ColorTextMuted;
+      tmp.alignment = TextAlignmentOptions.BottomRight;
+      tmp.raycastTarget = false;
+      versionText = tmp;
     }
 
-    /// <summary>
-    /// Stamps BuildStamp.Version onto the menu. Uses the inspector-assigned
-    /// label if present, otherwise creates a small muted TMP label anchored to
-    /// the bottom-right of this panel so no scene wiring is required.
-    /// </summary>
-    private void SetupVersionLabel()
-    {
-        if (versionText == null)
-        {
-            var go = new GameObject("VersionLabel", typeof(RectTransform));
-            go.transform.SetParent(transform, false);
-
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(1f, 0f);
-            rt.anchorMax = new Vector2(1f, 0f);
-            rt.pivot = new Vector2(1f, 0f);
-            rt.anchoredPosition = new Vector2(-24f, 16f);
-            rt.sizeDelta = new Vector2(400f, 40f);
-
-            var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.fontSize = UIStyleGuide.FontSizeSmall;
-            tmp.color = UIStyleGuide.ColorTextMuted;
-            tmp.alignment = TextAlignmentOptions.BottomRight;
-            tmp.raycastTarget = false;
-            versionText = tmp;
-        }
-
-        versionText.text = $"v{BuildStamp.Version}";
-    }
+    versionText.text = $"v{BuildStamp.Version}";
+  }
 }

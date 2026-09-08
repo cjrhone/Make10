@@ -5,273 +5,281 @@ using UnityEngine;
 /// Manages tile value weights, progressive difficulty ramp, and Tetris-style tile bag system.
 /// Extracted from GridManager to isolate tile distribution logic.
 /// </summary>
-public class TileWeightManager : MonoBehaviour
-{
-    public static TileWeightManager Instance { get; private set; }
+public class TileWeightManager : MonoBehaviour {
+  public static TileWeightManager Instance { get; private set; }
 
-    [Header("Tile Value Weights (fallback if no GameManager)")]
-    [SerializeField] private float weight0 = 0.12f;    // Grey (wildcard) — boosted for easy early 10s
-    [SerializeField] private float weight1 = 0.28f;    // Gold — boosted primary, easiest combos
-    [SerializeField] private float weight2 = 0.26f;    // Blue — dominant
-    [SerializeField] private float weight3 = 0.22f;    // Green — strong mid-range
-    [SerializeField] private float weight4 = 0.08f;    // Coral — further reduced
-    [SerializeField] private float weight5 = 0f;       // Orange — introduced by solve ramp
-    [SerializeField] private float weight6 = 0f;       // Purple — introduced by solve ramp
-    [SerializeField] private float weight7 = 0f;       // Teal — introduced by solve ramp
+  [Header("Tile Value Weights (fallback if no GameManager)"), SerializeField] 
+  private float weight0 = 0.12f; // Grey (wildcard) — boosted for easy early 10s
 
-    [Header("Progressive Difficulty - Solve-Based Ramp")]
-    [SerializeField] private int solvesFor5s = 2;               // 5s start appearing after this many solves
-    [SerializeField] private int solvesFor6s = 5;               // 6s start appearing after this many solves
-    [SerializeField] private int solvesFor7s = 8;               // 7s start appearing after this many solves
-    [SerializeField] private float maxWeight5 = 0.10f;          // Max weight for 5s at full ramp
-    [SerializeField] private float maxWeight6 = 0.06f;          // Max weight for 6s at full ramp
-    [SerializeField] private float maxWeight7 = 0.02f;          // Max weight for 7s at full ramp
-    [SerializeField] private int solvesToFullRamp = 12;          // Solves needed for all high tiles at max weight
-    [SerializeField] private float baseTileReduction = 0.85f;   // Low tiles reduce as high tiles ramp in
+  [SerializeField] private float weight1 = 0.28f; // Gold — boosted primary, easiest combos
+  [SerializeField] private float weight2 = 0.26f; // Blue — dominant
+  [SerializeField] private float weight3 = 0.22f; // Green — strong mid-range
+  [SerializeField] private float weight4 = 0.08f; // Coral — further reduced
+  [SerializeField] private float weight5 = 0f; // Orange — introduced by solve ramp
+  [SerializeField] private float weight6 = 0f; // Purple — introduced by solve ramp
+  [SerializeField] private float weight7 = 0f; // Teal — introduced by solve ramp
 
-    // Tile bag system (Tetris-style consistent distribution)
-    private List<int> tileBag = new List<int>();
-    private const int BAG_SIZE = 25;  // Refill after 25 draws
+  [Header("Progressive Difficulty - Solve-Based Ramp"), SerializeField] 
+  private int solvesFor5s = 2; // 5s start appearing after this many solves
 
-    // Cached weight array
-    private float[] weights;
+  [SerializeField] private int solvesFor6s = 5; // 6s start appearing after this many solves
+  [SerializeField] private int solvesFor7s = 8; // 7s start appearing after this many solves
+  [SerializeField] private float maxWeight5 = 0.10f; // Max weight for 5s at full ramp
+  [SerializeField] private float maxWeight6 = 0.06f; // Max weight for 6s at full ramp
+  [SerializeField] private float maxWeight7 = 0.02f; // Max weight for 7s at full ramp
+  [SerializeField] private int solvesToFullRamp = 12; // Solves needed for all high tiles at max weight
+  [SerializeField] private float baseTileReduction = 0.85f; // Low tiles reduce as high tiles ramp in
 
-    private void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
+  // Tile bag system (Tetris-style consistent distribution)
+  private List<int> tileBag = new();
+  private const int BAG_SIZE = 25; // Refill after 25 draws
 
-        weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, weight7, 0f, 0f };
+  // Cached weight array
+  private float[] weights;
+
+  private void Awake() {
+    if (Instance != null && Instance != this) {
+      Destroy(gameObject);
+      return;
     }
 
-    /// <summary>
-    /// Draw the next tile value from the bag. Refills bag when empty.
-    /// </summary>
-    public int GetWeightedRandomValue()
-    {
-        if (tileBag.Count == 0)
-            RefillTileBag();
+    Instance = this;
 
-        int value = tileBag[tileBag.Count - 1];
-        tileBag.RemoveAt(tileBag.Count - 1);
-        return value;
+    weights = new float[] { weight0, weight1, weight2, weight3, weight4, weight5, weight6, weight7, 0f, 0f };
+  }
+
+  /// <summary>
+  /// Draw the next tile value from the bag. Refills bag when empty.
+  /// </summary>
+  public int GetWeightedRandomValue() {
+    if (tileBag.Count == 0) {
+      RefillTileBag();
     }
 
-    /// <summary>
-    /// Clear the tile bag (used on grid reset / new round).
-    /// </summary>
-    public void ClearBag()
-    {
-        tileBag.Clear();
+    var value = tileBag[tileBag.Count - 1];
+    tileBag.RemoveAt(tileBag.Count - 1);
+    return value;
+  }
+
+  /// <summary>
+  /// Clear the tile bag (used on grid reset / new round).
+  /// </summary>
+  public void ClearBag() {
+    tileBag.Clear();
+  }
+
+  /// <summary>
+  /// Get current bag contents for save/resume. Returns remaining tile values.
+  /// </summary>
+  public int[] GetBagContents() {
+    return tileBag.ToArray();
+  }
+
+  /// <summary>
+  /// Restore bag contents from saved data.
+  /// </summary>
+  public void RestoreBag (int[] contents) {
+    tileBag.Clear();
+    if (contents != null) {
+      tileBag.AddRange(contents);
+    }
+  }
+
+  /// <summary>
+  /// Calculate the current adjusted weights based on mode, solve/match count, and progressive ramp.
+  /// Arcade: solve-based ramp introducing 5s, 6s, 7s gradually.
+  /// Zen: 7-tier match-based ramp widening the full tile range.
+  /// </summary>
+  private float[] GetAdjustedWeights() {
+    // Branch by game mode
+    if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen) {
+      return GetZenAdjustedWeights();
     }
 
-    /// <summary>
-    /// Get current bag contents for save/resume. Returns remaining tile values.
-    /// </summary>
-    public int[] GetBagContents()
-    {
-        return tileBag.ToArray();
+    return GetArcadeAdjustedWeights();
+  }
+
+  /// <summary>
+  /// Arcade difficulty ramp: solve-based, gradually introduces 5s/6s/7s.
+  /// </summary>
+  private float[] GetArcadeAdjustedWeights() {
+    var solves = GameManager.Instance != null ? GameManager.Instance.SolveCount : 0;
+
+    // Get base weights from GameManager or fallback (0-4 have weight, 5-7 start at 0)
+    var currentWeights = GetCurrentWeights();
+
+    // Build adjusted weight array (always 10 elements for tiles 0-9)
+    var adjustedWeights = new float[10];
+    for (var i = 0; i < adjustedWeights.Length && i < currentWeights.Length; i++) {
+      adjustedWeights[i] = currentWeights[i];
     }
 
-    /// <summary>
-    /// Restore bag contents from saved data.
-    /// </summary>
-    public void RestoreBag(int[] contents)
-    {
-        tileBag.Clear();
-        if (contents != null)
-        {
-            tileBag.AddRange(contents);
-        }
+    // Solve-based ramp: high tiles (5, 6, 7) gradually introduced as player clears matches
+    var rampProgress = Mathf.Clamp01((float)solves / solvesToFullRamp);
+
+    // 5s: appear after solvesFor5s, ramp to maxWeight5
+    if (solves >= solvesFor5s) {
+      var t5 = Mathf.Clamp01((float)(solves - solvesFor5s) / (solvesToFullRamp - solvesFor5s));
+      adjustedWeights[5] = Mathf.Lerp(0.02f, maxWeight5, t5);
     }
 
-    /// <summary>
-    /// Calculate the current adjusted weights based on mode, solve/match count, and progressive ramp.
-    /// Arcade: solve-based ramp introducing 5s, 6s, 7s gradually.
-    /// Zen: 7-tier match-based ramp widening the full tile range.
-    /// </summary>
-    private float[] GetAdjustedWeights()
-    {
-        // Branch by game mode
-        if (GameManager.Instance != null && GameManager.Instance.CurrentMode == GameManager.GameMode.Zen)
-            return GetZenAdjustedWeights();
-
-        return GetArcadeAdjustedWeights();
+    // 6s: appear after solvesFor6s, ramp to maxWeight6
+    if (solves >= solvesFor6s) {
+      var t6 = Mathf.Clamp01((float)(solves - solvesFor6s) / (solvesToFullRamp - solvesFor6s));
+      adjustedWeights[6] = Mathf.Lerp(0.01f, maxWeight6, t6);
     }
 
-    /// <summary>
-    /// Arcade difficulty ramp: solve-based, gradually introduces 5s/6s/7s.
-    /// </summary>
-    private float[] GetArcadeAdjustedWeights()
-    {
-        int solves = GameManager.Instance != null ? GameManager.Instance.SolveCount : 0;
-
-        // Get base weights from GameManager or fallback (0-4 have weight, 5-7 start at 0)
-        float[] currentWeights = GetCurrentWeights();
-
-        // Build adjusted weight array (always 10 elements for tiles 0-9)
-        float[] adjustedWeights = new float[10];
-        for (int i = 0; i < adjustedWeights.Length && i < currentWeights.Length; i++)
-        {
-            adjustedWeights[i] = currentWeights[i];
-        }
-
-        // Solve-based ramp: high tiles (5, 6, 7) gradually introduced as player clears matches
-        float rampProgress = Mathf.Clamp01((float)solves / solvesToFullRamp);
-
-        // 5s: appear after solvesFor5s, ramp to maxWeight5
-        if (solves >= solvesFor5s)
-        {
-            float t5 = Mathf.Clamp01((float)(solves - solvesFor5s) / (solvesToFullRamp - solvesFor5s));
-            adjustedWeights[5] = Mathf.Lerp(0.02f, maxWeight5, t5);
-        }
-
-        // 6s: appear after solvesFor6s, ramp to maxWeight6
-        if (solves >= solvesFor6s)
-        {
-            float t6 = Mathf.Clamp01((float)(solves - solvesFor6s) / (solvesToFullRamp - solvesFor6s));
-            adjustedWeights[6] = Mathf.Lerp(0.01f, maxWeight6, t6);
-        }
-
-        // 7s: appear after solvesFor7s, ramp to maxWeight7
-        if (solves >= solvesFor7s)
-        {
-            float t7 = Mathf.Clamp01((float)(solves - solvesFor7s) / (solvesToFullRamp - solvesFor7s));
-            adjustedWeights[7] = Mathf.Lerp(0.005f, maxWeight7, t7);
-        }
-
-        // Gently reduce base tiles (0-4) as high tiles ramp in, keeping board playable
-        float reduction = Mathf.Lerp(1.0f, baseTileReduction, rampProgress);
-        for (int i = 0; i <= 4; i++)
-        {
-            adjustedWeights[i] *= reduction;
-        }
-
-        return adjustedWeights;
+    // 7s: appear after solvesFor7s, ramp to maxWeight7
+    if (solves >= solvesFor7s) {
+      var t7 = Mathf.Clamp01((float)(solves - solvesFor7s) / (solvesToFullRamp - solvesFor7s));
+      adjustedWeights[7] = Mathf.Lerp(0.005f, maxWeight7, t7);
     }
 
-    /// <summary>
-    /// Zen difficulty ramp: 7 tiers based on cumulative match count.
-    /// Each tier widens the tile value range, creating progressive pressure.
-    /// Matches the prototype's difficulty design (make10zen_v6.jsx).
-    /// </summary>
-    private float[] GetZenAdjustedWeights()
-    {
-        int matches = GameManager.Instance != null ? GameManager.Instance.ZenMatchCount : 0;
-        var (minTile, maxTile, _) = GetZenDifficulty(matches);
-
-        // Build uniform-ish weights for the active tile range
-        float[] adjustedWeights = new float[10];
-        for (int i = minTile; i <= maxTile; i++)
-        {
-            // Base weight — lower tiles slightly more common for playability
-            if (i <= 4)
-                adjustedWeights[i] = 0.15f;
-            else
-                adjustedWeights[i] = 0.10f;
-        }
-
-        // Special case: "mastery" tier (90+ matches) drops 0s entirely
-        if (matches >= 90)
-            adjustedWeights[0] = 0f;
-
-        return adjustedWeights;
+    // Gently reduce base tiles (0-4) as high tiles ramp in, keeping board playable
+    var reduction = Mathf.Lerp(1.0f, baseTileReduction, rampProgress);
+    for (var i = 0; i <= 4; i++) {
+      adjustedWeights[i] *= reduction;
     }
 
-    /// <summary>
-    /// Get the Zen difficulty tier for a given match count.
-    /// Returns (minTile, maxTile, label) defining the active tile value range.
-    /// </summary>
-    public (int minTile, int maxTile, string label) GetZenDifficulty(int matchCount)
+    return adjustedWeights;
+  }
+
+  /// <summary>
+  /// Zen difficulty ramp: 7 tiers based on cumulative match count.
+  /// Each tier widens the tile value range, creating progressive pressure.
+  /// Matches the prototype's difficulty design (make10zen_v6.jsx).
+  /// </summary>
+  private float[] GetZenAdjustedWeights() {
+    var matches = GameManager.Instance != null ? GameManager.Instance.ZenMatchCount : 0;
+    var (minTile, maxTile, _) = GetZenDifficulty(matches);
+
+    // Build uniform-ish weights for the active tile range
+    var adjustedWeights = new float[10];
+    for (var i = minTile; i <= maxTile; i++)
+      // Base weight — lower tiles slightly more common for playability
     {
-        if (matchCount >= 90) return (1, 9, "mastery");
-        if (matchCount >= 65) return (0, 9, "deep");
-        if (matchCount >= 45) return (0, 8, "focused");
-        if (matchCount >= 30) return (0, 7, "rising");
-        if (matchCount >= 18) return (0, 6, "steady");
-        if (matchCount >= 8)  return (0, 5, "gentle");
-        return (0, 4, "calm");
+      if (i <= 4) {
+        adjustedWeights[i] = 0.15f;
+      }
+      else {
+        adjustedWeights[i] = 0.10f;
+      }
     }
 
-    /// <summary>
-    /// Refill the tile bag with BAG_SIZE tiles distributed according to current weights.
-    /// Tetris-style: guarantees consistent distribution over every 25 draws.
-    /// </summary>
-    private void RefillTileBag()
-    {
-        tileBag.Clear();
-
-        float[] adjustedWeights = GetAdjustedWeights();
-
-        float totalWeight = 0f;
-        for (int i = 0; i < adjustedWeights.Length; i++)
-            totalWeight += adjustedWeights[i];
-
-        if (totalWeight <= 0f)
-        {
-            // Fallback: fill bag with easy tiles only
-            for (int i = 0; i < BAG_SIZE; i++)
-                tileBag.Add(Random.Range(0, 5));
-        }
-        else
-        {
-            // Largest-remainder rounding: floor every bucket, then hand the leftover
-            // slots to the buckets with the biggest fractional parts. Always yields
-            // exactly BAG_SIZE tiles and never over-represents a single value the way
-            // RoundToInt + "pad with heaviest tile" did.
-            int n = adjustedWeights.Length;
-            int[] counts = new int[n];
-            float[] remainders = new float[n];
-            int placed = 0;
-
-            for (int i = 0; i < n; i++)
-            {
-                float exact = adjustedWeights[i] / totalWeight * BAG_SIZE;
-                counts[i] = Mathf.FloorToInt(exact);
-                remainders[i] = exact - counts[i];
-                placed += counts[i];
-            }
-
-            while (placed < BAG_SIZE)
-            {
-                int best = 0;
-                for (int i = 1; i < n; i++)
-                    if (remainders[i] > remainders[best]) best = i;
-                counts[best]++;
-                remainders[best] = -1f; // consumed
-                placed++;
-            }
-
-            for (int i = 0; i < n; i++)
-                for (int j = 0; j < counts[i]; j++)
-                    tileBag.Add(i);
-        }
-
-        // Fisher-Yates shuffle
-        for (int i = tileBag.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            int temp = tileBag[i];
-            tileBag[i] = tileBag[j];
-            tileBag[j] = temp;
-        }
+    // Special case: "mastery" tier (90+ matches) drops 0s entirely
+    if (matches >= 90) {
+      adjustedWeights[0] = 0f;
     }
 
-    /// <summary>
-    /// Get tile spawn weights from GameManager (difficulty-based) or use fallback.
-    /// </summary>
-    private float[] GetCurrentWeights()
-    {
-        if (GameManager.Instance != null)
-        {
-            return GameManager.Instance.GetCurrentWeights();
+    return adjustedWeights;
+  }
+
+  /// <summary>
+  /// Get the Zen difficulty tier for a given match count.
+  /// Returns (minTile, maxTile, label) defining the active tile value range.
+  /// </summary>
+  public (int minTile, int maxTile, string label) GetZenDifficulty (int matchCount) {
+    if (matchCount >= 90) {
+      return (1, 9, "mastery");
+    }
+
+    if (matchCount >= 65) {
+      return (0, 9, "deep");
+    }
+
+    if (matchCount >= 45) {
+      return (0, 8, "focused");
+    }
+
+    if (matchCount >= 30) {
+      return (0, 7, "rising");
+    }
+
+    if (matchCount >= 18) {
+      return (0, 6, "steady");
+    }
+
+    if (matchCount >= 8) {
+      return (0, 5, "gentle");
+    }
+
+    return (0, 4, "calm");
+  }
+
+  /// <summary>
+  /// Refill the tile bag with BAG_SIZE tiles distributed according to current weights.
+  /// Tetris-style: guarantees consistent distribution over every 25 draws.
+  /// </summary>
+  private void RefillTileBag() {
+    tileBag.Clear();
+
+    var adjustedWeights = GetAdjustedWeights();
+
+    var totalWeight = 0f;
+    for (var i = 0; i < adjustedWeights.Length; i++) {
+      totalWeight += adjustedWeights[i];
+    }
+
+    if (totalWeight <= 0f) {
+      // Fallback: fill bag with easy tiles only
+      for (var i = 0; i < BAG_SIZE; i++) {
+        tileBag.Add(Random.Range(0, 5));
+      }
+    }
+    else {
+      // Largest-remainder rounding: floor every bucket, then hand the leftover
+      // slots to the buckets with the biggest fractional parts. Always yields
+      // exactly BAG_SIZE tiles and never over-represents a single value the way
+      // RoundToInt + "pad with heaviest tile" did.
+      var n = adjustedWeights.Length;
+      var counts = new int[n];
+      var remainders = new float[n];
+      var placed = 0;
+
+      for (var i = 0; i < n; i++) {
+        var exact = adjustedWeights[i] / totalWeight * BAG_SIZE;
+        counts[i] = Mathf.FloorToInt(exact);
+        remainders[i] = exact - counts[i];
+        placed += counts[i];
+      }
+
+      while (placed < BAG_SIZE) {
+        var best = 0;
+        for (var i = 1; i < n; i++) {
+          if (remainders[i] > remainders[best]) {
+            best = i;
+          }
         }
 
-        // Fallback to serialized weights (for testing without GameManager)
-        return weights;
+        counts[best]++;
+        remainders[best] = -1f; // consumed
+        placed++;
+      }
+
+      for (var i = 0; i < n; i++)
+      for (var j = 0; j < counts[i]; j++) {
+        tileBag.Add(i);
+      }
     }
+
+    // Fisher-Yates shuffle
+    for (var i = tileBag.Count - 1; i > 0; i--) {
+      var j = Random.Range(0, i + 1);
+      var temp = tileBag[i];
+      tileBag[i] = tileBag[j];
+      tileBag[j] = temp;
+    }
+  }
+
+  /// <summary>
+  /// Get tile spawn weights from GameManager (difficulty-based) or use fallback.
+  /// </summary>
+  private float[] GetCurrentWeights() {
+    if (GameManager.Instance != null) {
+      return GameManager.Instance.GetCurrentWeights();
+    }
+
+    // Fallback to serialized weights (for testing without GameManager)
+    return weights;
+  }
 }
