@@ -214,7 +214,7 @@ public class UIManager : MonoBehaviour
         gameManager.OnHotStreakTimerChanged += HandleHotStreakTimerChanged;
 
         if (gridManager == null)
-            gridManager = FindFirstObjectByType<GridManager>();
+            gridManager = FindAnyObjectByType<GridManager>();
 
         if (gridManager != null)
             gridManager.OnGridUnsolvable += HandleGridUnsolvable;

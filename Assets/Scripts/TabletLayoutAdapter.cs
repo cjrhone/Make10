@@ -251,7 +251,7 @@ public class TabletLayoutAdapter : MonoBehaviour
     /// </summary>
     private void RefreshGridManager()
     {
-        if (gridManager == null) gridManager = FindObjectOfType<GridManager>();
+        if (gridManager == null) gridManager = FindAnyObjectByType<GridManager>();
         if (gridManager != null) gridManager.RecalculateSizesFromContainer();
     }
 }

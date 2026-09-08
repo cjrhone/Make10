@@ -857,7 +857,7 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
     /// </summary>
     public static void RefreshAllEnhancedStatus()
     {
-        Tile[] allTiles = FindObjectsByType<Tile>(FindObjectsSortMode.None);
+        Tile[] allTiles = FindObjectsByType<Tile>();
         foreach (Tile tile in allTiles)
         {
             tile.RefreshEnhancedStatus();

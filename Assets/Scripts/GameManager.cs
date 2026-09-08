@@ -87,6 +87,17 @@ public class GameManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private UIManager uiManager;
 
+    // GridManager is not a singleton. Cache it lazily instead of FindAnyObjectByType per call.
+    private GridManager gridManagerCache;
+    private GridManager Grid
+    {
+        get
+        {
+            if (gridManagerCache == null) gridManagerCache = FindAnyObjectByType<GridManager>();
+            return gridManagerCache;
+        }
+    }
+
     [Header("Zen Mode Settings")]
     [SerializeField] private float zenGameDuration = 300f;  // 5 minutes
     [SerializeField] private float zenFailedSwapPenalty = 3f; // Seconds deducted on bad swap
@@ -428,7 +439,7 @@ public class GameManager : MonoBehaviour
         ResetRoundState(gameDuration);
         NotifyUIOfReset();
 
-        GridManager gridManager = FindFirstObjectByType<GridManager>();
+        GridManager gridManager = Grid;
         if (gridManager != null)
         {
             gridManager.ResetGame();
@@ -773,7 +784,7 @@ public class GameManager : MonoBehaviour
         IsGameActive = false;
 
         // Freeze the grid immediately to stop any in-progress cascades
-        GridManager gm = FindFirstObjectByType<GridManager>();
+        GridManager gm = Grid;
         gm?.FreezeGrid();
 
         // Use mode-appropriate persistence keys
@@ -863,7 +874,7 @@ public class GameManager : MonoBehaviour
         save.zenChainCount = zenChainCount;
 
         // Grid state from GridManager
-        GridManager gm = FindFirstObjectByType<GridManager>();
+        GridManager gm = Grid;
         if (gm != null)
         {
             gm.SaveGridToData(save);
@@ -1029,7 +1040,7 @@ public class GameManager : MonoBehaviour
         IsGameActive = false;
 
         // Freeze the grid
-        GridManager gm = FindFirstObjectByType<GridManager>();
+        GridManager gm = Grid;
         gm?.FreezeGrid();
 
         // Track total games

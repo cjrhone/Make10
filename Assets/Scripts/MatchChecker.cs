@@ -19,7 +19,7 @@ public class MatchChecker : MonoBehaviour
     {
         if (gridManager == null)
         {
-            gridManager = FindFirstObjectByType<GridManager>();
+            gridManager = FindAnyObjectByType<GridManager>();
         }
     }
 

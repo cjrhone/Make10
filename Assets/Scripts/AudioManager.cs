@@ -174,7 +174,7 @@ public class AudioManager : MonoBehaviour
     
     private void ValidateAudioListener()
     {
-        var listener = FindFirstObjectByType<AudioListener>();
+        var listener = FindAnyObjectByType<AudioListener>();
         if (listener == null)
             Debug.LogError("AudioManager: No AudioListener found! Audio won't play.");
         else
