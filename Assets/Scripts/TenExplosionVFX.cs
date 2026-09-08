@@ -10,39 +10,38 @@ using System.Collections.Generic;
 public class TenExplosionVFX : MonoBehaviour {
   public static TenExplosionVFX Instance { get; private set; }
 
-  [Header("References"), SerializeField] 
-  private RectTransform particleContainer;
+  [Header("References"), SerializeField] private RectTransform particleContainer;
 
-  [Header("Timing"), SerializeField]  private float explosionDuration = 0.35f;
+  [Header("Timing"), SerializeField] private float explosionDuration = 0.35f;
   [SerializeField] private float pauseDuration = 0.1f;
   [SerializeField] private float collectionDuration = 0.5f;
 
-  [Header("Explosion Settings"), SerializeField] 
+  [Header("Explosion Settings"), SerializeField]
   private float explosionRadius = 180f;
 
   [SerializeField] private float explosionDecay = 3f; // Exponential decay rate
   [SerializeField] private Vector2 forceMultiplierRange = new(0.7f, 1.3f); // Min/max force variation
 
-  [Header("Small Particle Settings"), SerializeField] 
+  [Header("Small Particle Settings"), SerializeField]
   private Vector2 smallSizeRange = new(24f, 34f);
 
   [SerializeField] private Color smallParticleColor = new(1f, 0.95f, 0.65f); // Bright Gold
   [SerializeField] private float smallRotationSpeed = 150f;
 
-  [Header("Big Particle Settings"), SerializeField] 
+  [Header("Big Particle Settings"), SerializeField]
   private Vector2 bigSizeRange = new(48f, 62f);
 
   [SerializeField] private Color bigParticleColor = new(0.85f, 0.55f, 1f); // Bright Purple
   [SerializeField] private float bigRotationSpeed = 75f;
 
-  [Header("Collection Settings"), SerializeField] 
+  [Header("Collection Settings"), SerializeField]
   private float collectionStaggerSmall = 0.03f;
 
   [SerializeField] private float collectionStaggerBig = 0.08f;
   [SerializeField] private float arrivalRandomness = 0.15f; // Random variation in arrival time (0-1)
   [SerializeField] private float shrinkOnApproach = 0.6f; // Final scale when hitting target
 
-  [Header("Bounce Settings"), SerializeField] 
+  [Header("Bounce Settings"), SerializeField]
   private float smallBounceSubtle = 1.04f;
 
   [SerializeField] private float smallBounceMedium = 1.06f;
@@ -50,12 +49,12 @@ public class TenExplosionVFX : MonoBehaviour {
   [SerializeField] private float bigBounceScale = 1.15f;
   [SerializeField] private float bounceDuration = 0.08f;
 
-  [Header("Glow Settings"), SerializeField] 
+  [Header("Glow Settings"), SerializeField]
   private float glowSizeMultiplier = 2.2f;
 
   [SerializeField] private float glowAlpha = 0.55f;
 
-  [Header("Impact Flash Settings"), SerializeField] 
+  [Header("Impact Flash Settings"), SerializeField]
   private float flashSize = 50f;
 
   [SerializeField] private float flashDuration = 0.18f;

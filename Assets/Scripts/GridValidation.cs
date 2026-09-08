@@ -9,7 +9,7 @@ using UnityEngine;
 public class GridValidation : MonoBehaviour {
   public static GridValidation Instance { get; private set; }
 
-  [Header("Consecutive 10s Scaling"), SerializeField] 
+  [Header("Consecutive 10s Scaling"), SerializeField]
   private float baseTenScale = 1f;
 
   [SerializeField] private float tenScaleIncrement = 0.15f; // Scale increase per consecutive 10

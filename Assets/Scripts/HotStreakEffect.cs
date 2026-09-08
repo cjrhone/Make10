@@ -14,13 +14,13 @@ using System.Collections.Generic;
 /// The panel will appear wherever you position it in the editor.
 /// </summary>
 public class HotStreakEffect : MonoBehaviour {
-  [Header("References (auto-found if empty)"), SerializeField] 
+  [Header("References (auto-found if empty)"), SerializeField]
   private RectTransform panelTransform;
 
   [SerializeField] private TMP_Text multiplierText;
   [SerializeField] private Image barFillImage;
 
-  [Header("Flame Settings"), SerializeField] 
+  [Header("Flame Settings"), SerializeField]
   private int baseFlameCount = 8;
 
   [SerializeField] private int maxFlameCount = 20;
@@ -30,7 +30,7 @@ public class HotStreakEffect : MonoBehaviour {
   [SerializeField] private float flameWobbleAmount = 15f;
   [SerializeField] private Vector2 flameSizeRange = new(12f, 24f);
 
-  [Header("Ember Settings"), SerializeField] 
+  [Header("Ember Settings"), SerializeField]
   private int baseEmberCount = 4;
 
   [SerializeField] private int maxEmberCount = 12;
@@ -40,14 +40,14 @@ public class HotStreakEffect : MonoBehaviour {
   [SerializeField] private float emberDriftAmount = 30f;
   [SerializeField] private Vector2 emberSizeRange = new(4f, 8f);
 
-  [Header("Panel Float Settings"), SerializeField] 
+  [Header("Panel Float Settings"), SerializeField]
   private float floatAmount = 6f;
 
   [SerializeField] private float floatSpeed = 3f;
   [SerializeField] private float shakeIntensity = 2f;
   [SerializeField] private float shakeSpeed = 25f;
 
-  [Header("Color Settings"), SerializeField] 
+  [Header("Color Settings"), SerializeField]
   private Color flameCore = new(1f, 0.95f, 0.4f);
 
   [SerializeField] private Color flameMid = new(1f, 0.5f, 0.1f);

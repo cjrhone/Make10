@@ -10,7 +10,7 @@ using System.Collections;
 public class SceneFlowManager : MonoBehaviour {
   public static SceneFlowManager Instance { get; private set; }
 
-  [Header("Panels"), SerializeField]  private RectTransform loadingPanel;
+  [Header("Panels"), SerializeField] private RectTransform loadingPanel;
   [SerializeField] private RectTransform mainMenuPanel;
   [SerializeField] private RectTransform optionsPanel;
   [SerializeField] private RectTransform gamePanel;
@@ -19,24 +19,23 @@ public class SceneFlowManager : MonoBehaviour {
   [SerializeField] private RectTransform countdownPanel;
   [SerializeField] private RectTransform quitPanel;
 
-  [Header("Transition Settings"), SerializeField] 
+  [Header("Transition Settings"), SerializeField]
   private float transitionDuration = 0.4f;
 
   [SerializeField] private AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
-  [Header("Loading Settings"), SerializeField] 
+  [Header("Loading Settings"), SerializeField]
   private Slider loadingProgressBar;
 
   [SerializeField] private float minLoadDuration = 1.5f; // Minimum time to show loading (for VFX)
   [SerializeField] private float progressSmoothSpeed = 3f; // How fast progress bar catches up
 
-  [Header("Countdown Settings"), SerializeField] 
+  [Header("Countdown Settings"), SerializeField]
   private TMP_Text countdownText;
 
   [SerializeField] private float countdownStepDuration = 0.7f;
 
-  [Header("References"), SerializeField] 
-  private Canvas mainCanvas;
+  [Header("References"), SerializeField] private Canvas mainCanvas;
 
   // Screen dimensions for transition calculations
   private float screenWidth;

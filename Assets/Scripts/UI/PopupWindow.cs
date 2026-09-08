@@ -51,7 +51,7 @@ public class PopupWindow : MonoBehaviour {
     AutoSize
   }
 
-  [Header("Window Settings"), SerializeField] 
+  [Header("Window Settings"), SerializeField]
   private string windowTitle = "Window Title";
 
   [SerializeField] private WindowSize sizePreset = WindowSize.Medium;
@@ -62,34 +62,34 @@ public class PopupWindow : MonoBehaviour {
    SerializeField]
   private float autoSizeWidth = 800f;
 
-  [Tooltip("Minimum height for auto-sizing window"), SerializeField] 
+  [Tooltip("Minimum height for auto-sizing window"), SerializeField]
   private float autoSizeMinHeight = 300f;
 
-  [Tooltip("Maximum height for auto-sizing window (0 = no limit)"), SerializeField] 
+  [Tooltip("Maximum height for auto-sizing window (0 = no limit)"), SerializeField]
   private float autoSizeMaxHeight = 1400f;
 
-  [Tooltip("Extra padding added to content height"), SerializeField] 
+  [Tooltip("Extra padding added to content height"), SerializeField]
   private float autoSizePadding = 60f;
 
   [Header("Scrollbar Settings"), Tooltip("Show a visible scrollbar when content exceeds window height"), SerializeField]
   private bool showScrollbar = true;
 
-  [Tooltip("Width of the scrollbar in pixels"), SerializeField] 
+  [Tooltip("Width of the scrollbar in pixels"), SerializeField]
   private float scrollbarWidth = 20f;
 
-  [Tooltip("Color of the scrollbar background track"), SerializeField] 
+  [Tooltip("Color of the scrollbar background track"), SerializeField]
   private Color scrollbarTrackColor = new(0.1f, 0.1f, 0.15f, 0.8f);
 
-  [Tooltip("Color of the draggable scrollbar handle"), SerializeField] 
+  [Tooltip("Color of the draggable scrollbar handle"), SerializeField]
   private Color scrollbarHandleColor = new(0.5f, 0.45f, 0.6f, 1f);
 
-  [Tooltip("Color of the handle when hovered/pressed"), SerializeField] 
+  [Tooltip("Color of the handle when hovered/pressed"), SerializeField]
   private Color scrollbarHandleHoverColor = new(0.65f, 0.6f, 0.75f, 1f);
 
-  [Tooltip("Padding between scrollbar and content"), SerializeField] 
+  [Tooltip("Padding between scrollbar and content"), SerializeField]
   private float scrollbarPadding = 8f;
 
-  [Header("References (Auto-created if null)"), SerializeField] 
+  [Header("References (Auto-created if null)"), SerializeField]
   private GameObject darkBackground;
 
   [SerializeField] private GameObject windowContainer;

@@ -8,7 +8,7 @@ using System.Collections.Generic;
 /// Grid size is dynamically set based on difficulty.
 /// </summary>
 public class GridManager : MonoBehaviour {
-  [Header("Grid Settings"), SerializeField] 
+  [Header("Grid Settings"), SerializeField]
   private int gridWidth = 5;
 
   [SerializeField] private int gridHeight = 5;
@@ -18,7 +18,7 @@ public class GridManager : MonoBehaviour {
   [SerializeField] private float baseFontSize = 72f; // Base font size at reference size
 #pragma warning restore CS0414
 
-  [Header("Editor Preview"), SerializeField] 
+  [Header("Editor Preview"), SerializeField]
   private Color editorGridLineColor = new(1f, 1f, 0f, 0.5f);
 
   [SerializeField] private bool showGridLinesInEditor = true;
@@ -28,36 +28,35 @@ public class GridManager : MonoBehaviour {
   private float tileSpacing;
   private float scaleFactor = 1f; // Container size / reference size
 
-  [Header("References"), SerializeField] 
-  private GameObject tilePrefab;
+  [Header("References"), SerializeField] private GameObject tilePrefab;
 
   [SerializeField] private RectTransform gridContainer;
   public MatchChecker matchChecker;
 
-  [Header("Animation Settings"), SerializeField] 
+  [Header("Animation Settings"), SerializeField]
   private float tileFallSpeed = 1600f;
 
   [SerializeField] private float tileSwapDuration = 0.15f;
   [SerializeField] private float unsolvableResetDelay = 1f;
 
-  [Header("Solve Animation Settings"), SerializeField] 
+  [Header("Solve Animation Settings"), SerializeField]
   private float solveConvergeDuration = 0.3f;
 
   [SerializeField] private float solveShowTenDuration = 0.4f;
   [SerializeField] private float convergeShrinkAmount = 0.7f;
   [SerializeField] private GameObject tenTextPrefab;
 
-  [Header("Ten Effect Magic Settings"), SerializeField] 
+  [Header("Ten Effect Magic Settings"), SerializeField]
   private int sparkleCount = 12;
 
   [SerializeField] private float burstRingCount = 2;
   [SerializeField] private Color tenGlowColor = new(1f, 0.9f, 0.3f);
   [SerializeField] private Color sparkleColor = new(1f, 0.95f, 0.6f);
 
-  [Header("Managers"), SerializeField]  private GridValidation gridValidation;
+  [Header("Managers"), SerializeField] private GridValidation gridValidation;
   [SerializeField] private TileWeightManager tileWeightManager;
 
-  [Header("Hint System"), SerializeField] 
+  [Header("Hint System"), SerializeField]
   private HintSystem.Settings hintSettings = new();
 
   private Tile[,] grid;

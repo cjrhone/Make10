@@ -8,38 +8,37 @@ using System.Collections.Generic;
 /// Features: particle trail, shimmer waves, glow pulse, color shifting, completion burst.
 /// </summary>
 public class LoadingBarVFX : MonoBehaviour {
-  [Header("References"), SerializeField] 
-  private Slider progressSlider;
+  [Header("References"), SerializeField] private Slider progressSlider;
 
   [SerializeField] private Image fillImage;
   [SerializeField] private RectTransform fillArea;
 
-  [Header("Particle Trail Settings"), SerializeField] 
+  [Header("Particle Trail Settings"), SerializeField]
   private int particleCount = 8;
 
   [SerializeField] private float particleSize = 12f;
   [SerializeField] private float particleTrailLength = 30f;
   [SerializeField] private Color particleColor = new(1f, 1f, 0.8f, 0.9f);
 
-  [Header("Shimmer Wave Settings"), SerializeField] 
+  [Header("Shimmer Wave Settings"), SerializeField]
   private float shimmerSpeed = 3f;
 
   [SerializeField] private float shimmerIntensity = 0.3f;
   [SerializeField] private int shimmerWaveCount = 2;
 
-  [Header("Glow Pulse Settings"), SerializeField] 
+  [Header("Glow Pulse Settings"), SerializeField]
   private float glowPulseSpeed = 2f;
 
   [SerializeField] private float glowMinIntensity = 0.5f;
   [SerializeField] private float glowMaxIntensity = 1.2f;
 
-  [Header("Color Gradient"), SerializeField] 
+  [Header("Color Gradient"), SerializeField]
   private Color startColor = new(0.2f, 0.6f, 1f);
 
   [SerializeField] private Color midColor = new(0.4f, 0.9f, 0.5f);
   [SerializeField] private Color endColor = new(1f, 0.85f, 0.2f);
 
-  [Header("Completion Burst"), SerializeField] 
+  [Header("Completion Burst"), SerializeField]
   private int burstParticleCount = 20;
 
   [SerializeField] private float burstSpeed = 300f;

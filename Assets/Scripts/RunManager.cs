@@ -19,7 +19,7 @@ public class RunManager : MonoBehaviour {
   private const string TOTAL_BP_KEY = "Make10_TotalBP";
   private const string SPENDABLE_BP_KEY = "Make10_SpendableBP";
 
-  [Header("Run State"), SerializeField]  private int startingBP = 0;
+  [Header("Run State"), SerializeField] private int startingBP = 0;
 
   // Current run state (per-session, resets each run)
   public int CurrentBP { get; private set; }

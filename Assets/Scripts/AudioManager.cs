@@ -9,7 +9,7 @@ using UnityEngine.UI;
 public class AudioManager : MonoBehaviour {
   public static AudioManager Instance { get; private set; }
 
-  [Header("Audio Sources"), SerializeField] 
+  [Header("Audio Sources"), SerializeField]
   private AudioSource musicSource;
 
   [SerializeField] private AudioSource sfxSource; // Kept for Inspector wiring — seeds sfxPool[0]
@@ -27,19 +27,18 @@ public class AudioManager : MonoBehaviour {
   private const float SCORE_TICK_MIN_INTERVAL = 0.06f; // Play every other tick — still sounds continuous
 
 
-  [Header("Volume Defaults"), Range(0f, 1f), SerializeField]  
+  [Header("Volume Defaults"), Range(0f, 1f), SerializeField]
   private float defaultMusicVolume = 0.7f;
 
-  [Range(0f, 1f), SerializeField]  private float defaultSFXVolume = 1f;
-  [Range(0f, 1f), SerializeField]  private float defaultVoiceVolume = 1f;
+  [Range(0f, 1f), SerializeField] private float defaultSFXVolume = 1f;
+  [Range(0f, 1f), SerializeField] private float defaultVoiceVolume = 1f;
 
-  [Header("UI Sliders"), SerializeField] 
-  private Slider musicSlider;
+  [Header("UI Sliders"), SerializeField] private Slider musicSlider;
 
   [SerializeField] private Slider sfxSlider;
   [SerializeField] private Slider voiceSlider;
 
-  [Header("Music Clips"), SerializeField] 
+  [Header("Music Clips"), SerializeField]
   private AudioClip menuMusic;
 
   [SerializeField] private AudioClip gameMusic;
@@ -48,7 +47,7 @@ public class AudioManager : MonoBehaviour {
   [SerializeField] private AudioClip loseMusic;
   [SerializeField] private AudioClip hotStreakMusic;
 
-  [Header("SFX Clips"), SerializeField]  private AudioClip buttonClickSFX;
+  [Header("SFX Clips"), SerializeField] private AudioClip buttonClickSFX;
   [SerializeField] private AudioClip convergenceSFX; // Tiles converging together
   [SerializeField] private AudioClip tenPopSFX; // "10" appears after solve
   [SerializeField] private AudioClip swapSFX;
@@ -62,7 +61,7 @@ public class AudioManager : MonoBehaviour {
   [SerializeField] private AudioClip scoreTickSmallSFX; // Small particle hits progress bar
   [SerializeField] private AudioClip scoreTickBigSFX; // Big particle hits progress bar
 
-  [Header("Combo SFX"), SerializeField]  private AudioClip comboMergeSFX; // 2-4 line combo merge sound
+  [Header("Combo SFX"), SerializeField] private AudioClip comboMergeSFX; // 2-4 line combo merge sound
   [SerializeField] private AudioClip ultraComboSFX; // 5-line ultra combo (very rare)
 
   // Volume state (public read for UI, private write via setters)

@@ -20,14 +20,14 @@ public enum SwipeDirection {
 /// Handles its value, visual state, click and swipe interactions.
 /// </summary>
 public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler {
-  [Header("Visual References"), SerializeField] 
+  [Header("Visual References"), SerializeField]
   private TMP_Text numberText;
 
   [SerializeField] private Image backgroundImage;
   [SerializeField] private GameObject selectionHighlight;
   [SerializeField] private Image enhancedGlowImage;
 
-  [Header("Selection Pulse Settings"), SerializeField] 
+  [Header("Selection Pulse Settings"), SerializeField]
   private float pulseMinScale = 1.05f;
 
   [SerializeField] private float pulseMaxScale = 1.12f;
@@ -35,20 +35,20 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
   [SerializeField] private float floatAmount = 8f; // How much the tile floats up/down
   [SerializeField] private float floatSpeed = 3f; // Speed of floating animation
 
-  [Header("Shine Overlay"), SerializeField] 
+  [Header("Shine Overlay"), SerializeField]
   private Sprite shineSprite; // Assign tile_shine_overlay in Inspector
 
-  [SerializeField, Range(0f, 1f)]  private float shineOpacity = 0.5f; // Crank to 1.0 to debug visibility
+  [SerializeField, Range(0f, 1f)] private float shineOpacity = 0.5f; // Crank to 1.0 to debug visibility
   private Image shineImage;
 
-  [Header("Enhanced Glow Settings"), SerializeField] 
+  [Header("Enhanced Glow Settings"), SerializeField]
   private float glowPulseSpeed = 2f;
 
   [SerializeField] private float glowMinAlpha = 0.3f;
   [SerializeField] private float glowMaxAlpha = 0.7f;
   [SerializeField] private float glowSize = 1.3f; // Scale relative to tile
 
-  [Header("Enhanced Number Pulse Settings"), SerializeField] 
+  [Header("Enhanced Number Pulse Settings"), SerializeField]
   private float numberPulseSpeed = 3f;
 
   [SerializeField] private float numberPulseMinScale = 1.0f;
@@ -59,13 +59,13 @@ public class Tile : MonoBehaviour, IPointerClickHandler, IBeginDragHandler, IDra
    Tooltip("Scale multiplier for tile numbers. 1 = default, 1.3 = 30% bigger.")]
   private float numberScale = 1f;
 
-  [Header("Enhanced Number Shadow Settings"), SerializeField] 
+  [Header("Enhanced Number Shadow Settings"), SerializeField]
   private Vector2 shadowOffset = new(3f, -3f);
 
   [SerializeField] private Color shadowColor = new(0f, 0f, 0f, 0.5f);
   [SerializeField] private float shadowSoftness = 0.5f; // Dilation for soft shadow effect
 
-  [Header("Swipe Settings"), SerializeField] 
+  [Header("Swipe Settings"), SerializeField]
   private float swipeThreshold = 30f; // Minimum distance to register swipe
 
   // Properties

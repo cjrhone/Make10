@@ -9,28 +9,23 @@ using GameMode = GameManager.GameMode;
 public class ScoringRulesTests {
   // --- Player swap: lineSum × multiplier (+ speed bonus) -------------------
 
-  [TestCase(10, 1f, 10)]
-  [TestCase(20, 1f, 20)]
-  [TestCase(10, 1.5f, 15)]
-  [TestCase(30, 1.5f, 45)]
-  [TestCase(10, 2f, 20)]
-  [TestCase(10, 2.5f, 25)]
-  [TestCase(40, 2.5f, 100)]
+  [TestCase(10, 1f, 10), TestCase(20, 1f, 20), TestCase(10, 1.5f, 15), TestCase(30, 1.5f, 45), TestCase(10, 2f, 20),
+   TestCase(10, 2.5f, 25), TestCase(40, 2.5f, 100)]
   public void PlayerSolve_IsLineSumTimesMultiplier (int lineSum, float multiplier, int expected) {
-    Assert.AreEqual(expected, ScoringRules.PlayerSolve(lineSum, multiplier, speedBonus: false));
+    Assert.AreEqual(expected, ScoringRules.PlayerSolve(lineSum, multiplier, false));
   }
 
   [Test]
   public void PlayerSolve_SpeedBonus_AddsFlatFiveBP() {
     Assert.AreEqual(5, ScoringRules.SpeedBonusBP);
-    Assert.AreEqual(15, ScoringRules.PlayerSolve(10, 1f, speedBonus: true));
-    Assert.AreEqual(30, ScoringRules.PlayerSolve(10, 2.5f, speedBonus: true));
+    Assert.AreEqual(15, ScoringRules.PlayerSolve(10, 1f, true));
+    Assert.AreEqual(30, ScoringRules.PlayerSolve(10, 2.5f, true));
   }
 
   [Test]
   public void PlayerSolve_SpeedBonus_IsNotMultiplied() {
-    var withBonus = ScoringRules.PlayerSolve(10, 2.5f, speedBonus: true);
-    var without = ScoringRules.PlayerSolve(10, 2.5f, speedBonus: false);
+    var withBonus = ScoringRules.PlayerSolve(10, 2.5f, true);
+    var without = ScoringRules.PlayerSolve(10, 2.5f, false);
     Assert.AreEqual(ScoringRules.SpeedBonusBP, withBonus - without);
   }
 
@@ -53,14 +48,14 @@ public class ScoringRulesTests {
 
   [Test]
   public void CascadeSolve_Arcade_IsPlusOnePlusTwoPlusThree() {
-    Assert.AreEqual(1, ScoringRules.CascadeSolve(GameMode.Arcade, 10, chainIndex: 1));
-    Assert.AreEqual(2, ScoringRules.CascadeSolve(GameMode.Arcade, 10, chainIndex: 2));
-    Assert.AreEqual(3, ScoringRules.CascadeSolve(GameMode.Arcade, 10, chainIndex: 3));
+    Assert.AreEqual(1, ScoringRules.CascadeSolve(GameMode.Arcade, 10, 1));
+    Assert.AreEqual(2, ScoringRules.CascadeSolve(GameMode.Arcade, 10, 2));
+    Assert.AreEqual(3, ScoringRules.CascadeSolve(GameMode.Arcade, 10, 3));
   }
 
   [Test]
   public void CascadeSolve_Arcade_IgnoresLineSum() {
-    Assert.AreEqual(2, ScoringRules.CascadeSolve(GameMode.Arcade, 40, chainIndex: 2));
+    Assert.AreEqual(2, ScoringRules.CascadeSolve(GameMode.Arcade, 40, 2));
   }
 
   [Test]
@@ -73,25 +68,16 @@ public class ScoringRulesTests {
     Assert.AreEqual(6, total);
   }
 
-  [TestCase(10)]
-  [TestCase(20)]
-  [TestCase(30)]
+  [TestCase(10), TestCase(20), TestCase(30)]
   public void CascadeSolve_Zen_IsFlatLineSum (int lineSum) {
-    Assert.AreEqual(lineSum, ScoringRules.CascadeSolve(GameMode.Zen, lineSum, chainIndex: 1));
-    Assert.AreEqual(lineSum, ScoringRules.CascadeSolve(GameMode.Zen, lineSum, chainIndex: 3));
+    Assert.AreEqual(lineSum, ScoringRules.CascadeSolve(GameMode.Zen, lineSum, 1));
+    Assert.AreEqual(lineSum, ScoringRules.CascadeSolve(GameMode.Zen, lineSum, 3));
   }
 
   // --- Multiplier bar tiers ------------------------------------------------
 
-  [TestCase(0f, 1f)]
-  [TestCase(24f, 1f)]
-  [TestCase(25f, 1.5f)]
-  [TestCase(49f, 1.5f)]
-  [TestCase(50f, 2f)]
-  [TestCase(74f, 2f)]
-  [TestCase(75f, 2.5f)]
-  [TestCase(99f, 2.5f)]
-  [TestCase(100f, 5f)]
+  [TestCase(0f, 1f), TestCase(24f, 1f), TestCase(25f, 1.5f), TestCase(49f, 1.5f), TestCase(50f, 2f), TestCase(74f, 2f),
+   TestCase(75f, 2.5f), TestCase(99f, 2.5f), TestCase(100f, 5f)]
   public void MultiplierForBar_TierBoundaries (float bar, float expected) {
     Assert.AreEqual(expected, ScoringRules.MultiplierForBar(bar));
   }
@@ -144,25 +130,14 @@ public class ScoringRulesTests {
 
   // --- Star ratings ----------------------------------------------------------
 
-  [TestCase(0, 0)]
-  [TestCase(299, 0)]
-  [TestCase(300, 1)]
-  [TestCase(599, 1)]
-  [TestCase(600, 2)]
-  [TestCase(999, 2)]
-  [TestCase(1000, 3)]
-  [TestCase(5000, 3)]
+  [TestCase(0, 0), TestCase(299, 0), TestCase(300, 1), TestCase(599, 1), TestCase(600, 2), TestCase(999, 2),
+   TestCase(1000, 3), TestCase(5000, 3)]
   public void StarsFor_Arcade_300_600_1000 (int bp, int expected) {
     Assert.AreEqual(expected, ScoringRules.StarsFor(GameMode.Arcade, bp));
   }
 
-  [TestCase(0, 0)]
-  [TestCase(499, 0)]
-  [TestCase(500, 1)]
-  [TestCase(999, 1)]
-  [TestCase(1000, 2)]
-  [TestCase(1999, 2)]
-  [TestCase(2000, 3)]
+  [TestCase(0, 0), TestCase(499, 0), TestCase(500, 1), TestCase(999, 1), TestCase(1000, 2), TestCase(1999, 2),
+   TestCase(2000, 3)]
   public void StarsFor_Zen_500_1000_2000 (int bp, int expected) {
     Assert.AreEqual(expected, ScoringRules.StarsFor(GameMode.Zen, bp));
   }

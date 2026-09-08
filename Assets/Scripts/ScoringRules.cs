@@ -93,9 +93,7 @@ public static class ScoringRules {
 
   /// <summary>Star thresholds (1★, 2★, 3★) for a mode.</summary>
   public static (int star1, int star2, int star3) StarThresholds (GameManager.GameMode mode) {
-    return mode == GameManager.GameMode.Zen
-      ? (ZenStar1, ZenStar2, ZenStar3)
-      : (ArcadeStar1, ArcadeStar2, ArcadeStar3);
+    return mode == GameManager.GameMode.Zen ? (ZenStar1, ZenStar2, ZenStar3) : (ArcadeStar1, ArcadeStar2, ArcadeStar3);
   }
 
   /// <summary>Star rating (0–3) for total BP earned in a round.</summary>

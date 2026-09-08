@@ -8,19 +8,19 @@ using System.Collections;
 /// Shows a row of tiles, swaps two, and animates them solving to 10.
 /// </summary>
 public class TutorialDemoWidget : MonoBehaviour {
-  [Header("Layout Settings"), SerializeField] 
+  [Header("Layout Settings"), SerializeField]
   private float tileSize = 60f;
 
   [SerializeField] private float tileSpacing = 8f;
 
-  [Header("Animation Settings"), SerializeField] 
+  [Header("Animation Settings"), SerializeField]
   private float pauseBetweenSteps = 1f;
 
   [SerializeField] private float convergeDuration = 0.3f;
   [SerializeField] private float showTenDuration = 0.6f;
   [SerializeField] private float resetPause = 1.5f;
 
-  [Header("Colors (matching game)"), SerializeField] 
+  [Header("Colors (matching game)"), SerializeField]
   private Color backgroundColor = new(0.85f, 0.85f, 0.85f);
 
   [SerializeField] private Color[] numberColors = new Color[10] {
@@ -36,8 +36,7 @@ public class TutorialDemoWidget : MonoBehaviour {
     new(0.75f, 0.1f, 0.15f) // 9 - Crimson
   };
 
-  [Header("References"), SerializeField] 
-  private RectTransform container;
+  [Header("References"), SerializeField] private RectTransform container;
 
   [SerializeField] private GameObject tilePrefab; // Optional - will create if null
 

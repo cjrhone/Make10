@@ -17,10 +17,10 @@ using System.Collections.Generic;
 /// 3. Or: Add to a panel with a Canvas component, set Sort Order to -1
 /// </summary>
 public class ParallaxBackground : MonoBehaviour {
-  [Header("Container"), SerializeField]  private RectTransform container;
+  [Header("Container"), SerializeField] private RectTransform container;
   [SerializeField] private Vector2 bounds = new(1200f, 900f);
 
-  [Header("Deep Layer - The Tens"), SerializeField] 
+  [Header("Deep Layer - The Tens"), SerializeField]
   private int deepCount = 6;
 
   [SerializeField] private float deepSpeed = 15f;
@@ -28,7 +28,7 @@ public class ParallaxBackground : MonoBehaviour {
   [SerializeField] private float deepAlpha = 0.08f;
   [SerializeField] private Color deepColor = new(0.4f, 0.4f, 0.5f);
 
-  [Header("Mid Layer - Numbers & Symbols"), SerializeField] 
+  [Header("Mid Layer - Numbers & Symbols"), SerializeField]
   private int midCount = 20;
 
   [SerializeField] private float midSpeedMin = 25f;
@@ -37,7 +37,7 @@ public class ParallaxBackground : MonoBehaviour {
   [SerializeField] private float midScaleMax = 40f;
   [SerializeField] private float midAlpha = 0.10f;
 
-  [Header("Near Layer - Geometric Whispers"), SerializeField] 
+  [Header("Near Layer - Geometric Whispers"), SerializeField]
   private int nearCount = 12;
 
   [SerializeField] private float nearSpeedMin = 50f;
@@ -46,13 +46,12 @@ public class ParallaxBackground : MonoBehaviour {
   [SerializeField] private float nearScaleMax = 28f;
   [SerializeField] private float nearAlpha = 0.06f;
 
-  [Header("Movement"), SerializeField]  private Vector2 driftDirection = new(-1f, -0.3f);
+  [Header("Movement"), SerializeField] private Vector2 driftDirection = new(-1f, -0.3f);
   [SerializeField] private float verticalWobbleAmount = 20f;
   [SerializeField] private float wobbleSpeed = 0.5f;
   [SerializeField] private float rotationDrift = 5f;
 
-  [Header("Activation"), SerializeField] 
-  private bool generateOnStart = true;
+  [Header("Activation"), SerializeField] private bool generateOnStart = true;
 
   [SerializeField] private bool generateOnEnable = false;
 

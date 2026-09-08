@@ -10,37 +10,36 @@ using System.Collections.Generic;
 public class AvatarManager : MonoBehaviour {
   public static AvatarManager Instance { get; private set; }
 
-  [Header("Avatar Images"), SerializeField] 
+  [Header("Avatar Images"), SerializeField]
   private Sprite strugglingSprite; // Default - trying to solve
 
   [SerializeField] private Sprite solveSprite; // Ah-hah moment with lightbulb
   [SerializeField] private Sprite scribblingSprite; // Writing after solving
   [SerializeField] private Sprite hotStreakSprite; // On fire during hot streak
 
-  [Header("Timing"), SerializeField]  private float solveDuration = 1f; // How long to show solve sprite
+  [Header("Timing"), SerializeField] private float solveDuration = 1f; // How long to show solve sprite
   [SerializeField] private float scribblingDuration = 10f; // How long before returning to struggling
 
-  [Header("References"), SerializeField] 
-  private Image avatarImage;
+  [Header("References"), SerializeField] private Image avatarImage;
 
-  [Header("Optional Effects"), SerializeField] 
+  [Header("Optional Effects"), SerializeField]
   private GameObject lightbulbEffect; // Optional lightbulb popup
 
   [SerializeField] private GameObject fireEffect; // Optional fire particles
 
-  [Header("Solve Animation Settings"), SerializeField] 
+  [Header("Solve Animation Settings"), SerializeField]
   private float solveBounceHeight = 20f;
 
   [SerializeField] private float solveBounceDuration = 0.3f;
   [SerializeField] private int solveBounceCount = 2;
 
-  [Header("Hot Streak Shake Settings"), SerializeField] 
+  [Header("Hot Streak Shake Settings"), SerializeField]
   private float shakeIntensity = 8f;
 
   [SerializeField] private float shakeSpeed = 50f;
   [SerializeField] private float shakeRotationAmount = 3f;
 
-  [Header("Solve Particle Settings"), SerializeField] 
+  [Header("Solve Particle Settings"), SerializeField]
   private bool enableSolveParticles = true;
 
   [SerializeField] private float particleSpawnRate = 0.15f;

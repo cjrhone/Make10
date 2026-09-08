@@ -76,10 +76,10 @@ public class TabletLayoutAdapter : MonoBehaviour {
            "Lower this if the board still overlaps the HUD row above."), Range(0.5f, 1f), SerializeField]
   private float tabletHeightFillRatio = 0.95f;
 
-  [Header("Grid Sizing — Clamps"), Tooltip("Hard cap on grid width in canvas units. 0 = no cap."), SerializeField]  
+  [Header("Grid Sizing — Clamps"), Tooltip("Hard cap on grid width in canvas units. 0 = no cap."), SerializeField]
   private float maxGridWidth = 1200f;
 
-  [Tooltip("Hard floor on grid width in canvas units. 0 = no floor."), SerializeField] 
+  [Tooltip("Hard floor on grid width in canvas units. 0 = no floor."), SerializeField]
   private float minGridWidth = 600f;
 
   [Header("Tablet Extras"), Tooltip(

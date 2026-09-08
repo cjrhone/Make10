@@ -11,7 +11,7 @@ using System.Collections.Generic;
 public class GridVFX : MonoBehaviour {
   public static GridVFX Instance { get; private set; }
 
-  [Header("Beam Flash Settings"), SerializeField] 
+  [Header("Beam Flash Settings"), SerializeField]
   private Sprite beamSprite; // Assign particles/12.png or 13.png (vertical light streak)
 
   [SerializeField] private Sprite[] sparkleSprites; // Assign particles/3, 5, 8, 9 (sparkle/star shapes)
@@ -21,14 +21,14 @@ public class GridVFX : MonoBehaviour {
   [SerializeField] private float beamSparkleSize = 28f;
   [SerializeField] private float beamThickness = 1.6f;
 
-  [Header("Beam Gold Gradient"), SerializeField] 
+  [Header("Beam Gold Gradient"), SerializeField]
   private Color goldEdgeColor = new(1f, 0.75f, 0.2f, 1f);
 
   [SerializeField] private float gradientPower = 1.5f;
   [SerializeField] private float uvScrollSpeed = 3.0f;
   [SerializeField] private float edgeFade = 0.12f;
 
-  [Header("Screen Shake Settings"), SerializeField] 
+  [Header("Screen Shake Settings"), SerializeField]
   private float baseShakeIntensity = 8f;
 
   [SerializeField] private float shakeIntensityPerChain = 3f;
@@ -36,7 +36,7 @@ public class GridVFX : MonoBehaviour {
   [SerializeField] private float shakeDuration = 0.3f;
   [SerializeField] private float shakeFrequency = 35f;
 
-  [Header("Tile Sparkle Settings"), SerializeField] 
+  [Header("Tile Sparkle Settings"), SerializeField]
   private int sparklesPerTile = 5;
 
   [SerializeField] private float sparkleLifetime = 0.45f;
@@ -45,7 +45,7 @@ public class GridVFX : MonoBehaviour {
   [SerializeField] private Color sparkleColorA = new(1f, 0.95f, 0.6f, 0.9f);
   [SerializeField] private Color sparkleColorB = new(0.6f, 0.9f, 1f, 0.9f);
 
-  [Header("Ambient Particles"), SerializeField] 
+  [Header("Ambient Particles"), SerializeField]
   private bool enableAmbientParticles = true;
 
   [SerializeField] private int ambientParticleCount = 8;

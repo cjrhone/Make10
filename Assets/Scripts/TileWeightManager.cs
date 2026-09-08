@@ -8,7 +8,7 @@ using UnityEngine;
 public class TileWeightManager : MonoBehaviour {
   public static TileWeightManager Instance { get; private set; }
 
-  [Header("Tile Value Weights (fallback if no GameManager)"), SerializeField] 
+  [Header("Tile Value Weights (fallback if no GameManager)"), SerializeField]
   private float weight0 = 0.12f; // Grey (wildcard) — boosted for easy early 10s
 
   [SerializeField] private float weight1 = 0.28f; // Gold — boosted primary, easiest combos
@@ -19,7 +19,7 @@ public class TileWeightManager : MonoBehaviour {
   [SerializeField] private float weight6 = 0f; // Purple — introduced by solve ramp
   [SerializeField] private float weight7 = 0f; // Teal — introduced by solve ramp
 
-  [Header("Progressive Difficulty - Solve-Based Ramp"), SerializeField] 
+  [Header("Progressive Difficulty - Solve-Based Ramp"), SerializeField]
   private int solvesFor5s = 2; // 5s start appearing after this many solves
 
   [SerializeField] private int solvesFor6s = 5; // 6s start appearing after this many solves

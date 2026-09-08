@@ -22,22 +22,22 @@ using System.Collections.Generic;
 /// </summary>
 [RequireComponent(typeof(Image))]
 public class AvatarBackground : MonoBehaviour {
-  [Header("Panel Backdrop"), Tooltip("Base color for the panel. Alpha controls overall strength."), SerializeField]  
+  [Header("Panel Backdrop"), Tooltip("Base color for the panel. Alpha controls overall strength."), SerializeField]
   private Color panelTint = new(0.93f, 0.91f, 0.85f, 0.55f);
 
-  [Tooltip("Softness of the radial vignette (higher = sharper edge)."), SerializeField, Range(1f, 4f)]  
+  [Tooltip("Softness of the radial vignette (higher = sharper edge)."), SerializeField, Range(1f, 4f)]
   private float vignetteFalloff = 1.6f;
 
-  [Tooltip("Resolution of the generated vignette texture."), SerializeField] 
+  [Tooltip("Resolution of the generated vignette texture."), SerializeField]
   private int vignetteResolution = 128;
 
-  [Header("Floating Math Glyphs"), SerializeField] 
+  [Header("Floating Math Glyphs"), SerializeField]
   private bool spawnGlyphs = true;
 
-  [SerializeField, Range(0, 16)]  private int glyphCount = 7;
+  [SerializeField, Range(0, 16)] private int glyphCount = 7;
   [SerializeField] private float glyphSizeMin = 28f;
   [SerializeField] private float glyphSizeMax = 64f;
-  [SerializeField, Range(0f, 0.3f)]  private float glyphAlpha = 0.10f;
+  [SerializeField, Range(0f, 0.3f)] private float glyphAlpha = 0.10f;
   [SerializeField] private float driftSpeedMin = 4f;
   [SerializeField] private float driftSpeedMax = 9f;
   [SerializeField] private Vector2 driftDirection = new(-1f, -0.25f);
@@ -45,10 +45,10 @@ public class AvatarBackground : MonoBehaviour {
   [SerializeField] private float wobbleSpeed = 0.4f;
   [SerializeField] private float rotationDrift = 3f;
 
-  [Header("Glyph Set"), SerializeField]  private string[] glyphPool =
+  [Header("Glyph Set"), SerializeField] private string[] glyphPool =
     { "10", "10", "+", "=", "·", "0", "1", "2", "3", "4", "5", "6", "7" };
 
-  [Tooltip("Tints used for digit glyphs. Indices loosely align with tile colors."), SerializeField] 
+  [Tooltip("Tints used for digit glyphs. Indices loosely align with tile colors."), SerializeField]
   private Color[] glyphTints = new Color[] {
     new(0.55f, 0.45f, 0.35f), // warm grey
     new(0.70f, 0.55f, 0.25f), // gold
@@ -59,7 +59,7 @@ public class AvatarBackground : MonoBehaviour {
     new(0.50f, 0.35f, 0.60f) // purple
   };
 
-  [Header("Lifecycle"), Tooltip("Regenerate glyphs each time this GameObject is enabled."), SerializeField]  
+  [Header("Lifecycle"), Tooltip("Regenerate glyphs each time this GameObject is enabled."), SerializeField]
   private bool regenerateOnEnable = false;
 
   private Image panelImage;
