@@ -172,6 +172,12 @@ in `~/.zshenv`, and the Play key at `~/.config/play/Make10.play.json`.
 
 ---
 
+## Repository notes
+
+**Screenshots live in `Screenshots/` (capital S)** — App Store assets plus the BRP→URP render-comparison shots. macOS is case-insensitive, so a lowercase `screenshots/` folds into the tracked `Screenshots/` in git without warning; on a case-sensitive filesystem (e.g. Linux CI) the two diverge and paths/URLs break. Always reference the capital-S `Screenshots/`.
+
+---
+
 ## Credits
 
 **Game Design & Development:** CJ Rhone
