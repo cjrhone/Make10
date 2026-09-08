@@ -3,7 +3,7 @@ name: release-please
 # Keeps a rolling release PR from conventional commits on main; merging it
 # tags vX.Y.Z and publishes the GitHub release.
 #
-# Unity's bundleVersion / AndroidBundleVersionCode are synced by the step
+# Unity's bundleVersion / AndroidBundleVersionCode / iOS buildNumber are synced by the step
 # below, NOT by release-please's extra-files. That updater needs an
 # `x-release-please-version` comment on the target line, and Unity discards
 # comments in ProjectSettings.asset whenever the editor rewrites it, so the
@@ -40,7 +40,7 @@ jobs:
       # that changes no changelog content (ci:, chore:) would otherwise leave a
       # stale release PR unsynced. When the output is empty the step looks up
       # the open release PR by its "autorelease: pending" label.
-      - name: Sync Unity bundleVersion + AndroidBundleVersionCode into the release PR
+      - name: Sync Unity bundleVersion + AndroidBundleVersionCode + iOS buildNumber into the release PR
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           # Raw JSON string, parsed with jq at runtime. Do NOT use fromJson()
@@ -84,8 +84,14 @@ jobs:
 
           sed -i -E "s/^(  bundleVersion: ).*/\1${VERSION}/" "$SETTINGS"
           sed -i -E "s/^(  AndroidBundleVersionCode: ).*/\1${CODE}/" "$SETTINGS"
+          # iOS CFBundleVersion follows the Android code (BuildScript.BuildiOS
+          # copies it at build time). Sync the committed value too so the tree
+          # stays clean after an iOS build. "    iPhone:" also appears under
+          # mobileMTRendering / scriptingBackend, so restrict to the buildNumber block.
+          sed -i -E "/^  buildNumber:$/,/^  [A-Za-z]/ s/^(    iPhone: )[0-9]+$/\1${CODE}/" "$SETTINGS"
           grep -qE "^  bundleVersion: ${VERSION}$" "$SETTINGS" || { echo "::error::bundleVersion sync failed"; exit 1; }
           grep -qE "^  AndroidBundleVersionCode: ${CODE}$" "$SETTINGS" || { echo "::error::versionCode sync failed"; exit 1; }
+          sed -nE "/^  buildNumber:$/,/^  [A-Za-z]/p" "$SETTINGS" | grep -qE "^    iPhone: ${CODE}$" || { echo "::error::iOS buildNumber sync failed"; exit 1; }
 
           # Build profiles embed their own PlayerSettings snapshot, and that copy
           # wins when the profile is active. Inside the snapshot the keys are
