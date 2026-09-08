@@ -25,7 +25,7 @@ pins the scoring maths.
    - `float MultiplierForBar(float bar)` (tiers 0/25/50/75/100)
    - `int StarsFor(GameMode mode, int bp)`
    `GameManager` calls these; behaviour unchanged.
-3. `[ ]` Tests: one per rule in CLAUDE.md "Scoring & Multiplier", plus tier
+3. `[x]` Tests: one per rule in CLAUDE.md "Scoring & Multiplier", plus tier
    boundaries (24/25, 49/50, 74/75, 99/100) and the Arcade +1/+2/+3 chain.
 4. `[ ]` `TileWeightManager.RefillTileBag`: test bag is always 25 and matches
    largest-remainder expectation for a fixed weight table.
