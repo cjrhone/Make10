@@ -83,12 +83,20 @@ platform :android do
     # Optional native debug symbols (Unity's *.symbols.zip) for Play ANR /
     # native-crash symbolication. supply detects a .zip in mapping_paths and
     # uploads it as nativeCode deobfuscation for this versionCode.
+    # R8 mapping (Unity writes <name>_mapping.txt next to the .aab when minify
+    # is on). Without it Play warns "no deobfuscation file" on every release
+    # and Java stack traces in Crashlytics/ANRs stay obfuscated.
     symbols = options[:symbols] || ENV["SYMBOLS_PATH"]
-    if symbols && !symbols.empty?
-      UI.user_error!("symbols file not found: #{symbols}") unless File.exist?(symbols)
-      params[:mapping_paths] = [symbols]
+    mapping = options[:mapping] || ENV["MAPPING_PATH"]
+    paths = []
+    [mapping, symbols].each do |f|
+      next if f.nil? || f.empty?
+      UI.user_error!("deobfuscation file not found: #{f}") unless File.exist?(f)
+      paths << f
     end
+    params[:mapping_paths] = paths unless paths.empty?
 
     upload_to_play_store(**params)
   end
+
 end

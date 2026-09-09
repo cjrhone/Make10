@@ -112,6 +112,16 @@ def main(argv: list[str] | None = None) -> None:
         print("==> WARNING: no *.symbols.zip found — ANR/native symbolication won't be "
               "available for this build. Check that BuildScript set DebugSymbols.")
 
+    # R8 mapping for Java/Kotlin deobfuscation (minify is on for release builds).
+    # Unity writes it as <aab stem>_mapping.txt next to the bundle.
+    mapping = aab.with_name(f"{aab.stem}_mapping.txt")
+    if mapping.is_file():
+        print(f"==> Mapping  {mapping.stat().st_size / (1024 * 1024):.1f} MB  {mapping}")
+    else:
+        mapping = None
+        print("==> WARNING: no R8 mapping file next to the .aab — Play will warn about a "
+              "missing deobfuscation file and Java stack traces stay obfuscated.")
+
     # --- Optional upload (Production draft) --------------------------------
     if args.upload:
         key = Path(os.environ.get("SUPPLY_JSON_KEY", str(DEFAULT_KEY)))
@@ -122,12 +132,15 @@ def main(argv: list[str] | None = None) -> None:
         cmd = ["fastlane", "production_draft", f"aab:{aab}"]
         if symbols:
             cmd.append(f"symbols:{symbols}")  # uploaded as native debug symbols
+        if mapping:
+            cmd.append(f"mapping:{mapping}")  # uploaded as R8/proguard mapping
         subprocess.run(
             cmd, cwd=PROJECT_ROOT, env={**os.environ, "SUPPLY_JSON_KEY": str(key)}, check=True,
         )
         print("==> Uploaded as a DRAFT. Review and press publish in the Play Console to go live.")
     else:
         tail = f' symbols:"{symbols}"' if symbols else ""
+        tail += f' mapping:"{mapping}"' if mapping else ""
         print(f'Next: fastlane production_draft aab:"{aab}"{tail}   (uploads a production draft)')
 
 
